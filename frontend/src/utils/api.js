@@ -56,6 +56,7 @@ api.interceptors.response.use(
  * @returns {Promise} API响应
  */
 export const register = (userData) => {
+  console.log('🌐 API: 发送注册请求', userData);
   return api.post('/register', userData);
 };
 
@@ -67,6 +68,7 @@ export const register = (userData) => {
  * @returns {Promise} API响应
  */
 export const login = (credentials) => {
+  console.log('🌐 API: 发送登录请求', credentials);
   return api.post('/login', credentials);
 };
 

@@ -39,7 +39,9 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
    * Modal打开时重置表单
    */
   useEffect(() => {
+    console.log('🔄 AuthModal: useEffect触发', { isOpen, mode });
     if (isOpen) {
+      console.log('📂 AuthModal: Modal打开，重置表单');
       resetForm();
     }
   }, [isOpen, mode]);
@@ -49,6 +51,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
    */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    console.log('⌨️ AuthModal: 输入框变化', { name, value });
     setFormData(prev => ({
       ...prev,
       [name]: value
@@ -67,18 +70,24 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
    * 处理表单提交
    */
   const handleSubmit = async (e) => {
+    console.log('🚀 AuthModal: handleSubmit 被调用', { mode, formData, isLoading });
     e.preventDefault();
     
     // 表单验证
+    console.log('📝 AuthModal: 开始表单验证', formData);
     const validation = mode === 'login' 
       ? validateLoginForm(formData)
       : validateRegisterForm(formData);
     
+    console.log('✅ AuthModal: 表单验证结果', validation);
+    
     if (!validation.isValid) {
+      console.log('❌ AuthModal: 表单验证失败', validation.errors);
       setErrors(validation.errors);
       return;
     }
 
+    console.log('🔄 AuthModal: 开始API请求', { mode, email: formData.email });
     setIsLoading(true);
     setMessage('');
     setErrors({});
@@ -87,32 +96,43 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
       let response;
       
       if (mode === 'login') {
+        console.log('🔑 AuthModal: 调用登录API');
         response = await login({
           email: formData.email,
           password: formData.password
         });
       } else {
+        console.log('📝 AuthModal: 调用注册API');
         response = await register({
           email: formData.email,
           password: formData.password
         });
       }
 
+      console.log('📡 AuthModal: API响应', response);
+
       if (response.success) {
+        console.log('✅ AuthModal: 认证成功，保存数据');
         // 保存认证信息
         saveAuthData(response.data.token, response.data.user);
         
         setMessage(response.message || (mode === 'login' ? '登录成功！' : '注册成功！'));
         
         // 延迟关闭Modal，让用户看到成功消息
+        console.log('⏰ AuthModal: 设置延迟关闭Modal');
         setTimeout(() => {
+          console.log('🎯 AuthModal: 调用onSuccess回调');
           onSuccess();
         }, 1000);
+      } else {
+        console.log('❌ AuthModal: API返回失败', response);
+        setMessage(response.message || `${mode === 'login' ? '登录' : '注册'}失败`);
       }
     } catch (error) {
-      console.error(`${mode === 'login' ? '登录' : '注册'}失败:`, error);
+      console.error(`❌ AuthModal: ${mode === 'login' ? '登录' : '注册'}失败:`, error);
       setMessage(error.message || `${mode === 'login' ? '登录' : '注册'}失败，请重试`);
     } finally {
+      console.log('🏁 AuthModal: 请求完成，设置loading为false');
       setIsLoading(false);
     }
   };
@@ -145,7 +165,12 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log('🚫 AuthModal: Modal未打开，返回null');
+    return null;
+  }
+  
+  console.log('📱 AuthModal: 渲染Modal', { isOpen, mode, formData });
 
   return (
     <div 
@@ -253,6 +278,14 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
             <button
               type="submit"
               disabled={isLoading}
+              onClick={(e) => {
+                console.log('🖱️ AuthModal: 登录按钮被点击', { 
+                  mode, 
+                  isLoading, 
+                  disabled: isLoading,
+                  formData: formData 
+                });
+              }}
               className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (

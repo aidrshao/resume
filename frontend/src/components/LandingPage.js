@@ -22,8 +22,10 @@ const LandingPage = () => {
    * @param {string} action - 操作类型
    */
   const handleAuthAction = (action) => {
+    console.log('🎯 LandingPage: handleAuthAction被调用', { action, userLoggedIn });
     if (userLoggedIn) {
       // 已登录，直接执行操作
+      console.log('✅ LandingPage: 用户已登录，直接跳转');
       switch (action) {
         case 'create-resume':
           navigate('/create-resume');
@@ -39,6 +41,7 @@ const LandingPage = () => {
       }
     } else {
       // 未登录，弹出登录Modal
+      console.log('🔐 LandingPage: 用户未登录，弹出AuthModal');
       setAuthMode('login');
       setShowAuthModal(true);
     }
@@ -56,6 +59,7 @@ const LandingPage = () => {
    * 处理登录成功回调
    */
   const handleAuthSuccess = () => {
+    console.log('🎉 LandingPage: 认证成功回调被调用');
     setShowAuthModal(false);
     // 可以在这里添加登录成功后的跳转逻辑
     navigate('/profile');
