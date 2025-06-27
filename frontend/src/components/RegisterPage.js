@@ -53,25 +53,34 @@ const RegisterPage = () => {
    * @param {Object} e - 事件对象
    */
   const handleSubmit = async (e) => {
+    console.log('🚀 RegisterPage: handleSubmit 被调用', { formData, isSubmitting });
     e.preventDefault();
     
     // 表单验证
+    console.log('📝 RegisterPage: 开始表单验证', formData);
     const validation = validateRegisterForm(formData);
-    if (!validation.valid) {
+    console.log('✅ RegisterPage: 表单验证结果', validation);
+    
+    if (!validation.isValid) {
+      console.log('❌ RegisterPage: 表单验证失败', validation.errors);
       setErrors(validation.errors);
       return;
     }
     
+    console.log('🔄 RegisterPage: 开始API请求');
     setIsSubmitting(true);
     setMessage({ type: '', content: '' });
     
     try {
+      console.log('🔑 RegisterPage: 调用注册API');
       const response = await register({
         email: formData.email,
         password: formData.password
       });
+      console.log('📡 RegisterPage: API响应', response);
       
       if (response.success) {
+        console.log('✅ RegisterPage: 注册成功');
         setMessage({
           type: 'success',
           content: '注册成功！正在跳转...'
@@ -79,18 +88,28 @@ const RegisterPage = () => {
         
         // 注册成功后自动登录（如果后端返回了token）
         if (response.data?.token) {
+          console.log('🔐 RegisterPage: 保存认证数据并跳转到profile');
           saveAuthData(response.data.token, response.data.user);
           setTimeout(() => navigate('/profile'), 1500);
         } else {
+          console.log('⏰ RegisterPage: 跳转到登录页面');
           setTimeout(() => navigate('/login'), 1500);
         }
+      } else {
+        console.log('❌ RegisterPage: API返回失败', response);
+        setMessage({
+          type: 'error',
+          content: response.message || '注册失败'
+        });
       }
     } catch (error) {
+      console.error('❌ RegisterPage: 注册失败:', error);
       setMessage({
         type: 'error',
         content: error.message || '注册失败，请重试'
       });
     } finally {
+      console.log('🏁 RegisterPage: 请求完成，设置submitting为false');
       setIsSubmitting(false);
     }
   };
@@ -209,6 +228,13 @@ const RegisterPage = () => {
               <button
                 type="submit"
                 disabled={isSubmitting}
+                onClick={(e) => {
+                  console.log('🖱️ RegisterPage: 注册按钮被点击', { 
+                    isSubmitting, 
+                    disabled: isSubmitting,
+                    formData: formData 
+                  });
+                }}
                 className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${
                   isSubmitting
                     ? 'bg-gray-400 cursor-not-allowed'
