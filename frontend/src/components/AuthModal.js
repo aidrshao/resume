@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { loginUser, registerUser } from '../utils/api';
+import { login, register } from '../utils/api';
 import { saveAuthData } from '../utils/auth';
 import { validateLoginForm, validateRegisterForm } from '../utils/validation';
 
@@ -87,12 +87,12 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
       let response;
       
       if (mode === 'login') {
-        response = await loginUser({
+        response = await login({
           email: formData.email,
           password: formData.password
         });
       } else {
-        response = await registerUser({
+        response = await register({
           email: formData.email,
           password: formData.password
         });
