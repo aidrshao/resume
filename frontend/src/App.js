@@ -9,13 +9,23 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ProfilePage from './components/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
-import { isAuthenticated } from './utils/auth';
+import { isAuthenticated, getUser, logout } from './utils/auth';
 
 /**
  * 首页组件
  */
 const HomePage = () => {
   const userLoggedIn = isAuthenticated();
+  const user = getUser();
+
+  /**
+   * 处理用户登出
+   */
+  const handleLogout = () => {
+    if (window.confirm('确定要退出登录吗？')) {
+      logout();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -32,7 +42,13 @@ const HomePage = () => {
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
           {userLoggedIn ? (
             <div className="text-center space-y-4">
-              <p className="text-gray-700">您已登录系统</p>
+              <div className="mb-4">
+                <h2 className="text-lg font-medium text-gray-900">欢迎回来！</h2>
+                <p className="text-sm text-gray-600">
+                  {user?.email && `已登录账户：${user.email}`}
+                </p>
+              </div>
+              
               <div className="space-y-3">
                 <a
                   href="/profile"
@@ -40,6 +56,13 @@ const HomePage = () => {
                 >
                   前往用户中心
                 </a>
+                
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex justify-center py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                >
+                  退出登录
+                </button>
               </div>
             </div>
           ) : (
