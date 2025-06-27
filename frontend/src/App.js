@@ -5,90 +5,11 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ProfilePage from './components/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
-import { isAuthenticated, getUser, logout } from './utils/auth';
-
-/**
- * 首页组件
- */
-const HomePage = () => {
-  const userLoggedIn = isAuthenticated();
-  const user = getUser();
-
-  /**
-   * 处理用户登出
-   */
-  const handleLogout = () => {
-    if (window.confirm('确定要退出登录吗？')) {
-      logout();
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h1 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          简历管理系统
-        </h1>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          欢迎使用我们的简历管理平台
-        </p>
-      </div>
-
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {userLoggedIn ? (
-            <div className="text-center space-y-4">
-              <div className="mb-4">
-                <h2 className="text-lg font-medium text-gray-900">欢迎回来！</h2>
-                <p className="text-sm text-gray-600">
-                  {user?.email && `已登录账户：${user.email}`}
-                </p>
-              </div>
-              
-              <div className="space-y-3">
-                <a
-                  href="/profile"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  前往用户中心
-                </a>
-                
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex justify-center py-2 px-4 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  退出登录
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center space-y-4">
-              <p className="text-gray-700">请登录或注册以使用系统功能</p>
-              <div className="space-y-3">
-                <a
-                  href="/login"
-                  className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  登录
-                </a>
-                <a
-                  href="/register"
-                  className="w-full flex justify-center py-2 px-4 border border-indigo-300 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  注册新账户
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 /**
  * 主应用组件
@@ -98,13 +19,13 @@ function App() {
     <Router>
       <div className="App">
         <Routes>
-          {/* 首页 */}
-          <Route path="/" element={<HomePage />} />
+          {/* 首页 - Landing页面 */}
+          <Route path="/" element={<LandingPage />} />
           
-          {/* 登录页 */}
+          {/* 独立的登录页面（保留，用于直接访问） */}
           <Route path="/login" element={<LoginPage />} />
           
-          {/* 注册页 */}
+          {/* 独立的注册页面（保留，用于直接访问） */}
           <Route path="/register" element={<RegisterPage />} />
           
           {/* 用户中心 - 需要认证 */}
@@ -113,6 +34,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 创建简历页面 - 需要认证（暂时重定向到用户中心） */}
+          <Route 
+            path="/create-resume" 
+            element={
+              <ProtectedRoute>
+                <Navigate to="/profile" replace />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 模板页面 - 需要认证（暂时重定向到用户中心） */}
+          <Route 
+            path="/templates" 
+            element={
+              <ProtectedRoute>
+                <Navigate to="/profile" replace />
               </ProtectedRoute>
             } 
           />
