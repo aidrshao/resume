@@ -1,0 +1,209 @@
+# 依赖包目录
+node_modules/
+*/node_modules/
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+
+# 日志文件
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+*.log
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 覆盖率目录
+lib-cov
+coverage/
+*.lcov
+.nyc_output
+
+# 构建输出
+build/
+dist/
+frontend/build/
+
+# 缓存目录
+.npm
+.eslintcache
+.cache/
+.parcel-cache/
+
+# 可选的npm缓存目录
+.npm
+
+# 可选的REPL历史
+.node_repl_history
+
+# 输出的NPM包
+*.tgz
+
+# Yarn完整性文件
+.yarn-integrity
+
+# dotenv环境变量文件
+.env
+.env.test
+
+# parcel-bundler缓存
+.cache
+.parcel-cache
+
+# Next.js构建输出
+.next
+
+# Nuxt.js构建/生成输出
+.nuxt
+dist
+
+# Gatsby文件
+.cache/
+public
+
+# Storybook构建输出
+.out
+.storybook-out
+
+# Vuepress构建输出
+.vuepress/dist
+
+# Serverless目录
+.serverless/
+
+# FuseBox缓存
+.fusebox/
+
+# DynamoDB Local文件
+.dynamodb/
+
+# TernJS端口文件
+.tern-port
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.tmp
+*.temp
+temp/
+tmp/
+
+# 数据库文件
+*.sqlite
+*.sqlite3
+*.db
+
+# Docker数据卷
+postgres_data/
+
+# MacOS文件
+.AppleDouble
+.LSOverride
+
+# Windows文件
+desktop.ini
+
+# Linux文件
+*~
+
+# 备份文件
+*.bak
+*.backup
+
+# 压缩文件
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# 编译输出
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# 包文件
+*.war
+*.ear
+
+# JetBrains
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Sublime Text
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+*.sublime-workspace
+*.sublime-project
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# 项目特定的忽略文件
+# 数据库迁移备份
+backend/migrations/*.backup
+
+# 上传文件目录
+uploads/
+public/uploads/
+
+# 测试文件
+test-results/
+coverage/
+
+# 生产环境配置
+production.env 

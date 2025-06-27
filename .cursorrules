@@ -1,0 +1,195 @@
+
+🟢 Cursor开发宪法文件
+
+⚠️ 此文件为本项目所有代码的最高原则与规范，必须在每一次生成任务时遵守
+
+⸻
+
+1️⃣ 技术栈
+
+✅ 前端
+	•	框架：React
+	•	样式：Tailwind CSS
+
+✅ 后端
+	•	Node.js + Express
+
+✅ 数据库
+	•	PostgreSQL (使用knex.js作为ORM)
+
+⸻
+
+2️⃣ 项目结构
+
+请使用清晰的模块化目录：
+
+/frontend
+  /components
+  /pages
+  /utils
+
+/backend
+  /controllers
+  /models
+  /routes
+  /utils
+
+
+⸻
+
+3️⃣ 命名与代码风格
+
+✅ 命名规范
+	•	所有变量、函数使用驼峰命名
+	•	数据库表和字段使用下划线命名
+
+✅ 注释
+	•	每个文件顶部说明用途
+	•	每个函数写注释：功能 / 参数 / 返回值
+
+✅ 类型
+	•	所有数据库表写明字段类型
+	•	JSON返回写明字段格式
+
+⸻
+
+4️⃣ API规范
+
+✅ 请求返回格式
+所有API必须返回统一JSON格式：
+
+{
+  "success": true,
+  "data": {},
+  "message": "操作成功"
+}
+
+如遇错误：
+
+{
+  "success": false,
+  "message": "错误提示"
+}
+
+✅ Token验证
+	•	所有需要登录的接口，需在Authorization Header中传JWT Token
+	•	后端需编写验证中间件
+
+✅ 表单校验
+	•	所有输入进行校验（必填、格式、长度）
+
+⸻
+
+5️⃣ 数据库规范
+
+✅ 使用PostgreSQL
+	•	ORM：knex.js
+	•	所有表需有：
+	•	id (主键，自增)
+	•	created_at
+	•	updated_at
+	•	表名使用复数形式（如：users, resumes）
+
+✅ 示例用户表
+
+Table: users
+-----------------------------
+id              SERIAL PRIMARY KEY
+email           VARCHAR(255) UNIQUE NOT NULL
+password_hash   VARCHAR(255) NOT NULL
+created_at      TIMESTAMP DEFAULT now()
+updated_at      TIMESTAMP DEFAULT now()
+
+✅ 表关系
+	•	用户表 users
+	•	简历表 resumes
+	•	user_id 外键
+	•	信息表 user_infos
+	•	user_id 外键
+
+⸻
+
+6️⃣ GPT/DeepSeek模型规范
+
+✅ 用途分工
+	•	问答/信息归纳：DeepSeek
+	•	高质量简历生成：GPT-4o
+
+✅ API调用方式
+请使用以下官方示例模板：
+
+⸻
+
+DeepSeek示例：
+
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="自己的API key",
+    base_url="https://api.agicto.cn/v1"
+)
+
+chat_completion = client.chat.completions.create(
+    messages=[
+        {
+            "role": "user",
+            "content": "你好",
+        }
+    ],
+    model="deepseek-v3",
+)
+
+print(chat_completion.choices[0].message.content)
+
+
+⸻
+
+GPT-4o示例：
+
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="自己的API key",
+    base_url="https://api.agicto.cn/v1"
+)
+
+chat_completion = client.chat.completions.create(
+    messages=[
+        {
+            "role": "user",
+            "content": "你好",
+        }
+    ],
+    model="gpt-4o-2024-11-20",
+)
+
+print(chat_completion.choices[0].message.content)
+
+✅ 注意事项
+	•	所有模型输出需先转为JSON，再做后续渲染
+	•	在调用前写明Prompt内容和期望格式
+
+⸻
+
+7️⃣ 前端规范
+
+✅ 所有页面需使用TailwindCSS
+✅ 所有表单需带校验
+✅ 所有API请求需：
+	•	携带Authorization Header（如需要）
+	•	捕获错误并显示提示
+
+⸻
+
+8️⃣ 版本管理
+
+✅ 所有提交需写清楚：
+	•	文件名
+	•	功能描述
+	•	依赖修改
+
+✅ 所有功能需逐步提交，一次只做一个模块
+
+⸻
+
+✅ 务必遵守以上所有规则。
