@@ -141,13 +141,23 @@ class TaskQueueService extends EventEmitter {
         throw new Error('任务不存在');
       }
 
+      // 安全解析 JSON 数据
+      let resultData = null;
+      if (task.result_data) {
+        if (typeof task.result_data === 'string') {
+          resultData = JSON.parse(task.result_data);
+        } else if (typeof task.result_data === 'object') {
+          resultData = task.result_data;
+        }
+      }
+
       return {
         taskId: task.task_id,
         taskType: task.task_type,
         status: task.status,
         progress: task.progress,
         message: task.status_message,
-        resultData: task.result_data ? JSON.parse(task.result_data) : null,
+        resultData: resultData,
         errorMessage: task.error_message,
         createdAt: task.created_at,
         startedAt: task.started_at,
@@ -170,12 +180,24 @@ class TaskQueueService extends EventEmitter {
         .where('task_id', taskId)
         .orderBy('created_at', 'asc');
 
-      return logs.map(log => ({
-        progress: log.progress,
-        message: log.message,
-        metadata: log.metadata ? JSON.parse(log.metadata) : null,
-        timestamp: log.created_at
-      }));
+      return logs.map(log => {
+        // 安全解析 metadata JSON
+        let metadata = null;
+        if (log.metadata) {
+          if (typeof log.metadata === 'string') {
+            metadata = JSON.parse(log.metadata);
+          } else if (typeof log.metadata === 'object') {
+            metadata = log.metadata;
+          }
+        }
+
+        return {
+          progress: log.progress,
+          message: log.message,
+          metadata: metadata,
+          timestamp: log.created_at
+        };
+      });
     } catch (error) {
       console.error('获取进度历史失败:', error);
       throw error;
@@ -227,7 +249,15 @@ class TaskQueueService extends EventEmitter {
     const { task_id: taskId, task_type: taskType, task_data: taskDataJson } = task;
     
     try {
-      const taskData = JSON.parse(taskDataJson);
+      // 处理 knex 自动解析 JSON 列的情况
+      let taskData;
+      if (typeof taskDataJson === 'string') {
+        taskData = JSON.parse(taskDataJson);
+      } else if (typeof taskDataJson === 'object' && taskDataJson !== null) {
+        taskData = taskDataJson;
+      } else {
+        throw new Error('无效的任务数据格式');
+      }
 
       switch (taskType) {
         case 'resume_parse':
