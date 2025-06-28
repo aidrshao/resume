@@ -95,6 +95,67 @@ const LandingPage = () => {
   };
 
   /**
+   * 轮询任务状态
+   * @param {string} taskId - 任务ID
+   */
+  const pollTaskStatus = async (taskId) => {
+    return new Promise((resolve, reject) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`/api/tasks/${taskId}/status`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            const task = data.data;
+            
+            // 更新进度和状态
+            setUploadProgress(task.progress || 0);
+            setUploadStage(task.message || '处理中...');
+            
+            // 检查任务是否完成
+            if (task.status === 'completed') {
+              clearInterval(pollInterval);
+              setUploadProgress(100);
+              setUploadStage('解析完成！');
+              
+              // 设置解析结果
+              if (task.resultData && task.resultData.structuredData) {
+                setTimeout(() => {
+                  setUploadResult(task.resultData.structuredData);
+                }, 300);
+              }
+              
+              resolve(task);
+            } else if (task.status === 'failed') {
+              clearInterval(pollInterval);
+              throw new Error(task.errorMessage || '解析失败');
+            }
+            // 继续轮询处理中的任务
+          } else {
+            throw new Error(data.message || '获取任务状态失败');
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+          reject(error);
+        }
+      }, 1000); // 每秒轮询一次
+      
+      // 设置超时（5分钟）
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        reject(new Error('解析超时，请稍后重试'));
+      }, 5 * 60 * 1000);
+    });
+  };
+
+  /**
    * 处理文件上传
    */
   const handleFileUpload = async (event) => {
@@ -175,22 +236,16 @@ const LandingPage = () => {
         body: formData,
       });
 
-      // 第四阶段：AI分析 (60% -> 85%)
-      setUploadStage('AI正在智能分析简历内容...');
-      await startProgressAnimation(85, 2000);
-
       const data = await response.json();
       
-      if (data.success) {
-        // 第五阶段：完成 (85% -> 100%)
-        setUploadStage('解析完成，正在整理结果...');
-        await startProgressAnimation(100, 800);
+      if (data.success && data.data.taskId) {
+        // 开始轮询任务状态
+        const taskId = data.data.taskId;
+        setUploadStage('正在后台解析简历内容...');
         
-        setTimeout(() => {
-          setUploadResult(data.data);
-        }, 300);
+        await pollTaskStatus(taskId);
       } else {
-        throw new Error(data.message || '解析失败');
+        throw new Error(data.message || '上传失败');
       }
     } catch (error) {
       console.error('简历解析失败:', error);

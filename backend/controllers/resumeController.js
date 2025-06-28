@@ -9,6 +9,7 @@ const ResumeParseService = require('../services/resumeParseService');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const knex = require('../config/database');
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -341,10 +342,12 @@ class ResumeController {
   }
 
   /**
-   * 上传简历文件进行解析
+   * 上传简历文件进行解析（异步任务）
    * POST /api/resumes/upload
    */
   static async uploadAndParseResume(req, res) {
+    const { taskQueueService } = require('../services/taskQueueService');
+    
     const uploadMiddleware = upload.single('resume');
     
     uploadMiddleware(req, res, async function (err) {
@@ -366,60 +369,29 @@ class ResumeController {
         const userId = req.user.id;
         const file = req.file;
         
-        console.log('📁 开始处理上传的简历文件:', file.originalname);
+        console.log('📁 创建简历解析任务:', file.originalname);
         
-        // 解析简历文件
-        const parseResult = await ResumeParseService.parseResumeFile(
-          file.path,
-          path.extname(file.originalname).substring(1)
-        );
+        // 创建异步解析任务
+        const taskId = await taskQueueService.createTask('resume_parse', {
+          filePath: file.path,
+          fileType: path.extname(file.originalname).substring(1),
+          originalName: file.originalname,
+          userId: userId
+        }, userId);
         
-        if (parseResult.success) {
-          // 清理和验证数据
-          const cleanedData = ResumeParseService.validateAndCleanData(parseResult.structuredData);
-          
-          // 保存到用户信息中
-          if (cleanedData.personalInfo) {
-            await UserProfile.upsert(userId, cleanedData.personalInfo);
-          }
-          
-          // 保存教育经历
-          if (cleanedData.educations && cleanedData.educations.length > 0) {
-            // 这里可以添加保存教育经历的逻辑
-          }
-          
-          // 保存工作经历
-          if (cleanedData.workExperiences && cleanedData.workExperiences.length > 0) {
-            // 这里可以添加保存工作经历的逻辑
-          }
-          
-          // 保存项目经历
-          if (cleanedData.projects && cleanedData.projects.length > 0) {
-            // 这里可以添加保存项目经历的逻辑
-          }
-          
-          res.json({
-            success: true,
-            data: {
-              extractedText: parseResult.extractedText,
-              structuredData: cleanedData
-            },
-            message: '简历解析成功'
-          });
-        } else {
-          res.status(400).json({
-            success: false,
-            message: parseResult.error || '简历解析失败'
-          });
-        }
-        
-        // 清理上传的临时文件
-        fs.unlink(file.path, (err) => {
-          if (err) console.error('删除临时文件失败:', err);
+        // 立即返回任务ID
+        res.json({
+          success: true,
+          data: {
+            taskId: taskId,
+            status: 'processing',
+            message: '简历上传成功，正在后台解析中...'
+          },
+          message: '简历解析任务已创建'
         });
         
       } catch (error) {
-        console.error('处理上传简历失败:', error);
+        console.error('创建简历解析任务失败:', error);
         
         // 清理上传的临时文件
         if (req.file) {
@@ -430,7 +402,7 @@ class ResumeController {
         
         res.status(500).json({
           success: false,
-          message: '处理上传简历失败'
+          message: '创建简历解析任务失败'
         });
       }
     });
@@ -491,7 +463,91 @@ class ResumeController {
     }
   }
 
-  // 演示方法已删除 - 统一使用认证后的真实解析功能
+  /**
+   * 获取任务状态
+   * GET /api/tasks/:taskId/status
+   */
+  static async getTaskStatus(req, res) {
+    try {
+      const { taskId } = req.params;
+      const userId = req.user.id;
+      const { taskQueueService } = require('../services/taskQueueService');
+      
+      // 验证任务是否属于当前用户
+      const task = await taskQueueService.getTaskStatus(taskId);
+      
+      // 检查任务权限（只有任务创建者可以查看）
+      const taskRecord = await knex('task_queue')
+        .where('task_id', taskId)
+        .first();
+        
+      if (taskRecord && taskRecord.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: '无权访问此任务'
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: task,
+        message: '获取任务状态成功'
+      });
+      
+    } catch (error) {
+      console.error('获取任务状态失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取任务状态失败'
+      });
+    }
+  }
+
+  /**
+   * 获取任务进度历史
+   * GET /api/tasks/:taskId/progress
+   */
+  static async getTaskProgress(req, res) {
+    try {
+      const { taskId } = req.params;
+      const userId = req.user.id;
+      const { taskQueueService } = require('../services/taskQueueService');
+      
+      // 验证任务权限
+      const taskRecord = await knex('task_queue')
+        .where('task_id', taskId)
+        .first();
+        
+      if (!taskRecord) {
+        return res.status(404).json({
+          success: false,
+          message: '任务不存在'
+        });
+      }
+        
+      if (taskRecord.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: '无权访问此任务'
+        });
+      }
+      
+      const progressHistory = await taskQueueService.getTaskProgressHistory(taskId);
+      
+      res.json({
+        success: true,
+        data: progressHistory,
+        message: '获取任务进度成功'
+      });
+      
+    } catch (error) {
+      console.error('获取任务进度失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取任务进度失败'
+      });
+    }
+  }
 
   /**
    * 保存基础简历
