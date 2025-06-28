@@ -604,9 +604,10 @@ class ResumeController {
       console.log('👤 [SAVE_BASE_RESUME] 用户ID:', userId);
       
       // 2. 验证请求数据
-      const { resumeData, source } = req.body;
+      const { resumeData, source, forceOverwrite = false } = req.body;
       console.log('📋 [SAVE_BASE_RESUME] 请求数据验证:');
       console.log('  - source:', source);
+      console.log('  - forceOverwrite:', forceOverwrite);
       console.log('  - resumeData 类型:', typeof resumeData);
       console.log('  - resumeData 是否存在:', !!resumeData);
       console.log('  - personalInfo 是否存在:', !!(resumeData && resumeData.personalInfo));
@@ -625,17 +626,38 @@ class ResumeController {
       const existingBaseResume = await Resume.findBaseResumeByUserId(userId);
       console.log('📊 [SAVE_BASE_RESUME] 现有基础简历查询结果:', existingBaseResume ? `ID: ${existingBaseResume.id}` : '无');
       
+      // 4. 如果存在现有简历且未强制覆盖，返回确认请求
+      if (existingBaseResume && !forceOverwrite) {
+        console.log('⚠️ [SAVE_BASE_RESUME] 检测到现有简历，需要用户确认覆盖');
+        return res.status(409).json({
+          success: false,
+          message: '检测到您已有一份基础简历，是否要覆盖现有简历？',
+          error_code: 'RESUME_EXISTS_NEED_CONFIRMATION',
+          data: {
+            existingResume: {
+              id: existingBaseResume.id,
+              title: existingBaseResume.title,
+              created_at: existingBaseResume.created_at,
+              updated_at: existingBaseResume.updated_at
+            },
+            needConfirmation: true
+          }
+        });
+      }
+      
       let savedResume;
-      if (existingBaseResume) {
-        // 更新现有基础简历
-        console.log('🔄 [SAVE_BASE_RESUME] 更新现有基础简历...');
+      if (existingBaseResume && forceOverwrite) {
+        // 5. 覆盖现有基础简历
+        console.log('🔄 [SAVE_BASE_RESUME] 覆盖现有基础简历...');
         const updateData = {
+          title: `${resumeData.personalInfo.name || '我'}的基础简历`,
           resume_data: resumeData,
           source: source,
           updated_at: new Date()
         };
         
-        console.log('📝 [SAVE_BASE_RESUME] 更新数据:', {
+        console.log('📝 [SAVE_BASE_RESUME] 覆盖数据:', {
+          title: updateData.title,
           source: updateData.source,
           updated_at: updateData.updated_at,
           resume_data_size: JSON.stringify(updateData.resume_data).length
@@ -643,9 +665,9 @@ class ResumeController {
         
         await Resume.update(existingBaseResume.id, updateData);
         savedResume = await Resume.findById(existingBaseResume.id);
-        console.log('✅ [SAVE_BASE_RESUME] 基础简历更新成功，ID:', existingBaseResume.id);
+        console.log('✅ [SAVE_BASE_RESUME] 基础简历覆盖成功，ID:', existingBaseResume.id);
       } else {
-        // 创建新的基础简历
+        // 6. 创建新的基础简历
         console.log('➕ [SAVE_BASE_RESUME] 创建新的基础简历...');
         const resumeInfo = {
           user_id: userId,
@@ -670,7 +692,7 @@ class ResumeController {
         console.log('✅ [SAVE_BASE_RESUME] 基础简历创建成功，ID:', savedResume.id);
       }
 
-      // 4. 保存用户详细信息
+      // 7. 保存用户详细信息
       console.log('👤 [SAVE_BASE_RESUME] 保存用户详细信息...');
       await ResumeController.saveUserProfile(userId, resumeData);
       console.log('✅ [SAVE_BASE_RESUME] 用户详细信息保存成功');
@@ -681,9 +703,9 @@ class ResumeController {
       res.json({
         success: true,
         data: savedResume,
-        message: '基础简历保存成功',
+        message: existingBaseResume && forceOverwrite ? '基础简历覆盖成功' : '基础简历保存成功',
         debug_info: {
-          action: existingBaseResume ? 'updated' : 'created',
+          action: existingBaseResume && forceOverwrite ? 'overwritten' : (existingBaseResume ? 'updated' : 'created'),
           duration: duration
         }
       });

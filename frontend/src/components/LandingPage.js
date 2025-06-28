@@ -296,11 +296,11 @@ const LandingPage = () => {
   /**
    * 保存基础简历
    */
-  const handleSaveBaseResume = async () => {
+  const handleSaveBaseResume = async (forceOverwrite = false) => {
     // 检查用户是否已登录
     if (!isAuthenticated()) {
       // 设置待执行的操作
-      setPendingAction(() => handleSaveBaseResume);
+      setPendingAction(() => () => handleSaveBaseResume(forceOverwrite));
       setAuthMode('login');
       setShowAuthModal(true);
       return;
@@ -318,15 +318,29 @@ const LandingPage = () => {
         },
         body: JSON.stringify({
           resumeData: dataToSave,
-          source: selectedMode === 'upload' ? 'upload' : 'chat'
+          source: selectedMode === 'upload' ? 'upload' : 'chat',
+          forceOverwrite: forceOverwrite
         })
       });
 
       const data = await response.json();
       
       if (data.success) {
-        alert('基础简历保存成功！现在可以针对不同岗位进行AI优化。');
+        alert(data.message || '基础简历保存成功！现在可以针对不同岗位进行AI优化。');
         navigate('/resumes');
+      } else if (data.error_code === 'RESUME_EXISTS_NEED_CONFIRMATION') {
+        // 需要用户确认覆盖
+        const existingResume = data.data.existingResume;
+        const confirmMessage = `检测到您已有一份基础简历：\n\n标题：${existingResume.title}\n创建时间：${new Date(existingResume.created_at).toLocaleString()}\n更新时间：${new Date(existingResume.updated_at).toLocaleString()}\n\n是否要用新解析的简历覆盖现有简历？\n\n注意：覆盖后原简历数据将无法恢复！`;
+        
+        if (window.confirm(confirmMessage)) {
+          // 用户确认覆盖，重新调用保存函数
+          handleSaveBaseResume(true);
+          return;
+        } else {
+          // 用户取消覆盖
+          alert('保存已取消。您可以在简历管理页面查看和编辑现有简历。');
+        }
       } else {
         throw new Error(data.message || '保存失败');
       }
@@ -339,10 +353,9 @@ const LandingPage = () => {
   };
 
   /**
-   * 取消编辑
+   * 重置编辑状态
    */
   const handleCancelEdit = () => {
-    setShowEditModal(false);
     setEditedResult(null);
   };
 
@@ -680,7 +693,7 @@ const LandingPage = () => {
                         ✏️ 编辑信息
                       </button>
                       <button
-                        onClick={handleSaveBaseResume}
+                        onClick={() => handleSaveBaseResume()}
                         disabled={isSaving}
                         className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                       >
