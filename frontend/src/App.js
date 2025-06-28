@@ -9,6 +9,8 @@ import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ProfilePage from './components/ProfilePage';
+import ResumeDashboard from './components/ResumeDashboard';
+import AIChatPage from './components/AIChatPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 /**
@@ -38,22 +40,42 @@ function App() {
             } 
           />
           
-          {/* 创建简历页面 - 需要认证（暂时重定向到用户中心） */}
+          {/* 简历管理页面 - 需要认证 */}
           <Route 
-            path="/create-resume" 
+            path="/resumes" 
             element={
               <ProtectedRoute>
-                <Navigate to="/profile" replace />
+                <ResumeDashboard />
               </ProtectedRoute>
             } 
           />
           
-          {/* 模板页面 - 需要认证（暂时重定向到用户中心） */}
+          {/* AI对话页面 - 需要认证 */}
+          <Route 
+            path="/ai-chat" 
+            element={
+              <ProtectedRoute>
+                <AIChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 创建简历页面 - 需要认证（重定向到简历管理） */}
+          <Route 
+            path="/create-resume" 
+            element={
+              <ProtectedRoute>
+                <Navigate to="/resumes" replace />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 模板页面 - 需要认证（重定向到简历管理） */}
           <Route 
             path="/templates" 
             element={
               <ProtectedRoute>
-                <Navigate to="/profile" replace />
+                <Navigate to="/resumes" replace />
               </ProtectedRoute>
             } 
           />

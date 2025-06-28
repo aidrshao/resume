@@ -16,6 +16,15 @@ const generateToken = (payload) => {
 };
 
 /**
+ * 验证JWT token
+ * @param {string} token - JWT token
+ * @returns {Object} 解码后的payload
+ */
+const verifyToken = (token) => {
+  return jwt.verify(token, process.env.JWT_SECRET);
+};
+
+/**
  * JWT认证中间件
  * @param {Object} req - 请求对象
  * @param {Object} res - 响应对象
@@ -55,5 +64,6 @@ const authenticateToken = async (req, res, next) => {
 
 module.exports = {
   generateToken,
+  verifyToken,
   authenticateToken
 }; 

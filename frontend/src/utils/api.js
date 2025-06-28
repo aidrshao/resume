@@ -57,7 +57,7 @@ api.interceptors.response.use(
  */
 export const register = (userData) => {
   console.log('🌐 API: 发送注册请求', userData);
-  return api.post('/register', userData);
+  return api.post('/auth/register', userData);
 };
 
 /**
@@ -69,7 +69,7 @@ export const register = (userData) => {
  */
 export const login = (credentials) => {
   console.log('🌐 API: 发送登录请求', credentials);
-  return api.post('/login', credentials);
+  return api.post('/auth/login', credentials);
 };
 
 /**
