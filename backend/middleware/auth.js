@@ -13,10 +13,18 @@ const authUtils = require('../utils/auth');
  * @param {Function} next - 下一个中间件函数
  */
 const authenticateToken = (req, res, next) => {
+  console.log('🔐 [AUTH_MIDDLEWARE] ==> 开始Token验证');
+  console.log('🔐 [AUTH_MIDDLEWARE] 请求路径:', req.method, req.path);
+  console.log('🔐 [AUTH_MIDDLEWARE] 请求来源:', req.headers['user-agent'] || '未知');
+  
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  
+  console.log('🔐 [AUTH_MIDDLEWARE] 认证头:', authHeader ? 'Bearer ***' : '无');
+  console.log('🔐 [AUTH_MIDDLEWARE] Token长度:', token ? token.length : 0);
 
   if (!token) {
+    console.log('❌ [AUTH_MIDDLEWARE] Token缺失');
     return res.status(401).json({
       success: false,
       message: '访问令牌缺失'
@@ -24,20 +32,42 @@ const authenticateToken = (req, res, next) => {
   }
 
   try {
+    console.log('🔐 [AUTH_MIDDLEWARE] 开始验证Token...');
     const decoded = authUtils.verifyToken(token);
+    
     // 确保用户对象格式正确
     req.user = {
       id: decoded.userId,
       userId: decoded.userId,
       ...decoded
     };
-    console.log('🔑 [AUTH] Token验证成功，用户ID:', req.user.id);
+    
+    console.log('✅ [AUTH_MIDDLEWARE] Token验证成功，用户ID:', req.user.id);
+    console.log('✅ [AUTH_MIDDLEWARE] Token信息:', {
+      userId: decoded.userId,
+      exp: new Date(decoded.exp * 1000).toISOString(),
+      iat: new Date(decoded.iat * 1000).toISOString()
+    });
+    
     next();
   } catch (error) {
-    console.error('❌ [AUTH] Token验证失败:', error);
+    console.error('❌ [AUTH_MIDDLEWARE] Token验证失败:', {
+      error: error.name,
+      message: error.message,
+      tokenPrefix: token ? token.substring(0, 20) + '...' : '无'
+    });
+    
+    // 根据错误类型返回更具体的错误信息
+    let errorMessage = '访问令牌无效';
+    if (error.name === 'TokenExpiredError') {
+      errorMessage = '访问令牌已过期，请重新登录';
+    } else if (error.name === 'JsonWebTokenError') {
+      errorMessage = '访问令牌格式无效';
+    }
+    
     return res.status(403).json({
       success: false,
-      message: '访问令牌无效'
+      message: errorMessage
     });
   }
 };

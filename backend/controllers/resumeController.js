@@ -9,6 +9,7 @@ const ResumeParseService = require('../services/resumeParseService');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const knex = require('../config/database');
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -43,23 +44,7 @@ const upload = multer({
   }
 });
 
-// 演示用的上传配置，支持更多文件类型
-const uploadDemo = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB限制
-  },
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /pdf|docx|doc|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    
-    if (extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('只支持PDF、Word文档和TXT文件格式'));
-    }
-  }
-});
+// 删除演示模式配置
 
 class ResumeController {
   /**
@@ -254,15 +239,24 @@ class ResumeController {
       // 更新状态为生成中
       await Resume.updateStatus(id, 'generating', '开始生成简历');
       
-      // 这里可以添加实际的PDF生成逻辑
-      // 目前先模拟生成过程
-      setTimeout(async () => {
+      // 异步执行简历生成
+      setImmediate(async () => {
         try {
+          console.log('🚀 开始生成简历PDF');
+          
+          // TODO: 这里应该调用实际的PDF生成服务
+          // 例如使用 puppeteer 或其他PDF生成库
+          // const pdfUrl = await generateResumePDF(resume.resume_data, resume.template_id);
+          
+          // 暂时标记为完成，等待PDF生成功能实现
           await Resume.updateStatus(id, 'completed', '简历生成完成');
+          console.log('✅ 简历生成完成');
+          
         } catch (error) {
+          console.error('❌ 简历生成失败:', error);
           await Resume.updateStatus(id, 'failed', `生成失败: ${error.message}`);
         }
-      }, 3000);
+      });
       
       res.json({
         success: true,
@@ -348,21 +342,42 @@ class ResumeController {
   }
 
   /**
-   * 上传简历文件进行解析
+   * 上传简历文件进行解析（异步任务）
    * POST /api/resumes/upload
    */
   static async uploadAndParseResume(req, res) {
+    const startTime = Date.now();
+    console.log('🚀 [UPLOAD_RESUME] ==> 开始处理简历上传请求');
+    console.log('📋 [UPLOAD_RESUME] 请求头:', {
+      authorization: req.headers.authorization ? 'Bearer ***' : '无',
+      contentType: req.headers['content-type'],
+      userAgent: req.headers['user-agent']
+    });
+    console.log('👤 [UPLOAD_RESUME] 用户信息:', req.user ? { id: req.user.id, userId: req.user.userId } : '无');
+    
+    const { taskQueueService } = require('../services/taskQueueService');
+    
     const uploadMiddleware = upload.single('resume');
     
     uploadMiddleware(req, res, async function (err) {
       if (err) {
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误:', err);
         return res.status(400).json({
           success: false,
           message: err.message
         });
       }
       
+      console.log('📁 [UPLOAD_RESUME] 文件上传中间件处理完成');
+      console.log('📄 [UPLOAD_RESUME] 上传文件信息:', req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      } : '无文件');
+      
       if (!req.file) {
+        console.error('❌ [UPLOAD_RESUME] 未检测到上传文件');
         return res.status(400).json({
           success: false,
           message: '请选择要上传的简历文件'
@@ -373,71 +388,52 @@ class ResumeController {
         const userId = req.user.id;
         const file = req.file;
         
-        console.log('📁 开始处理上传的简历文件:', file.originalname);
+        console.log('🔧 [UPLOAD_RESUME] 准备创建解析任务:', {
+          userId: userId,
+          filename: file.originalname,
+          fileSize: file.size,
+          fileType: path.extname(file.originalname).substring(1)
+        });
         
-        // 解析简历文件
-        const parseResult = await ResumeParseService.parseResumeFile(
-          file.path,
-          path.extname(file.originalname).substring(1)
-        );
+        // 创建异步解析任务
+        const taskId = await taskQueueService.createTask('resume_parse', {
+          filePath: file.path,
+          fileType: path.extname(file.originalname).substring(1),
+          originalName: file.originalname,
+          userId: userId
+        }, userId);
         
-        if (parseResult.success) {
-          // 清理和验证数据
-          const cleanedData = ResumeParseService.validateAndCleanData(parseResult.structuredData);
-          
-          // 保存到用户信息中
-          if (cleanedData.personalInfo) {
-            await UserProfile.upsert(userId, cleanedData.personalInfo);
-          }
-          
-          // 保存教育经历
-          if (cleanedData.educations && cleanedData.educations.length > 0) {
-            // 这里可以添加保存教育经历的逻辑
-          }
-          
-          // 保存工作经历
-          if (cleanedData.workExperiences && cleanedData.workExperiences.length > 0) {
-            // 这里可以添加保存工作经历的逻辑
-          }
-          
-          // 保存项目经历
-          if (cleanedData.projects && cleanedData.projects.length > 0) {
-            // 这里可以添加保存项目经历的逻辑
-          }
-          
-          res.json({
-            success: true,
-            data: {
-              extractedText: parseResult.extractedText,
-              structuredData: cleanedData
-            },
-            message: '简历解析成功'
-          });
-        } else {
-          res.status(400).json({
-            success: false,
-            message: parseResult.error || '简历解析失败'
-          });
-        }
+        console.log('✅ [UPLOAD_RESUME] 任务创建成功:', { taskId: taskId });
         
-        // 清理上传的临时文件
-        fs.unlink(file.path, (err) => {
-          if (err) console.error('删除临时文件失败:', err);
+        const duration = Date.now() - startTime;
+        console.log(`🏁 [UPLOAD_RESUME] 请求处理完成，耗时: ${duration}ms`);
+        
+        // 立即返回任务ID
+        res.json({
+          success: true,
+          data: {
+            taskId: taskId,
+            status: 'processing',
+            message: '简历上传成功，正在后台解析中...'
+          },
+          message: '简历解析任务已创建'
         });
         
       } catch (error) {
-        console.error('处理上传简历失败:', error);
+        console.error('❌ [UPLOAD_RESUME] 创建简历解析任务失败:', error);
+        console.error('❌ [UPLOAD_RESUME] 错误堆栈:', error.stack);
         
         // 清理上传的临时文件
         if (req.file) {
           fs.unlink(req.file.path, (err) => {
-            if (err) console.error('删除临时文件失败:', err);
+            if (err) console.error('❌ [UPLOAD_RESUME] 删除临时文件失败:', err);
+            else console.log('🗑️ [UPLOAD_RESUME] 临时文件已清理:', req.file.path);
           });
         }
         
         res.status(500).json({
           success: false,
-          message: '处理上传简历失败'
+          message: '创建简历解析任务失败: ' + error.message
         });
       }
     });
@@ -499,85 +495,122 @@ class ResumeController {
   }
 
   /**
-   * 简历解析演示 - 不需要认证
-   * POST /api/resumes/parse
+   * 获取任务状态
+   * GET /api/tasks/:taskId/status
    */
-  static async parseResumeDemo(req, res) {
-    const uploadMiddleware = uploadDemo.single('resume');
+  static async getTaskStatus(req, res) {
+    console.log('📊 [TASK_STATUS] ==> 开始查询任务状态');
     
-    uploadMiddleware(req, res, async function (err) {
-      if (err) {
-        return res.status(400).json({
+    try {
+      const { taskId } = req.params;
+      const userId = req.user.id;
+      
+      console.log('📊 [TASK_STATUS] 查询参数:', {
+        taskId: taskId,
+        userId: userId,
+        userAgent: req.headers['user-agent']
+      });
+   
+      const { taskQueueService } = require('../services/taskQueueService');
+      
+      // 验证任务是否属于当前用户
+      console.log('📊 [TASK_STATUS] 开始获取任务状态...');
+      const task = await taskQueueService.getTaskStatus(taskId);
+      console.log('📊 [TASK_STATUS] 任务状态获取成功:', {
+        taskId: task.taskId,
+        status: task.status,
+        progress: task.progress,
+        message: task.message
+      });
+      
+      // 检查任务权限（只有任务创建者可以查看）
+      console.log('📊 [TASK_STATUS] 开始验证任务权限...');
+      const taskRecord = await knex('task_queue')
+        .where('task_id', taskId)
+        .first();
+        
+      if (taskRecord && taskRecord.user_id !== userId) {
+        console.error('❌ [TASK_STATUS] 权限验证失败:', {
+          taskUserId: taskRecord.user_id,
+          requestUserId: userId
+        });
+        return res.status(403).json({
           success: false,
-          message: err.message
+          message: '无权访问此任务'
         });
       }
       
-      if (!req.file) {
-        return res.status(400).json({
+      console.log('✅ [TASK_STATUS] 权限验证通过');
+      console.log('📤 [TASK_STATUS] 返回任务状态:', {
+        status: task.status,
+        progress: task.progress,
+        hasResultData: !!task.resultData
+      });
+      
+      res.json({
+        success: true,
+        data: task,
+        message: '获取任务状态成功'
+      });
+      
+    } catch (error) {
+      console.error('❌ [TASK_STATUS] 获取任务状态失败:', {
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId
+      });
+      
+      res.status(500).json({
+        success: false,
+        message: error.message.includes('任务不存在') ? '任务不存在' : '获取任务状态失败'
+      });
+    }
+  }
+
+  /**
+   * 获取任务进度历史
+   * GET /api/tasks/:taskId/progress
+   */
+  static async getTaskProgress(req, res) {
+    try {
+      const { taskId } = req.params;
+      const userId = req.user.id;
+      const { taskQueueService } = require('../services/taskQueueService');
+      
+      // 验证任务权限
+      const taskRecord = await knex('task_queue')
+        .where('task_id', taskId)
+        .first();
+        
+      if (!taskRecord) {
+        return res.status(404).json({
           success: false,
-          message: '请选择要上传的简历文件'
+          message: '任务不存在'
+        });
+      }
+        
+      if (taskRecord.user_id !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: '无权访问此任务'
         });
       }
       
-      try {
-        const file = req.file;
-        
-        console.log('📁 开始处理上传的简历文件(演示):', file.originalname);
-        
-        // 解析简历文件
-        const parseResult = await ResumeParseService.parseResumeFile(
-          file.path,
-          path.extname(file.originalname).substring(1)
-        );
-        
-        if (parseResult.success) {
-          // 清理和验证数据
-          const cleanedData = ResumeParseService.validateAndCleanData(parseResult.structuredData);
-          
-          res.json({
-            success: true,
-            data: {
-              personalInfo: cleanedData.personalInfo,
-              educations: cleanedData.educations,
-              workExperiences: cleanedData.workExperiences,
-              projects: cleanedData.projects,
-              skills: cleanedData.skills,
-              languages: cleanedData.languages,
-              awards: cleanedData.awards,
-              publications: cleanedData.publications,
-              interests: cleanedData.interests
-            },
-            message: '简历解析成功'
-          });
-        } else {
-          res.status(400).json({
-            success: false,
-            message: parseResult.error || '简历解析失败'
-          });
-        }
-        
-        // 清理上传的临时文件
-        fs.unlink(file.path, (err) => {
-          if (err) console.error('删除临时文件失败:', err);
-        });
-        
-      } catch (error) {
-        console.error('处理上传简历失败:', error);
-        
-        // 清理上传的临时文件
-        if (req.file) {
-          fs.unlink(req.file.path, (err) => {
-            if (err) console.error('删除临时文件失败:', err);
-          });
-        }
-        
-        res.status(500).json({
-          success: false,
-          message: '处理上传简历失败'
-        });
-      }
-    });
+      const progressHistory = await taskQueueService.getTaskProgressHistory(taskId);
+      
+      res.json({
+        success: true,
+        data: progressHistory,
+        message: '获取任务进度成功'
+      });
+      
+    } catch (error) {
+      console.error('获取任务进度失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '获取任务进度失败'
+      });
+    }
   }
 
   /**
