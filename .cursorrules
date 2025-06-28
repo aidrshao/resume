@@ -90,6 +90,8 @@
 	•	updated_at
 	•	表名使用复数形式（如：users, resumes）
 
+	不得使用虚拟数据，不得使用演示模式。
+
 ✅ 示例用户表
 
 Table: users

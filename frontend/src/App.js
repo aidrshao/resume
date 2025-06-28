@@ -10,6 +10,8 @@ import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
 import ProfilePage from './components/ProfilePage';
 import ResumeDashboard from './components/ResumeDashboard';
+import ResumeView from './components/ResumeView';
+import ResumeEdit from './components/ResumeEdit';
 import AIChatPage from './components/AIChatPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -46,6 +48,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <ResumeDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 简历查看页面 - 需要认证 */}
+          <Route 
+            path="/resume/:id" 
+            element={
+              <ProtectedRoute>
+                <ResumeView />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 简历编辑页面 - 需要认证 */}
+          <Route 
+            path="/resume/:id/edit" 
+            element={
+              <ProtectedRoute>
+                <ResumeEdit />
               </ProtectedRoute>
             } 
           />
