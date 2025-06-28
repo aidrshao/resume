@@ -1,0 +1,612 @@
+name: Safe Deploy to Server
+
+# 触发条件：推送到main分支时自动部署
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    # 添加部署环境保护
+    environment: production
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 确保获取完整git历史
+    
+    - name: 生成唯一部署ID和项目前缀
+      run: |
+        echo "DEPLOY_ID=resume-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+        echo "PROJECT_PREFIX=$(echo '${{ github.repository }}' | md5sum | cut -c1-8)" >> $GITHUB_ENV
+        echo "FRONTEND_PORT=3016" >> $GITHUB_ENV
+        echo "BACKEND_PORT=8016" >> $GITHUB_ENV
+    
+    - name: 验证环境和Secrets
+      run: |
+        REQUIRED_SECRETS=(
+          "AGICTO_API_KEY"
+          "TENCENT_SECRET_ID"
+          "TENCENT_SECRET_KEY"
+          "DB_PASSWORD"
+          "JWT_SECRET"
+          "HOST"
+          "USERNAME"
+          "PRIVATE_KEY"
+        )
+        
+        for secret in "${REQUIRED_SECRETS[@]}"; do
+          if [ -z "${{ secrets[secret] }}" ]; then
+            echo "❌ 缺少必要Secret: $secret"
+            exit 1
+          fi
+        done
+
+        echo "✅ 所有Secrets已配置"
+    
+    - name: 验证SSH连通性
+      run: |
+        # 创建临时SSH密钥文件
+        echo "${{ secrets.PRIVATE_KEY }}" > /tmp/ssh_key
+        chmod 600 /tmp/ssh_key
+        
+        # 测试SSH连接
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 \
+          -i /tmp/ssh_key \
+          ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+          "echo 'SSH连接成功'" || (echo "❌ SSH连接失败"; exit 1)
+        
+        # 清理临时文件
+        rm -f /tmp/ssh_key
+    
+    - name: 设置Node.js环境
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: |
+          backend/package-lock.json
+          frontend/package-lock.json
+    
+    - name: 安装依赖并安全扫描
+      run: |
+        cd backend && npm ci
+        cd ../frontend && npm ci
+        
+        # 安全扫描
+        cd ../backend && npm audit --audit-level=moderate || echo "⚠️ 发现安全警告"
+        cd ../frontend && npm audit --audit-level=moderate || echo "⚠️ 发现安全警告"
+    
+    - name: 构建前端
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: 创建安全隔离部署包
+      run: |
+        mkdir -p deploy/{backend,frontend,scripts}
+        
+        # 复制文件（排除敏感文件）
+        cp -r backend/* deploy/backend/
+        rm -rf deploy/backend/{node_modules,.env*,test,coverage}
+        cp -r frontend/build/* deploy/frontend/
+
+        # 生成安全隔离部署脚本
+        cat > deploy/scripts/deploy.sh << 'DEPLOY_EOF'
+        #!/bin/bash
+        set -euo pipefail
+
+        # 动态变量（从GitHub Actions传递）
+        readonly PROJECT_NAME="resume-system"
+        readonly DEPLOY_ID="$1"
+        readonly PROJECT_PREFIX="$2"
+        readonly FRONTEND_PORT="$3"
+        readonly BACKEND_PORT="$4"
+        readonly DEPLOY_USER=$(whoami)
+        readonly APP_DIR="/home/$DEPLOY_USER/$PROJECT_NAME-$DEPLOY_ID"
+        readonly LOG_FILE="/var/log/${PROJECT_NAME}-${DEPLOY_ID}.log"
+        readonly BACKUP_DIR="/home/$DEPLOY_USER/backup/${PROJECT_NAME}-$(date +%Y%m%d_%H%M%S)"
+
+        # 确保日志文件存在
+        sudo touch "$LOG_FILE"
+        sudo chown "$DEPLOY_USER:$DEPLOY_USER" "$LOG_FILE"
+
+        # 日志函数
+        log() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+        }
+
+        # 清理函数
+        cleanup_on_error() {
+          log "❌ 部署失败，开始清理..."
+          
+          # 停止可能启动的服务
+          pm2 delete "${PROJECT_PREFIX}-backend" 2>/dev/null || true
+          pm2 delete "${PROJECT_PREFIX}-frontend" 2>/dev/null || true
+          
+          # 清理临时目录
+          rm -rf "$APP_DIR" 2>/dev/null || true
+          
+          log "🧹 清理完成"
+          exit 1
+        }
+
+        # 设置错误处理
+        trap cleanup_on_error ERR
+
+        # 安全预检函数
+        safe_precheck() {
+          log "🔍 开始安全预检 (部署ID: $DEPLOY_ID)"
+
+          # 1. 检查系统资源
+          local available_space=$(df --output=avail / | tail -1)
+          [ $available_space -lt 3145728 ] && { 
+            log "❌ 磁盘空间不足，需要至少3GB"; 
+            exit 1; 
+          }
+
+          local available_memory=$(free -m | awk '/Mem:/ {print $7}')
+          [ $available_memory -lt 1024 ] && { 
+            log "⚠️  可用内存较低: ${available_memory}MB"; 
+          }
+
+          # 2. 检查关键端口是否被占用
+          check_port() {
+            local port=$1
+            local service=$2
+            if lsof -i :$port >/dev/null 2>&1; then
+              local process=$(lsof -i :$port | grep LISTEN | head -1)
+              log "❌ 端口 $port ($service) 被占用: $process"
+              return 1
+            fi
+            log "✅ 端口 $port ($service) 可用"
+            return 0
+          }
+
+          check_port $FRONTEND_PORT "前端服务" || exit 1
+          check_port $BACKEND_PORT "后端API" || exit 1
+
+          # 3. 检查Docker容器命名冲突
+          local db_container="${PROJECT_PREFIX}-postgres"
+          if docker ps -a --format '{{.Names}}' | grep -q "^${db_container}$"; then
+            log "⚠️  发现同名Docker容器: $db_container"
+            log "🔧 将重用现有容器（确保数据安全）"
+            USE_EXISTING_DB=true
+          else
+            USE_EXISTING_DB=false
+          fi
+
+          # 4. 检查PM2进程命名冲突
+          if pm2 list | grep -q "${PROJECT_PREFIX}-backend"; then
+            log "⚠️  发现同名PM2进程，将先停止旧进程"
+            pm2 delete "${PROJECT_PREFIX}-backend" || true
+          fi
+          if pm2 list | grep -q "${PROJECT_PREFIX}-frontend"; then
+            log "⚠️  发现同名PM2进程，将先停止旧进程"
+            pm2 delete "${PROJECT_PREFIX}-frontend" || true
+          fi
+
+          # 5. 检查Nginx配置冲突
+          if [ -f "/etc/nginx/sites-enabled/${PROJECT_PREFIX}-resume.conf" ]; then
+            log "⚠️  发现现有Nginx配置，将更新配置"
+          fi
+
+          log "✅ 安全预检通过"
+        }
+
+        # 备份现有部署
+        backup_existing() {
+          local old_app_dir="/home/$DEPLOY_USER/$PROJECT_NAME"
+          if [ -d "$old_app_dir" ]; then
+            log "📦 备份现有部署到: $BACKUP_DIR"
+            mkdir -p "$BACKUP_DIR"
+            cp -r "$old_app_dir" "$BACKUP_DIR/" || true
+            
+            # 备份数据库
+            local db_container="${PROJECT_PREFIX}-postgres"
+            if docker ps --format '{{.Names}}' | grep -q "^${db_container}$"; then
+              log "💾 备份数据库..."
+              docker exec "$db_container" pg_dump \
+                -U "${PROJECT_PREFIX}_resume_user" \
+                "${PROJECT_PREFIX}_resume_db" > "$BACKUP_DIR/database_backup.sql" 2>/dev/null || true
+            fi
+          fi
+        }
+
+        # 数据库设置
+        setup_database() {
+          log "🐘 配置PostgreSQL数据库..."
+          
+          local db_container="${PROJECT_PREFIX}-postgres"
+          local db_network="${PROJECT_PREFIX}-network"
+          local db_volume="${PROJECT_PREFIX}-pgdata"
+          
+          # 创建独立网络
+          docker network create "$db_network" 2>/dev/null || log "网络 $db_network 已存在"
+          
+          if [ "$USE_EXISTING_DB" = "false" ]; then
+            log "🚀 启动新的数据库容器..."
+            
+            # 生成随机端口避免冲突
+            local db_port=$(shuf -i 5432-5532 -n 1)
+            while lsof -i :$db_port >/dev/null 2>&1; do
+              db_port=$(shuf -i 5432-5532 -n 1)
+            done
+            
+            docker run -d \
+              --name "$db_container" \
+              --network "$db_network" \
+              --restart unless-stopped \
+              -e POSTGRES_DB="${PROJECT_PREFIX}_resume_db" \
+              -e POSTGRES_USER="${PROJECT_PREFIX}_resume_user" \
+              -e POSTGRES_PASSWORD="$DB_PASSWORD" \
+              -p "127.0.0.1:$db_port:5432" \
+              -v "$db_volume:/var/lib/postgresql/data" \
+              postgres:15-alpine
+            
+            # 等待数据库启动
+            log "⏳ 等待数据库启动..."
+            local max_attempts=30
+            local attempt=1
+            while [ $attempt -le $max_attempts ]; do
+              if docker exec "$db_container" pg_isready -U "${PROJECT_PREFIX}_resume_user"; then
+                log "✅ 数据库启动成功"
+                break
+              fi
+              log "⏳ 数据库启动中... ($attempt/$max_attempts)"
+              sleep 2
+              ((attempt++))
+            done
+            
+            if [ $attempt -gt $max_attempts ]; then
+              log "❌ 数据库启动失败"
+              exit 1
+            fi
+          else
+            log "✅ 重用现有数据库容器"
+          fi
+        }
+
+        # 部署应用
+        deploy_application() {
+          log "📂 部署应用文件..."
+          
+          # 创建隔离的应用目录
+          mkdir -p "$APP_DIR"/{backend,frontend}
+          
+          # 复制文件
+          cp -r backend/* "$APP_DIR/backend/"
+          cp -r frontend/* "$APP_DIR/frontend/"
+          
+          # 设置权限
+          chown -R "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+          chmod -R 755 "$APP_DIR"
+          
+          # 安装后端依赖
+          log "📦 安装后端依赖..."
+          cd "$APP_DIR/backend"
+          npm ci --production --no-audit
+          
+          # 生成隔离的环境配置
+          log "⚙️  配置环境变量..."
+          cat > "$APP_DIR/backend/.env" << ENV_EOF
+        NODE_ENV=production
+        PORT=$BACKEND_PORT
+
+        # 数据库配置（使用隔离命名）
+        DB_HOST=127.0.0.1
+        DB_PORT=5432
+        DB_NAME=${PROJECT_PREFIX}_resume_db
+        DB_USER=${PROJECT_PREFIX}_resume_user
+        DB_PASS=$DB_PASSWORD
+
+        # JWT密钥
+        JWT_SECRET=$JWT_SECRET
+
+        # AI API配置（使用agicto代理）
+        AGICTO_API_KEY=$AGICTO_API_KEY
+        OPENAI_BASE_URL=https://api.agicto.cn/v1
+
+        # 腾讯云邮件服务配置
+        TENCENT_SECRET_ID=$TENCENT_SECRET_ID
+        TENCENT_SECRET_KEY=$TENCENT_SECRET_KEY
+        TENCENT_SES_TEMPLATE_ID=31516
+        TENCENT_SES_FROM_EMAIL=admin@juncaishe.com
+        TENCENT_SES_FROM_NAME=AI俊才社
+        ENV_EOF
+          
+          chmod 600 "$APP_DIR/backend/.env"
+          
+          # 运行数据库迁移
+          log "🔄 运行数据库迁移..."
+          npm run migrate || log "⚠️ 迁移可能已存在，继续部署..."
+        }
+
+        # 启动服务
+        start_services() {
+          log "🚀 启动应用服务..."
+          
+          # 确保PM2已安装
+          if ! command -v pm2 &> /dev/null; then
+            sudo npm install -g pm2 serve
+          fi
+          
+          # 启动后端服务（使用隔离命名）
+          pm2 start "$APP_DIR/backend/server.js" \
+            --name "${PROJECT_PREFIX}-backend" \
+            --cwd "$APP_DIR/backend" \
+            --env production \
+            --output "/var/log/${PROJECT_PREFIX}-backend.log" \
+            --error "/var/log/${PROJECT_PREFIX}-backend-error.log" \
+            --max-memory-restart 1G
+          
+          # 启动前端服务（使用隔离命名）
+          pm2 start serve \
+            --name "${PROJECT_PREFIX}-frontend" \
+            -- -s "$APP_DIR/frontend" -l "$FRONTEND_PORT" \
+            --output "/var/log/${PROJECT_PREFIX}-frontend.log" \
+            --error "/var/log/${PROJECT_PREFIX}-frontend-error.log" \
+            --max-memory-restart 512M
+          
+          # 保存PM2配置
+          pm2 save
+        }
+
+        # 配置Nginx反向代理
+        setup_nginx() {
+          log "🌐 配置Nginx反向代理..."
+          
+          # 安装Nginx（如果未安装）
+          if ! command -v nginx &> /dev/null; then
+            log "📦 安装Nginx..."
+            sudo apt update
+            sudo apt install -y nginx
+          fi
+          
+          # 创建隔离的Nginx配置
+          local nginx_conf="/etc/nginx/sites-available/${PROJECT_PREFIX}-resume.conf"
+          sudo tee "$nginx_conf" > /dev/null << NGINX_EOF
+        # AI俊才社简历系统 - 隔离配置
+        # 项目前缀: ${PROJECT_PREFIX}
+        # 部署ID: ${DEPLOY_ID}
+
+        # 全局安全设置
+        client_max_body_size 10M;
+        server_tokens off;
+
+        # 限制请求频率
+        limit_req_zone \$binary_remote_addr zone=${PROJECT_PREFIX}_api:10m rate=10r/s;
+        limit_req_zone \$binary_remote_addr zone=${PROJECT_PREFIX}_web:10m rate=30r/s;
+
+        server {
+            listen 80;
+            server_name _;
+            
+            # 添加安全头
+            add_header X-Frame-Options DENY;
+            add_header X-Content-Type-Options nosniff;
+            add_header X-XSS-Protection "1; mode=block";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            
+            # 应用请求频率限制
+            limit_req zone=${PROJECT_PREFIX}_web burst=20 nodelay;
+            
+            # 前端静态文件 - 转发到端口${FRONTEND_PORT}
+            location / {
+                proxy_pass http://127.0.0.1:${FRONTEND_PORT};
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+                
+                # 缓存静态资源
+                location ~* \\.(js|css|png|jpg|jpeg|gif|ico|svg)\$ {
+                    expires 1y;
+                    add_header Cache-Control "public, immutable";
+                }
+            }
+            
+            # 后端API - 转发到端口${BACKEND_PORT}
+            location /api {
+                limit_req zone=${PROJECT_PREFIX}_api burst=10 nodelay;
+                
+                proxy_pass http://127.0.0.1:${BACKEND_PORT};
+                proxy_set_header Host \$host;
+                proxy_set_header X-Real-IP \$remote_addr;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto \$scheme;
+                proxy_connect_timeout 30s;
+                proxy_send_timeout 30s;
+                proxy_read_timeout 30s;
+            }
+            
+            # 健康检查
+            location /health {
+                access_log off;
+                return 200 "OK - Project: ${PROJECT_PREFIX}";
+                add_header Content-Type text/plain;
+            }
+            
+            # 禁止访问敏感文件
+            location ~ /\\. {
+                deny all;
+            }
+            
+            location ~ \\.(yml|yaml|json|env)\$ {
+                deny all;
+            }
+        }
+        NGINX_EOF
+          
+          # 启用配置
+          sudo ln -sf "$nginx_conf" "/etc/nginx/sites-enabled/${PROJECT_PREFIX}-resume.conf"
+          
+          # 移除默认配置（如果存在且没有其他配置）
+          if [ $(ls /etc/nginx/sites-enabled/ | grep -v "${PROJECT_PREFIX}-resume.conf" | wc -l) -eq 0 ]; then
+            sudo rm -f /etc/nginx/sites-enabled/default
+          fi
+          
+          # 测试并重载Nginx
+          if sudo nginx -t; then
+            sudo systemctl enable nginx
+            sudo systemctl reload nginx
+            log "✅ Nginx配置更新成功"
+          else
+            log "❌ Nginx配置测试失败"
+            exit 1
+          fi
+        }
+
+        # 健康检查
+        health_check() {
+          log "🏥 执行健康检查..."
+          
+          sleep 15  # 等待服务启动
+          
+          local health_ok=true
+          
+          # 检查后端API
+          if curl -f -m 10 "http://127.0.0.1:$BACKEND_PORT/api/health" 2>/dev/null; then
+            log "✅ 后端API健康 (端口: $BACKEND_PORT)"
+          else
+            log "❌ 后端API健康检查失败"
+            health_ok=false
+          fi
+          
+          # 检查前端
+          if curl -f -m 10 "http://127.0.0.1:$FRONTEND_PORT" 2>/dev/null; then
+            log "✅ 前端服务健康 (端口: $FRONTEND_PORT)"
+          else
+            log "❌ 前端服务健康检查失败"
+            health_ok=false
+          fi
+          
+          # 检查Nginx代理
+          if curl -f -m 10 "http://127.0.0.1/health" 2>/dev/null; then
+            log "✅ Nginx代理健康"
+          else
+            log "❌ Nginx代理健康检查失败"
+            health_ok=false
+          fi
+          
+          # 检查数据库连接
+          local db_container="${PROJECT_PREFIX}-postgres"
+          if docker exec "$db_container" pg_isready -U "${PROJECT_PREFIX}_resume_user" 2>/dev/null; then
+            log "✅ 数据库连接正常"
+          else
+            log "❌ 数据库连接失败"
+            health_ok=false
+          fi
+          
+          if [ "$health_ok" = false ]; then
+            log "❌ 健康检查发现问题"
+            return 1
+          fi
+          
+          return 0
+        }
+
+        # 显示部署结果
+        show_result() {
+          log "🎉 部署完成！"
+          echo ""
+          echo "📊 服务状态："
+          pm2 list | grep "$PROJECT_PREFIX"
+          echo ""
+          echo "🌐 访问地址："
+          echo "   - 网站: http://$(curl -s ifconfig.me)/"
+          echo "   - 前端直接访问: http://$(curl -s ifconfig.me):$FRONTEND_PORT"
+          echo "   - 后端API: http://$(curl -s ifconfig.me):$BACKEND_PORT"
+          echo ""
+          echo "🔧 管理命令："
+          echo "   - 查看后端日志: pm2 logs ${PROJECT_PREFIX}-backend"
+          echo "   - 查看前端日志: pm2 logs ${PROJECT_PREFIX}-frontend"
+          echo "   - 重启后端: pm2 restart ${PROJECT_PREFIX}-backend"
+          echo "   - 重启前端: pm2 restart ${PROJECT_PREFIX}-frontend"
+          echo "   - 查看部署日志: tail -f $LOG_FILE"
+          echo ""
+          echo "🔒 隔离信息："
+          echo "   - 项目前缀: $PROJECT_PREFIX"
+          echo "   - 部署ID: $DEPLOY_ID"
+          echo "   - 前端端口: $FRONTEND_PORT"
+          echo "   - 后端端口: $BACKEND_PORT"
+          echo "   - 数据库容器: ${PROJECT_PREFIX}-postgres"
+        }
+
+        # 主部署流程
+        main() {
+          log "🚀 开始安全隔离部署流程"
+          log "项目前缀: $PROJECT_PREFIX | 部署ID: $DEPLOY_ID"
+          log "前端端口: $FRONTEND_PORT | 后端端口: $BACKEND_PORT"
+          
+          safe_precheck
+          backup_existing
+          setup_database
+          deploy_application
+          start_services
+          setup_nginx
+          
+          if health_check; then
+            show_result
+            log "✅ 部署成功完成"
+            
+            # 创建符号链接到标准路径（方便管理）
+            ln -sfn "$APP_DIR" "/home/$DEPLOY_USER/$PROJECT_NAME"
+          else
+            log "❌ 健康检查失败，开始回滚"
+            cleanup_on_error
+          fi
+        }
+
+        # 执行主函数
+        main
+        DEPLOY_EOF
+
+        chmod +x deploy/scripts/*.sh
+        echo "✅ 安全隔离部署包创建完成"
+
+    - name: 上传部署包到服务器
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT || 22 }}
+        source: "deploy/*"
+        target: "/tmp/${{ env.DEPLOY_ID }}"
+        strip_components: 1
+
+    - name: 执行安全隔离部署
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT || 22 }}
+        command_timeout: 30m
+        script: |
+          # 设置环境变量（从GitHub Secrets传递）
+          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          export AGICTO_API_KEY="${{ secrets.AGICTO_API_KEY }}"
+          export TENCENT_SECRET_ID="${{ secrets.TENCENT_SECRET_ID }}"
+          export TENCENT_SECRET_KEY="${{ secrets.TENCENT_SECRET_KEY }}"
+          
+          # 执行隔离部署脚本（传递所有必要参数）
+          cd "/tmp/${{ env.DEPLOY_ID }}/scripts"
+          chmod +x deploy.sh
+          ./deploy.sh "${{ env.DEPLOY_ID }}" "${{ env.PROJECT_PREFIX }}" "${{ env.FRONTEND_PORT }}" "${{ env.BACKEND_PORT }}"
+          
+          # 清理临时部署文件
+          rm -rf "/tmp/${{ env.DEPLOY_ID }}"
+          
+          echo "🎉 安全隔离部署完成！"
+          echo "前端端口: ${{ env.FRONTEND_PORT }}"
+          echo "后端端口: ${{ env.BACKEND_PORT }}" 

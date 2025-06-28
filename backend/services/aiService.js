@@ -7,16 +7,18 @@ const OpenAI = require('openai');
 
 class AIService {
   constructor() {
-    // 初始化DeepSeek客户端
-    this.deepseekClient = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY || "your-deepseek-api-key",
-      baseURL: "https://api.agicto.cn/v1"
+    // 优先使用agicto.cn代理服务（按照.cursorrules规范）
+    this.agictoClient = new OpenAI({
+      apiKey: process.env.AGICTO_API_KEY || "your-agicto-api-key",
+      baseURL: "https://api.agicto.cn/v1",
+      timeout: 150000 // 2.5分钟超时
     });
 
-    // 初始化GPT客户端
-    this.gptClient = new OpenAI({
-      apiKey: process.env.GPT_API_KEY || process.env.OPENAI_API_KEY || "your-gpt-api-key",
-      baseURL: "https://api.agicto.cn/v1"
+    // 备用官方OpenAI客户端
+    this.openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key",
+      timeout: 150000 // 2.5分钟超时
+      // 使用OpenAI官方API
     });
   }
 
@@ -28,54 +30,109 @@ class AIService {
    * @returns {Promise<string>} 生成的文本
    */
   async generateText(prompt, model = 'deepseek', options = {}) {
-    try {
-      const defaultOptions = {
-        temperature: 0.7,
-        max_tokens: 4000,
-        ...options
-      };
+    const defaultOptions = {
+      temperature: 0.7,
+      max_tokens: 4000,
+      timeout: 150000, // 增加超时时间到2.5分钟
+      ...options
+    };
 
-      let client, modelName;
+    const errors = {};
+
+    // 优先使用agicto.cn代理服务（更稳定）
+    try {
+      console.log(`🚀 优先使用agicto.cn代理服务 (${model})`);
       
+      let primaryModel;
       if (model === 'deepseek') {
-        client = this.deepseekClient;
-        modelName = 'deepseek-v3';
+        primaryModel = 'deepseek-v3';
       } else if (model === 'gpt') {
-        client = this.gptClient;
-        modelName = 'gpt-4o-2024-11-20';
+        primaryModel = 'gpt-4o-2024-11-20'; // 使用最新的gpt-4o模型
       } else {
         throw new Error(`不支持的模型类型: ${model}`);
       }
 
-      const response = await client.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        model: modelName,
-        ...defaultOptions
-      });
+      // 使用Promise.race添加超时控制
+      const response = await Promise.race([
+        this.agictoClient.chat.completions.create({
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          model: primaryModel,
+          temperature: defaultOptions.temperature,
+          max_tokens: defaultOptions.max_tokens
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
+        )
+      ]);
 
-      console.log('AI API响应:', JSON.stringify(response, null, 2));
+      console.log('✅ agicto.cn代理服务调用成功');
 
       // 检查是否有错误
       if (response.error) {
-        console.log('AI API密钥无效，使用模拟数据进行演示');
-        return this.getMockResponse(prompt);
+        throw new Error(`agicto API错误: ${response.error.message}`);
       }
 
       if (!response.choices || response.choices.length === 0) {
-        throw new Error('AI API返回空响应');
+        throw new Error('agicto API返回空响应');
       }
 
       return response.choices[0].message.content;
       
-    } catch (error) {
-      console.error(`AI生成失败 (${model}):`, error);
-      throw new Error(`AI服务调用失败: ${error.message}`);
+    } catch (agictoError) {
+      errors.agicto = `agicto API错误: ${agictoError.response?.data?.error?.message || agictoError.message}`;
+      console.warn(`⚠️ agicto.cn代理失败，切换到官方OpenAI API: ${agictoError.message}`);
+      
+      // 只有当agicto失败时才使用官方OpenAI API
+      try {
+        console.log(`🔄 使用官方OpenAI API备用服务 (${model})`);
+        
+        let fallbackModel;
+        if (model === 'deepseek') {
+          fallbackModel = 'gpt-3.5-turbo'; // DeepSeek使用gpt-3.5-turbo作为备用
+        } else if (model === 'gpt') {
+          fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
+        }
+
+        // 同样添加超时控制
+        const response = await Promise.race([
+          this.openaiClient.chat.completions.create({
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            model: fallbackModel,
+            temperature: defaultOptions.temperature,
+            max_tokens: defaultOptions.max_tokens
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
+          )
+        ]);
+
+        console.log('✅ 官方OpenAI API调用成功');
+
+        if (!response.choices || response.choices.length === 0) {
+          throw new Error('OpenAI API返回空响应');
+        }
+
+        return response.choices[0].message.content;
+        
+      } catch (openaiError) {
+        errors.openai = openaiError.message;
+        console.error(`❌ 官方OpenAI API失败:`, openaiError.message);
+      }
     }
+
+    // 所有API都失败了
+    console.error(`❌ 所有AI服务都失败了:`, errors);
+    throw new Error(`AI服务调用失败: agicto(${errors.agicto}) + openai(${errors.openai})`);
   }
 
   /**
@@ -304,183 +361,7 @@ ${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
     }
   }
 
-  /**
-   * 获取模拟响应（当AI API不可用时使用）
-   * @param {string} prompt - 提示词
-   * @returns {string} 模拟响应
-   */
-  getMockResponse(prompt) {
-    // 如果是简历解析请求
-    if (prompt.includes('简历文本') && prompt.includes('personalInfo')) {
-      return JSON.stringify({
-        "personalInfo": {
-          "name": "张三",
-          "phone": "13800138000",
-          "email": "zhangsan@example.com",
-          "location": "北京市朝阳区",
-          "summary": "5年前端开发经验，精通React、Vue等主流框架，具有丰富的大型项目开发经验，擅长性能优化和团队协作。",
-          "objective": "高级前端工程师"
-        },
-        "educations": [
-          {
-            "school": "北京理工大学",
-            "degree": "本科",
-            "major": "计算机科学与技术",
-            "startDate": "2015-09",
-            "endDate": "2019-06",
-            "gpa": null,
-            "honors": ["校级三好学生", "ACM程序设计竞赛二等奖"],
-            "courses": ["数据结构", "算法设计", "操作系统", "数据库原理"],
-            "description": null
-          },
-          {
-            "school": "清华大学",
-            "degree": "硕士",
-            "major": "软件工程",
-            "startDate": "2019-09",
-            "endDate": "2022-06",
-            "gpa": null,
-            "honors": ["优秀毕业生", "国家奖学金"],
-            "courses": ["软件架构", "项目管理", "人工智能"],
-            "description": null
-          }
-        ],
-        "workExperiences": [
-          {
-            "company": "阿里巴巴集团",
-            "position": "高级前端工程师",
-            "department": "淘宝事业部",
-            "location": "杭州",
-            "startDate": "2022-07",
-            "endDate": "至今",
-            "description": "负责淘宝商品详情页的前端开发和维护，参与前端架构升级，将传统页面重构为React组件化架构",
-            "achievements": [
-              "主导开发了商品详情页新版本，用户转化率提升15%",
-              "设计并实现了前端监控系统，线上问题发现效率提升50%",
-              "获得部门年度最佳员工奖"
-            ],
-            "technologies": ["React", "TypeScript", "Webpack", "Node.js", "Redis"],
-            "teamSize": "5人团队",
-            "reportTo": "技术经理"
-          },
-          {
-            "company": "腾讯科技",
-            "position": "前端工程师",
-            "department": "微信事业群",
-            "location": "深圳",
-            "startDate": "2021-03",
-            "endDate": "2022-06",
-            "description": "开发微信小程序商城相关功能，参与微信支付H5页面的开发和优化",
-            "achievements": [
-              "开发的小程序商城模块日活跃用户超过100万",
-              "建立的自动化测试覆盖率达到85%",
-              "参与的微信支付优化项目获得公司创新奖"
-            ],
-            "technologies": ["Vue.js", "微信小程序", "Jest", "Cypress", "MySQL"],
-            "teamSize": "8人团队",
-            "reportTo": "高级工程师"
-          }
-        ],
-        "projects": [
-          {
-            "name": "电商平台重构项目",
-            "role": "项目负责人",
-            "company": "阿里巴巴",
-            "startDate": "2023-01",
-            "endDate": "2023-08",
-            "description": "对淘宝商品详情页进行全面重构，采用微前端架构，提升页面性能和开发效率",
-            "responsibilities": [
-              "负责整体技术方案设计和架构选型",
-              "协调5人开发团队，制定开发计划和里程碑",
-              "负责核心模块的开发和代码审查"
-            ],
-            "achievements": [
-              "页面加载时间减少40%，用户体验显著提升",
-              "开发效率提升25%，代码复用率达到60%",
-              "项目按时交付，获得业务方高度认可"
-            ],
-            "technologies": ["React", "TypeScript", "Webpack 5", "qiankun", "Docker"],
-            "teamSize": "5人",
-            "budget": null
-          },
-          {
-            "name": "智能客服系统",
-            "role": "核心开发",
-            "company": "腾讯",
-            "startDate": "2022-03",
-            "endDate": "2022-12",
-            "description": "为微信客服开发智能对话系统，集成AI能力，提升客服效率",
-            "responsibilities": [
-              "负责前端对话界面的设计和开发",
-              "实现实时消息推送和文件传输功能",
-              "与后端团队协作完成API对接"
-            ],
-            "achievements": [
-              "客服响应效率提升60%，用户满意度提升35%",
-              "系统稳定性达到99.9%，支持并发用户5000+",
-              "获得腾讯内部技术创新奖"
-            ],
-            "technologies": ["Vue.js", "WebSocket", "Element UI", "Echarts"],
-            "teamSize": "3人",
-            "budget": null
-          }
-        ],
-        "skills": {
-          "technical": ["JavaScript", "TypeScript", "React", "Vue.js", "Node.js", "Webpack", "Docker"],
-          "professional": ["前端性能优化", "前端架构设计", "跨平台开发", "敏捷开发"],
-          "soft": ["团队协作", "沟通表达", "项目管理", "问题解决"],
-          "certifications": ["阿里云前端工程师认证", "PMP项目管理认证"]
-        },
-        "languages": [
-          {
-            "language": "中文",
-            "level": "母语",
-            "certification": null
-          },
-          {
-            "language": "英语",
-            "level": "熟练",
-            "certification": "CET-6 580分，托业850分"
-          },
-          {
-            "language": "日语",
-            "level": "一般",
-            "certification": "JLPT N3"
-          }
-        ],
-        "awards": [
-          {
-            "name": "阿里巴巴年度最佳员工",
-            "issuer": "阿里巴巴集团",
-            "date": "2023",
-            "description": "在淘宝事业部表现突出，获得年度最佳员工奖"
-          },
-          {
-            "name": "腾讯技术创新奖",
-            "issuer": "腾讯科技",
-            "date": "2022",
-            "description": "智能客服系统项目获得公司技术创新奖"
-          }
-        ],
-        "publications": [],
-        "interests": ["编程", "阅读", "摄影", "旅行", "羽毛球"]
-      }, null, 2);
-    }
-
-    // 如果是对话请求
-    if (prompt.includes('对话') || prompt.includes('response')) {
-      return JSON.stringify({
-        "response": "感谢您提供的信息！我已经记录下来了。",
-        "updatedInfo": {},
-        "nextQuestion": "请告诉我您的工作经历，包括公司名称、职位和主要工作内容？",
-        "isComplete": false,
-        "completionPercentage": 0.3
-      });
-    }
-
-    // 默认响应
-    return "抱歉，AI服务暂时不可用，请稍后重试。";
-  }
+  // 演示模式代码已删除 - 统一使用真实AI API
 }
 
 // 创建单例实例

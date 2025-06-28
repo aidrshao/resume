@@ -192,6 +192,8 @@ print(chat_completion.choices[0].message.content)
 
 ✅ 所有功能需逐步提交，一次只做一个模块
 
+✅ 你不得主动推送Github，除非我明确要求你这么做。
+
 ⸻
 
 ✅ 务必遵守以上所有规则。

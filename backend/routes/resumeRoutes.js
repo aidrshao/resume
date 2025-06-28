@@ -9,9 +9,7 @@ const ResumeController = require('../controllers/resumeController');
 const AIChatController = require('../controllers/aiChatController');
 const { authenticateToken } = require('../middleware/auth');
 
-// 公开API - 不需要认证的体验功能
-router.post('/resumes/parse', ResumeController.parseResumeDemo);
-router.post('/ai/chat', AIChatController.chatDemo);
+// 演示API已删除 - 统一使用认证后的功能
 
 // 应用认证中间件到需要登录的路由
 router.use(authenticateToken);
@@ -32,6 +30,10 @@ router.post('/resumes/:id/generate-advanced', ResumeController.generateAdvancedR
 
 // 简历上传和解析
 router.post('/resumes/upload', ResumeController.uploadAndParseResume);
+
+// 任务状态查询
+router.get('/tasks/:taskId/status', ResumeController.getTaskStatus);
+router.get('/tasks/:taskId/progress', ResumeController.getTaskProgress);
 
 // 简历模板路由
 router.get('/resume-templates', ResumeController.getResumeTemplates);
