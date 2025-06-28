@@ -178,56 +178,20 @@ const LandingPage = () => {
     setUploadLoading(true);
     setUploadResult(null);
     setUploadProgress(0);
-    setUploadStage('准备上传...');
+    setUploadStage('准备上传文件...');
 
     try {
-      // 创建匀速进度更新函数
-      let currentProgress = 0;
-      let progressInterval;
-      
-      const startProgressAnimation = (targetProgress, duration = 2000) => {
-        return new Promise((resolve) => {
-          const startProgress = currentProgress;
-          const progressDiff = targetProgress - startProgress;
-          const startTime = Date.now();
-          
-          progressInterval = setInterval(() => {
-            const elapsed = Date.now() - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            
-            currentProgress = startProgress + (progressDiff * progress);
-            setUploadProgress(Math.round(currentProgress));
-            
-            if (progress >= 1) {
-              clearInterval(progressInterval);
-              currentProgress = targetProgress;
-              resolve();
-            }
-          }, 50); // 每50ms更新一次，保持流畅
-        });
-      };
-
-      // 第一阶段：准备上传 (0% -> 15%)
-      setUploadStage('准备上传文件...');
-      await startProgressAnimation(15, 1000);
-
-      // 第二阶段：文件上传 (15% -> 35%)
-      setUploadStage('正在上传文件...');
-      await startProgressAnimation(35, 1500);
-      
-      const formData = new FormData();
-      formData.append('resume', file);
-
-      // 第三阶段：服务器处理 (35% -> 60%)
-      setUploadStage('服务器正在处理文件...');
-      await startProgressAnimation(60, 1000);
-
       // 检查用户认证状态
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('需要登录后才能上传简历');
       }
 
+      const formData = new FormData();
+      formData.append('resume', file);
+
+      setUploadStage('正在上传文件...');
+      
       const response = await fetch('/api/resumes/upload', {
         method: 'POST',
         headers: {
@@ -239,9 +203,9 @@ const LandingPage = () => {
       const data = await response.json();
       
       if (data.success && data.data.taskId) {
-        // 开始轮询任务状态
+        // 立即开始轮询后端真实进度
         const taskId = data.data.taskId;
-        setUploadStage('正在后台解析简历内容...');
+        setUploadStage('文件上传成功，开始解析...');
         
         await pollTaskStatus(taskId);
       } else {
