@@ -8,7 +8,9 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
-backend/.env
+.env.backup*
+backend/.env*
+frontend/.env*
 
 # 日志文件
 npm-debug.log*
@@ -206,4 +208,13 @@ test-results/
 coverage/
 
 # 生产环境配置
-production.env 
+production.env
+
+# 敏感配置文件
+config/secrets.*
+secrets.*
+
+# API密钥和配置文件
+**/api-keys.*
+**/credentials.*
+**/secrets.* 
