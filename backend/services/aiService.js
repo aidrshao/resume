@@ -7,16 +7,18 @@ const OpenAI = require('openai');
 
 class AIService {
   constructor() {
-    // 初始化DeepSeek客户端
-    this.deepseekClient = new OpenAI({
-      apiKey: process.env.DEEPSEEK_API_KEY || "your-deepseek-api-key",
-      baseURL: "https://api.agicto.cn/v1"
+    // 优先使用agicto.cn代理服务（按照.cursorrules规范）
+    this.agictoClient = new OpenAI({
+      apiKey: process.env.AGICTO_API_KEY || "your-agicto-api-key",
+      baseURL: "https://api.agicto.cn/v1",
+      timeout: 150000 // 2.5分钟超时
     });
 
-    // 初始化GPT客户端
-    this.gptClient = new OpenAI({
-      apiKey: process.env.GPT_API_KEY || process.env.OPENAI_API_KEY || "your-gpt-api-key",
-      baseURL: "https://api.agicto.cn/v1"
+    // 备用官方OpenAI客户端
+    this.openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key",
+      timeout: 150000 // 2.5分钟超时
+      // 使用OpenAI官方API
     });
   }
 
@@ -28,54 +30,109 @@ class AIService {
    * @returns {Promise<string>} 生成的文本
    */
   async generateText(prompt, model = 'deepseek', options = {}) {
-    try {
-      const defaultOptions = {
-        temperature: 0.7,
-        max_tokens: 4000,
-        ...options
-      };
+    const defaultOptions = {
+      temperature: 0.7,
+      max_tokens: 4000,
+      timeout: 150000, // 增加超时时间到2.5分钟
+      ...options
+    };
 
-      let client, modelName;
+    const errors = {};
+
+    // 优先使用agicto.cn代理服务（更稳定）
+    try {
+      console.log(`🚀 优先使用agicto.cn代理服务 (${model})`);
       
+      let primaryModel;
       if (model === 'deepseek') {
-        client = this.deepseekClient;
-        modelName = 'deepseek-v3';
+        primaryModel = 'deepseek-v3';
       } else if (model === 'gpt') {
-        client = this.gptClient;
-        modelName = 'gpt-4o-2024-11-20';
+        primaryModel = 'gpt-4o-2024-11-20'; // 使用最新的gpt-4o模型
       } else {
         throw new Error(`不支持的模型类型: ${model}`);
       }
 
-      const response = await client.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        model: modelName,
-        ...defaultOptions
-      });
+      // 使用Promise.race添加超时控制
+      const response = await Promise.race([
+        this.agictoClient.chat.completions.create({
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          model: primaryModel,
+          temperature: defaultOptions.temperature,
+          max_tokens: defaultOptions.max_tokens
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
+        )
+      ]);
 
-      console.log('AI API响应:', JSON.stringify(response, null, 2));
+      console.log('✅ agicto.cn代理服务调用成功');
 
       // 检查是否有错误
       if (response.error) {
-        console.error('AI API调用失败:', response.error);
-        throw new Error(`AI API调用失败: ${response.error.message || 'Unknown error'}`);
+        throw new Error(`agicto API错误: ${response.error.message}`);
       }
 
       if (!response.choices || response.choices.length === 0) {
-        throw new Error('AI API返回空响应');
+        throw new Error('agicto API返回空响应');
       }
 
       return response.choices[0].message.content;
       
-    } catch (error) {
-      console.error(`AI生成失败 (${model}):`, error);
-      throw new Error(`AI服务调用失败: ${error.message}`);
+    } catch (agictoError) {
+      errors.agicto = `agicto API错误: ${agictoError.response?.data?.error?.message || agictoError.message}`;
+      console.warn(`⚠️ agicto.cn代理失败，切换到官方OpenAI API: ${agictoError.message}`);
+      
+      // 只有当agicto失败时才使用官方OpenAI API
+      try {
+        console.log(`🔄 使用官方OpenAI API备用服务 (${model})`);
+        
+        let fallbackModel;
+        if (model === 'deepseek') {
+          fallbackModel = 'gpt-3.5-turbo'; // DeepSeek使用gpt-3.5-turbo作为备用
+        } else if (model === 'gpt') {
+          fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
+        }
+
+        // 同样添加超时控制
+        const response = await Promise.race([
+          this.openaiClient.chat.completions.create({
+            messages: [
+              {
+                role: "user",
+                content: prompt
+              }
+            ],
+            model: fallbackModel,
+            temperature: defaultOptions.temperature,
+            max_tokens: defaultOptions.max_tokens
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
+          )
+        ]);
+
+        console.log('✅ 官方OpenAI API调用成功');
+
+        if (!response.choices || response.choices.length === 0) {
+          throw new Error('OpenAI API返回空响应');
+        }
+
+        return response.choices[0].message.content;
+        
+      } catch (openaiError) {
+        errors.openai = openaiError.message;
+        console.error(`❌ 官方OpenAI API失败:`, openaiError.message);
+      }
     }
+
+    // 所有API都失败了
+    console.error(`❌ 所有AI服务都失败了:`, errors);
+    throw new Error(`AI服务调用失败: agicto(${errors.agicto}) + openai(${errors.openai})`);
   }
 
   /**

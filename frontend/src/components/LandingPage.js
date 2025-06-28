@@ -99,10 +99,19 @@ const LandingPage = () => {
    * @param {string} taskId - 任务ID
    */
   const pollTaskStatus = async (taskId) => {
+    console.log('🔄 [POLL_TASK] ==> 开始轮询任务状态:', taskId);
+    
     return new Promise((resolve, reject) => {
+      let pollCount = 0;
+      
       const pollInterval = setInterval(async () => {
+        pollCount++;
+        console.log(`🔄 [POLL_TASK] 第 ${pollCount} 次轮询，任务ID: ${taskId}`);
+        
         try {
           const token = localStorage.getItem('token');
+          
+          console.log('🔄 [POLL_TASK] 发送状态查询请求...');
           const response = await fetch(`/api/tasks/${taskId}/status`, {
             method: 'GET',
             headers: {
@@ -110,10 +119,23 @@ const LandingPage = () => {
             }
           });
           
+          console.log('🔄 [POLL_TASK] 收到响应:', {
+            status: response.status,
+            statusText: response.statusText
+          });
+          
           const data = await response.json();
+          console.log('🔄 [POLL_TASK] 响应数据:', data);
           
           if (data.success) {
             const task = data.data;
+            
+            console.log('🔄 [POLL_TASK] 任务当前状态:', {
+              status: task.status,
+              progress: task.progress,
+              message: task.message,
+              hasResultData: !!task.resultData
+            });
             
             // 更新进度和状态
             setUploadProgress(task.progress || 0);
@@ -121,27 +143,40 @@ const LandingPage = () => {
             
             // 检查任务是否完成
             if (task.status === 'completed') {
+              console.log('✅ [POLL_TASK] 任务完成！');
               clearInterval(pollInterval);
               setUploadProgress(100);
               setUploadStage('解析完成！');
               
               // 设置解析结果
               if (task.resultData && task.resultData.structuredData) {
+                console.log('📄 [POLL_TASK] 设置解析结果...');
                 setTimeout(() => {
                   setUploadResult(task.resultData.structuredData);
                 }, 300);
+              } else {
+                console.warn('⚠️ [POLL_TASK] 任务完成但缺少结构化数据');
               }
               
               resolve(task);
             } else if (task.status === 'failed') {
+              console.error('❌ [POLL_TASK] 任务失败:', task.errorMessage);
               clearInterval(pollInterval);
               throw new Error(task.errorMessage || '解析失败');
+            } else {
+              console.log('🔄 [POLL_TASK] 任务仍在处理中，继续轮询...');
             }
             // 继续轮询处理中的任务
           } else {
+            console.error('❌ [POLL_TASK] API返回失败:', data);
             throw new Error(data.message || '获取任务状态失败');
           }
         } catch (error) {
+          console.error('❌ [POLL_TASK] 轮询出错:', {
+            error: error.message,
+            pollCount: pollCount,
+            taskId: taskId
+          });
           clearInterval(pollInterval);
           reject(error);
         }
@@ -149,6 +184,7 @@ const LandingPage = () => {
       
       // 设置超时（5分钟）
       setTimeout(() => {
+        console.error('⏰ [POLL_TASK] 轮询超时');
         clearInterval(pollInterval);
         reject(new Error('解析超时，请稍后重试'));
       }, 5 * 60 * 1000);
@@ -159,11 +195,28 @@ const LandingPage = () => {
    * 处理文件上传
    */
   const handleFileUpload = async (event) => {
+    const startTime = Date.now();
+    console.log('🚀 [FRONTEND_UPLOAD] ==> 开始文件上传处理');
+    
     const file = event.target.files[0];
-    if (!file) return;
+    if (!file) {
+      console.log('❌ [FRONTEND_UPLOAD] 未选择文件');
+      return;
+    }
+
+    console.log('📄 [FRONTEND_UPLOAD] 文件信息:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
 
     // 检查用户是否已登录
-    if (!isAuthenticated()) {
+    const authStatus = isAuthenticated();
+    console.log('🔑 [FRONTEND_UPLOAD] 认证状态检查:', authStatus);
+    
+    if (!authStatus) {
+      console.log('🔑 用户未登录，显示登录框');
       // 设置待执行的操作并提示登录
       setPendingAction(() => () => {
         const fakeEvent = { target: { files: [file] } };
@@ -181,14 +234,26 @@ const LandingPage = () => {
     setUploadStage('准备上传文件...');
 
     try {
-      // 检查用户认证状态
+      // 双重检查用户认证状态
       const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      console.log('🔐 [FRONTEND_UPLOAD] 认证信息检查:', {
+        hasToken: !!token,
+        tokenLength: token ? token.length : 0,
+        hasUser: !!user,
+        tokenPrefix: token ? token.substring(0, 20) + '...' : '无'
+      });
+      
       if (!token) {
-        throw new Error('需要登录后才能上传简历');
+        throw new Error('认证信息缺失，请重新登录');
       }
 
       const formData = new FormData();
       formData.append('resume', file);
+      
+      console.log('📤 [FRONTEND_UPLOAD] 准备发送请求到:', '/api/resumes/upload');
+      console.log('📤 [FRONTEND_UPLOAD] FormData包含文件:', file.name);
 
       setUploadStage('正在上传文件...');
       
@@ -200,25 +265,67 @@ const LandingPage = () => {
         body: formData,
       });
 
+      console.log('📡 [FRONTEND_UPLOAD] 收到响应:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+
       const data = await response.json();
+      console.log('📋 [FRONTEND_UPLOAD] 响应数据:', data);
+      
+      // 处理认证错误
+      if (response.status === 401 || response.status === 403) {
+        console.log('🔑 认证失败，清除本地认证信息');
+        // 清除无效的认证信息
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // 显示登录框
+        setPendingAction(() => () => {
+          const fakeEvent = { target: { files: [file] } };
+          handleFileUpload(fakeEvent);
+        });
+        setAuthMode('login');
+        setShowAuthModal(true);
+        
+        throw new Error('登录状态已过期，请重新登录');
+      }
       
       if (data.success && data.data.taskId) {
         // 立即开始轮询后端真实进度
         const taskId = data.data.taskId;
+        console.log('✅ [FRONTEND_UPLOAD] 上传成功，任务ID:', taskId);
         setUploadStage('文件上传成功，开始解析...');
         
         await pollTaskStatus(taskId);
       } else {
+        console.error('❌ [FRONTEND_UPLOAD] 上传失败，服务器响应:', data);
         throw new Error(data.message || '上传失败');
       }
     } catch (error) {
-      console.error('简历解析失败:', error);
-      alert('简历解析失败，请稍后重试');
+      const duration = Date.now() - startTime;
+      console.error('❌ [FRONTEND_UPLOAD] 简历解析失败:', error);
+      console.error('❌ [FRONTEND_UPLOAD] 错误详情:', {
+        message: error.message,
+        stack: error.stack,
+        duration: `${duration}ms`
+      });
+      
+      // 根据错误类型显示不同的提示
+      if (error.message.includes('登录') || error.message.includes('认证')) {
+        alert(`${error.message}，请登录后重试`);
+      } else {
+        alert('简历解析失败，请稍后重试');
+      }
+      
       setUploadStage('');
       setUploadProgress(0);
     } finally {
       setTimeout(() => {
         setUploadLoading(false);
+        const totalDuration = Date.now() - startTime;
+        console.log(`🏁 [FRONTEND_UPLOAD] 处理完成，总耗时: ${totalDuration}ms`);
       }, 1000);
     }
   };
@@ -399,6 +506,53 @@ const LandingPage = () => {
     setEditedResult(null);
   };
 
+  /**
+   * 临时诊断函数 - 检查认证状态
+   */
+  const handleDiagnosis = async () => {
+    console.log('🔍 开始认证诊断...');
+    
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    
+    console.log('Token:', token ? '存在' : '不存在');
+    console.log('User:', user ? '存在' : '不存在');
+    console.log('isAuthenticated():', isAuthenticated());
+    
+    if (token) {
+      try {
+        // 测试API调用
+        const response = await fetch('/api/resumes', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const data = await response.json();
+        console.log('API测试结果:', response.status, data);
+        
+        alert(`诊断结果：
+Token: ${token ? '存在' : '不存在'}
+User: ${user ? '存在' : '不存在'}  
+认证检查: ${isAuthenticated() ? '通过' : '失败'}
+API测试: ${response.status} - ${data.message || '成功'}`);
+      } catch (error) {
+        console.error('API测试失败:', error);
+        alert(`诊断结果：
+Token: ${token ? '存在' : '不存在'}
+User: ${user ? '存在' : '不存在'}
+认证检查: ${isAuthenticated() ? '通过' : '失败'}
+API测试: 失败 - ${error.message}`);
+      }
+    } else {
+      alert(`诊断结果：
+Token: 不存在
+User: ${user ? '存在' : '不存在'}
+认证检查: 失败
+需要先登录！`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* 导航栏 */}
@@ -420,6 +574,13 @@ const LandingPage = () => {
                     我的简历
                   </button>
                   <button
+                    onClick={handleDiagnosis}
+                    className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+                    title="诊断认证状态"
+                  >
+                    🔍诊断
+                  </button>
+                  <button
                     onClick={handleLogout}
                     className="text-gray-500 hover:text-gray-700 text-sm"
                   >
@@ -428,6 +589,13 @@ const LandingPage = () => {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
+                  <button
+                    onClick={handleDiagnosis}
+                    className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
+                    title="诊断认证状态"
+                  >
+                    🔍诊断
+                  </button>
                   <button
                     onClick={() => {
                       setAuthMode('login');

@@ -346,19 +346,38 @@ class ResumeController {
    * POST /api/resumes/upload
    */
   static async uploadAndParseResume(req, res) {
+    const startTime = Date.now();
+    console.log('🚀 [UPLOAD_RESUME] ==> 开始处理简历上传请求');
+    console.log('📋 [UPLOAD_RESUME] 请求头:', {
+      authorization: req.headers.authorization ? 'Bearer ***' : '无',
+      contentType: req.headers['content-type'],
+      userAgent: req.headers['user-agent']
+    });
+    console.log('👤 [UPLOAD_RESUME] 用户信息:', req.user ? { id: req.user.id, userId: req.user.userId } : '无');
+    
     const { taskQueueService } = require('../services/taskQueueService');
     
     const uploadMiddleware = upload.single('resume');
     
     uploadMiddleware(req, res, async function (err) {
       if (err) {
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误:', err);
         return res.status(400).json({
           success: false,
           message: err.message
         });
       }
       
+      console.log('📁 [UPLOAD_RESUME] 文件上传中间件处理完成');
+      console.log('📄 [UPLOAD_RESUME] 上传文件信息:', req.file ? {
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        path: req.file.path
+      } : '无文件');
+      
       if (!req.file) {
+        console.error('❌ [UPLOAD_RESUME] 未检测到上传文件');
         return res.status(400).json({
           success: false,
           message: '请选择要上传的简历文件'
@@ -369,7 +388,12 @@ class ResumeController {
         const userId = req.user.id;
         const file = req.file;
         
-        console.log('📁 创建简历解析任务:', file.originalname);
+        console.log('🔧 [UPLOAD_RESUME] 准备创建解析任务:', {
+          userId: userId,
+          filename: file.originalname,
+          fileSize: file.size,
+          fileType: path.extname(file.originalname).substring(1)
+        });
         
         // 创建异步解析任务
         const taskId = await taskQueueService.createTask('resume_parse', {
@@ -378,6 +402,11 @@ class ResumeController {
           originalName: file.originalname,
           userId: userId
         }, userId);
+        
+        console.log('✅ [UPLOAD_RESUME] 任务创建成功:', { taskId: taskId });
+        
+        const duration = Date.now() - startTime;
+        console.log(`🏁 [UPLOAD_RESUME] 请求处理完成，耗时: ${duration}ms`);
         
         // 立即返回任务ID
         res.json({
@@ -391,18 +420,20 @@ class ResumeController {
         });
         
       } catch (error) {
-        console.error('创建简历解析任务失败:', error);
+        console.error('❌ [UPLOAD_RESUME] 创建简历解析任务失败:', error);
+        console.error('❌ [UPLOAD_RESUME] 错误堆栈:', error.stack);
         
         // 清理上传的临时文件
         if (req.file) {
           fs.unlink(req.file.path, (err) => {
-            if (err) console.error('删除临时文件失败:', err);
+            if (err) console.error('❌ [UPLOAD_RESUME] 删除临时文件失败:', err);
+            else console.log('🗑️ [UPLOAD_RESUME] 临时文件已清理:', req.file.path);
           });
         }
         
         res.status(500).json({
           success: false,
-          message: '创建简历解析任务失败'
+          message: '创建简历解析任务失败: ' + error.message
         });
       }
     });
@@ -468,25 +499,53 @@ class ResumeController {
    * GET /api/tasks/:taskId/status
    */
   static async getTaskStatus(req, res) {
+    console.log('📊 [TASK_STATUS] ==> 开始查询任务状态');
+    
     try {
       const { taskId } = req.params;
       const userId = req.user.id;
+      
+      console.log('📊 [TASK_STATUS] 查询参数:', {
+        taskId: taskId,
+        userId: userId,
+        userAgent: req.headers['user-agent']
+      });
+   
       const { taskQueueService } = require('../services/taskQueueService');
       
       // 验证任务是否属于当前用户
+      console.log('📊 [TASK_STATUS] 开始获取任务状态...');
       const task = await taskQueueService.getTaskStatus(taskId);
+      console.log('📊 [TASK_STATUS] 任务状态获取成功:', {
+        taskId: task.taskId,
+        status: task.status,
+        progress: task.progress,
+        message: task.message
+      });
       
       // 检查任务权限（只有任务创建者可以查看）
+      console.log('📊 [TASK_STATUS] 开始验证任务权限...');
       const taskRecord = await knex('task_queue')
         .where('task_id', taskId)
         .first();
         
       if (taskRecord && taskRecord.user_id !== userId) {
+        console.error('❌ [TASK_STATUS] 权限验证失败:', {
+          taskUserId: taskRecord.user_id,
+          requestUserId: userId
+        });
         return res.status(403).json({
           success: false,
           message: '无权访问此任务'
         });
       }
+      
+      console.log('✅ [TASK_STATUS] 权限验证通过');
+      console.log('📤 [TASK_STATUS] 返回任务状态:', {
+        status: task.status,
+        progress: task.progress,
+        hasResultData: !!task.resultData
+      });
       
       res.json({
         success: true,
@@ -495,10 +554,15 @@ class ResumeController {
       });
       
     } catch (error) {
-      console.error('获取任务状态失败:', error);
+      console.error('❌ [TASK_STATUS] 获取任务状态失败:', {
+        error: error.message,
+        stack: error.stack,
+        taskId: req.params.taskId
+      });
+      
       res.status(500).json({
         success: false,
-        message: '获取任务状态失败'
+        message: error.message.includes('任务不存在') ? '任务不存在' : '获取任务状态失败'
       });
     }
   }

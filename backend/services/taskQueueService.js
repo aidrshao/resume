@@ -285,46 +285,80 @@ class TaskQueueService extends EventEmitter {
    * @param {Object} taskData - 任务数据
    */
   async executeResumeParseTask(taskId, taskData) {
+    console.log('🔧 [RESUME_PARSE_TASK] ==> 开始执行简历解析任务');
+    console.log('🔧 [RESUME_PARSE_TASK] 任务参数:', {
+      taskId: taskId,
+      taskData: {
+        filePath: taskData.filePath,
+        fileType: taskData.fileType,
+        originalName: taskData.originalName,
+        userId: taskData.userId
+      }
+    });
+    
     const ResumeParseService = require('./resumeParseService');
     
     try {
       const { filePath, fileType } = taskData;
       
+      console.log('🔧 [RESUME_PARSE_TASK] 验证文件存在性...');
+      const fs = require('fs');
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`文件不存在: ${filePath}`);
+      }
+      
       // 更新进度：开始文本提取
+      console.log('🔧 [RESUME_PARSE_TASK] 开始文本提取...');
       await this.updateTask(taskId, 'processing', 15, '正在提取文件文本...');
       
       // 提取文本
       let extractedText = '';
       switch (fileType.toLowerCase()) {
         case 'pdf':
+          console.log('🔧 [RESUME_PARSE_TASK] 提取PDF文本...');
           extractedText = await ResumeParseService.extractTextFromPDF(filePath);
           break;
         case 'docx':
         case 'doc':
+          console.log('🔧 [RESUME_PARSE_TASK] 提取Word文本...');
           extractedText = await ResumeParseService.extractTextFromWord(filePath);
           break;
         case 'txt':
+          console.log('🔧 [RESUME_PARSE_TASK] 读取TXT文本...');
           extractedText = await ResumeParseService.extractTextFromTXT(filePath);
           break;
         default:
           throw new Error(`不支持的文件类型: ${fileType}`);
       }
 
+      console.log('🔧 [RESUME_PARSE_TASK] 文本提取完成:', {
+        textLength: extractedText.length,
+        preview: extractedText.substring(0, 100) + '...'
+      });
+
       // 更新进度：文本提取完成
       await this.updateTask(taskId, 'processing', 35, `文本提取完成，长度: ${extractedText.length} 字符`);
 
       // 更新进度：开始AI结构化
+      console.log('🔧 [RESUME_PARSE_TASK] 开始AI结构化分析...');
       await this.updateTask(taskId, 'processing', 50, '正在进行AI智能结构化分析...');
 
       // AI结构化
       const structuredData = await ResumeParseService.structureResumeText(extractedText);
+      console.log('🔧 [RESUME_PARSE_TASK] AI结构化完成:', {
+        hasPersonalInfo: !!(structuredData && structuredData.personalInfo),
+        hasExperiences: !!(structuredData && structuredData.experiences),
+        hasEducations: !!(structuredData && structuredData.educations)
+      });
 
       // 更新进度：AI分析完成
       await this.updateTask(taskId, 'processing', 80, 'AI分析完成，正在清理数据...');
 
       // 清理和验证数据
+      console.log('🔧 [RESUME_PARSE_TASK] 开始数据清理验证...');
       const cleanedData = ResumeParseService.validateAndCleanData(structuredData);
 
+      console.log('✅ [RESUME_PARSE_TASK] 简历解析完成');
       // 任务完成
       await this.updateTask(taskId, 'completed', 100, '简历解析完成', {
         extractedText,
@@ -332,20 +366,29 @@ class TaskQueueService extends EventEmitter {
       });
 
     } catch (error) {
-      console.error('简历解析任务失败:', error);
+      console.error('❌ [RESUME_PARSE_TASK] 简历解析任务失败:', {
+        taskId: taskId,
+        error: error.message,
+        stack: error.stack,
+        taskData: taskData
+      });
       await this.updateTask(taskId, 'failed', 100, '简历解析失败', null, error.message);
     } finally {
       // 清理临时文件
       try {
+        console.log('🗑️ [RESUME_PARSE_TASK] 开始清理临时文件...');
         const fs = require('fs');
         if (taskData.filePath) {
           fs.unlink(taskData.filePath, (err) => {
-            if (err) console.error('删除临时文件失败:', err);
-            else console.log('✅ 临时文件已清理:', taskData.filePath);
+            if (err) {
+              console.error('❌ [RESUME_PARSE_TASK] 删除临时文件失败:', err);
+            } else {
+              console.log('✅ [RESUME_PARSE_TASK] 临时文件已清理:', taskData.filePath);
+            }
           });
         }
       } catch (cleanupError) {
-        console.error('文件清理过程中出错:', cleanupError);
+        console.error('❌ [RESUME_PARSE_TASK] 文件清理过程中出错:', cleanupError);
       }
     }
   }
