@@ -9,9 +9,7 @@ const ResumeController = require('../controllers/resumeController');
 const AIChatController = require('../controllers/aiChatController');
 const { authenticateToken } = require('../middleware/auth');
 
-// 公开API - 不需要认证的体验功能
-router.post('/resumes/parse', ResumeController.parseResumeDemo);
-router.post('/ai/chat', AIChatController.chatDemo);
+// 演示API已删除 - 统一使用认证后的功能
 
 // 应用认证中间件到需要登录的路由
 router.use(authenticateToken);

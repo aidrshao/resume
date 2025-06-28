@@ -390,63 +390,7 @@ class AIChatController {
     }
   }
 
-  /**
-   * AI对话演示 - 不需要认证
-   * POST /api/ai/chat
-   */
-  static async chatDemo(req, res) {
-    try {
-      const { message, conversationId } = req.body;
-      
-      if (!message) {
-        return res.status(400).json({
-          success: false,
-          message: '缺少消息内容'
-        });
-      }
-      
-      console.log('🤖 处理AI对话演示:', { conversationId, message });
-      
-      // 构建简单的对话历史（演示模式）
-      const conversationHistory = [
-        {
-          role: 'system',
-          content: '你是一个专业的简历助手，正在帮助用户收集简历信息。请保持友好、专业的语调，每次只问1-2个相关问题。'
-        },
-        {
-          role: 'user',
-          content: message
-        }
-      ];
-      
-      // 调用AI服务处理对话
-      const aiResponse = await aiService.collectUserInfoByChat(
-        conversationHistory,
-        message,
-        {} // 演示模式，不保存已收集信息
-      );
-      
-      console.log('✅ AI对话演示处理完成');
-      
-      res.json({
-        success: true,
-        data: {
-          reply: aiResponse.response || '感谢您的信息！请继续告诉我更多关于您的工作经历。',
-          nextQuestion: aiResponse.nextQuestion,
-          isComplete: aiResponse.isComplete || false,
-          completionPercentage: aiResponse.completionPercentage || 0
-        },
-        message: '对话成功'
-      });
-      
-    } catch (error) {
-      console.error('AI对话演示失败:', error);
-      res.status(500).json({
-        success: false,
-        message: 'AI对话服务暂时不可用，请稍后重试'
-      });
-    }
-  }
+  // 演示对话方法已删除 - 统一使用认证后的真实对话功能
 }
 
 module.exports = AIChatController; 

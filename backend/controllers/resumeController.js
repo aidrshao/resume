@@ -43,23 +43,7 @@ const upload = multer({
   }
 });
 
-// 演示用的上传配置，支持更多文件类型
-const uploadDemo = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB限制
-  },
-  fileFilter: function (req, file, cb) {
-    const allowedTypes = /pdf|docx|doc|txt/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    
-    if (extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('只支持PDF、Word文档和TXT文件格式'));
-    }
-  }
-});
+// 删除演示模式配置
 
 class ResumeController {
   /**
@@ -254,15 +238,24 @@ class ResumeController {
       // 更新状态为生成中
       await Resume.updateStatus(id, 'generating', '开始生成简历');
       
-      // 这里可以添加实际的PDF生成逻辑
-      // 目前先模拟生成过程
-      setTimeout(async () => {
+      // 异步执行简历生成
+      setImmediate(async () => {
         try {
+          console.log('🚀 开始生成简历PDF');
+          
+          // TODO: 这里应该调用实际的PDF生成服务
+          // 例如使用 puppeteer 或其他PDF生成库
+          // const pdfUrl = await generateResumePDF(resume.resume_data, resume.template_id);
+          
+          // 暂时标记为完成，等待PDF生成功能实现
           await Resume.updateStatus(id, 'completed', '简历生成完成');
+          console.log('✅ 简历生成完成');
+          
         } catch (error) {
+          console.error('❌ 简历生成失败:', error);
           await Resume.updateStatus(id, 'failed', `生成失败: ${error.message}`);
         }
-      }, 3000);
+      });
       
       res.json({
         success: true,
@@ -498,87 +491,7 @@ class ResumeController {
     }
   }
 
-  /**
-   * 简历解析演示 - 不需要认证
-   * POST /api/resumes/parse
-   */
-  static async parseResumeDemo(req, res) {
-    const uploadMiddleware = uploadDemo.single('resume');
-    
-    uploadMiddleware(req, res, async function (err) {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          message: err.message
-        });
-      }
-      
-      if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          message: '请选择要上传的简历文件'
-        });
-      }
-      
-      try {
-        const file = req.file;
-        
-        console.log('📁 开始处理上传的简历文件(演示):', file.originalname);
-        
-        // 解析简历文件
-        const parseResult = await ResumeParseService.parseResumeFile(
-          file.path,
-          path.extname(file.originalname).substring(1)
-        );
-        
-        if (parseResult.success) {
-          // 清理和验证数据
-          const cleanedData = ResumeParseService.validateAndCleanData(parseResult.structuredData);
-          
-          res.json({
-            success: true,
-            data: {
-              personalInfo: cleanedData.personalInfo,
-              educations: cleanedData.educations,
-              workExperiences: cleanedData.workExperiences,
-              projects: cleanedData.projects,
-              skills: cleanedData.skills,
-              languages: cleanedData.languages,
-              awards: cleanedData.awards,
-              publications: cleanedData.publications,
-              interests: cleanedData.interests
-            },
-            message: '简历解析成功'
-          });
-        } else {
-          res.status(400).json({
-            success: false,
-            message: parseResult.error || '简历解析失败'
-          });
-        }
-        
-        // 清理上传的临时文件
-        fs.unlink(file.path, (err) => {
-          if (err) console.error('删除临时文件失败:', err);
-        });
-        
-      } catch (error) {
-        console.error('处理上传简历失败:', error);
-        
-        // 清理上传的临时文件
-        if (req.file) {
-          fs.unlink(req.file.path, (err) => {
-            if (err) console.error('删除临时文件失败:', err);
-          });
-        }
-        
-        res.status(500).json({
-          success: false,
-          message: '处理上传简历失败'
-        });
-      }
-    });
-  }
+  // 演示方法已删除 - 统一使用认证后的真实解析功能
 
   /**
    * 保存基础简历

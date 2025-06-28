@@ -101,6 +101,18 @@ const LandingPage = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // 检查用户是否已登录
+    if (!isAuthenticated()) {
+      // 设置待执行的操作并提示登录
+      setPendingAction(() => () => {
+        const fakeEvent = { target: { files: [file] } };
+        handleFileUpload(fakeEvent);
+      });
+      setAuthMode('login');
+      setShowAuthModal(true);
+      return;
+    }
+
     setUploadFile(file);
     setUploadLoading(true);
     setUploadResult(null);
@@ -149,8 +161,17 @@ const LandingPage = () => {
       setUploadStage('服务器正在处理文件...');
       await startProgressAnimation(60, 1000);
 
-      const response = await fetch('/api/resumes/parse', {
+      // 检查用户认证状态
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('需要登录后才能上传简历');
+      }
+
+      const response = await fetch('/api/resumes/upload', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData,
       });
 
