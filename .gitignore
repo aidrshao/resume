@@ -198,6 +198,9 @@ tramp
 # 数据库迁移备份
 backend/migrations/*.backup
 
+# 部署脚本（包含敏感密钥信息）
+deploy-standalone.sh
+
 # 部署相关文档（包含敏感信息）
 QUICK_DEPLOY.md
 
@@ -215,6 +218,7 @@ production.env
 # 敏感配置文件
 config/secrets.*
 secrets.*
+deploy-standalone.sh
 
 # API密钥和配置文件
 **/api-keys.*
