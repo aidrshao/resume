@@ -12,7 +12,7 @@ DB_PORT=5435
 DB_CONTAINER_NAME="resume-postgres"
 DB_NAME="resume_db"
 DB_USER="resume_user"
-DB_PASSWORD="Resume2024!SecurePass"
+DB_PASSWORD="Resume2024SecurePass"
 
 # 日志函数
 log() {
@@ -434,7 +434,7 @@ DB_USER=$DB_USER
 DB_PASS=$DB_PASSWORD
 
 # JWT安全配置
-JWT_SECRET=Resume2024!SuperSecure!JWT!Key!$(date +%s)
+JWT_SECRET=Resume2024SuperSecureJWTKey$(date +%s)
 JWT_EXPIRES_IN=24h
 
 # AI API配置（agicto代理）
@@ -626,6 +626,85 @@ start_services() {
   log_success "服务启动完成"
 }
 
+# 配置nginx反向代理
+setup_nginx() {
+  log "🌐 配置nginx反向代理..."
+  
+  # 检查nginx是否安装
+  if ! command -v nginx &> /dev/null; then
+    log_warning "nginx未安装，跳过nginx配置"
+    return 0
+  fi
+  
+  # 创建nginx配置文件
+  cat > /etc/nginx/sites-available/cv.juncaishe.com << 'NGINXEOF'
+# Resume项目 - cv.juncaishe.com 配置
+server {
+    listen 80;
+    server_name cv.juncaishe.com;
+    
+    # 临时HTTP访问（用于测试）
+    location / {
+        proxy_pass http://127.0.0.1:3016;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # 后端API
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # 文件上传大小限制
+        client_max_body_size 50M;
+    }
+    
+    # 健康检查
+    location /health {
+        access_log off;
+        return 200 "Resume System OK\n";
+        add_header Content-Type text/plain;
+    }
+    
+    # 日志
+    access_log /var/log/nginx/cv.juncaishe.com.access.log;
+    error_log /var/log/nginx/cv.juncaishe.com.error.log;
+}
+NGINXEOF
+  
+  # 启用站点配置
+  if [ ! -L /etc/nginx/sites-enabled/cv.juncaishe.com ]; then
+    ln -sf /etc/nginx/sites-available/cv.juncaishe.com /etc/nginx/sites-enabled/
+    log_success "nginx配置已创建并启用"
+  else
+    log "nginx配置已存在，已更新"
+  fi
+  
+  # 测试nginx配置
+  if nginx -t 2>/dev/null; then
+    log_success "nginx配置测试通过"
+    
+    # 重载nginx配置
+    systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
+    log_success "nginx配置已重载"
+  else
+    log_warning "nginx配置测试失败，请手动检查"
+  fi
+}
+
 # 修复的健康检查
 health_check() {
   log "🏥 执行全面健康检查..."
@@ -772,6 +851,7 @@ main() {
   setup_backend
   setup_frontend
   start_services
+  setup_nginx
   
   # 健康检查
   if health_check; then
