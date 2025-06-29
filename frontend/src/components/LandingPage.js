@@ -444,6 +444,9 @@ const LandingPage = () => {
    * 保存基础简历
    */
   const handleSaveBaseResume = async (forceOverwrite = false) => {
+    // 确保forceOverwrite是布尔值，防止意外传递事件对象
+    forceOverwrite = Boolean(forceOverwrite);
+    
     // 检查用户是否已登录
     if (!isAuthenticated()) {
       // 设置待执行的操作
@@ -457,6 +460,14 @@ const LandingPage = () => {
     try {
       const dataToSave = editedResult || uploadResult;
       
+      // 验证数据的完整性，防止包含DOM引用或循环引用
+      if (!dataToSave || typeof dataToSave !== 'object') {
+        throw new Error('简历数据无效，请重新解析简历');
+      }
+      
+      // 创建一个干净的数据副本，移除可能的DOM引用
+      const cleanData = JSON.parse(JSON.stringify(dataToSave));
+      
       const response = await fetch('/api/resumes/save-base', {
         method: 'POST',
         headers: {
@@ -464,7 +475,7 @@ const LandingPage = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          resumeData: dataToSave,
+          resumeData: cleanData,
           source: selectedMode === 'upload' ? 'upload' : 'chat',
           forceOverwrite: forceOverwrite
         })
@@ -1003,7 +1014,7 @@ User: ${user ? '存在' : '不存在'}
         onEditChange={handleEditChange}
         onAddExperience={handleAddExperience}
         onRemoveExperience={handleRemoveExperience}
-        onSave={handleSaveBaseResume}
+        onSave={() => handleSaveBaseResume()}
         isSaving={isSaving}
       />
 
