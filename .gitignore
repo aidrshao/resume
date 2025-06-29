@@ -71,17 +71,6 @@ dist
 
 # Gatsby文件
 .cache/
-# public  # ⚠️ 重要：不要忽略frontend/public目录，React应用需要这些文件！
-
-# 只忽略上传文件，不忽略public目录本身
-public/uploads/
-frontend/public/uploads/
-backend/public/uploads/
-
-# 但确保保留这些重要的public文件：
-# frontend/public/index.html
-# frontend/public/manifest.json
-# frontend/public/favicon.ico
 
 # Storybook构建输出
 .out
@@ -208,6 +197,9 @@ tramp
 # 项目特定的忽略文件
 # 数据库迁移备份
 backend/migrations/*.backup
+
+# 部署相关文档（包含敏感信息）
+QUICK_DEPLOY.md
 
 # 上传文件目录
 uploads/
