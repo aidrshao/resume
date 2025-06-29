@@ -71,7 +71,6 @@ dist
 
 # Gatsby文件
 .cache/
-# public  # 注释掉，不要忽略frontend/public目录
 
 # Storybook构建输出
 .out
