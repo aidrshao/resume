@@ -225,3 +225,14 @@ deploy-standalone.sh
 **/api-keys.*
 **/credentials.*
 **/secrets.* 
+
+# 临时修复脚本（防止意外提交）
+fix-*.sh
+test-*.sh
+quick-*.sh
+deploy-clean.sh
+*-fix.sh
+*-test.sh
+EMERGENCY-*.md
+*问题解决方案.md
+diagnose-*.js
