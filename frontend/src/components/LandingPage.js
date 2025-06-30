@@ -364,9 +364,19 @@ const LandingPage = () => {
         console.log('🌐 [FRONTEND_UPLOAD] 健康检查响应状态:', healthCheck.status);
         
         if (healthCheck.ok) {
-          const healthData = await healthCheck.json();
-          console.log('🌐 [FRONTEND_UPLOAD] 健康检查响应:', healthData);
-          console.log('✅ [FRONTEND_UPLOAD] 网络连接正常');
+          // 先获取响应文本，然后尝试解析JSON
+          const responseText = await healthCheck.text();
+          try {
+            const healthData = JSON.parse(responseText);
+            console.log('🌐 [FRONTEND_UPLOAD] 健康检查响应:', healthData);
+            console.log('✅ [FRONTEND_UPLOAD] 网络连接正常');
+          } catch (jsonError) {
+            // 如果不是JSON格式，说明nginx代理配置有问题
+            console.warn('⚠️ [FRONTEND_UPLOAD] 健康检查返回非JSON格式:', responseText);
+            console.warn('⚠️ [FRONTEND_UPLOAD] 这通常表明nginx代理配置有问题，请检查端口配置');
+            console.warn('⚠️ [FRONTEND_UPLOAD] JSON解析错误:', jsonError.message);
+            // 不抛出错误，继续执行上传逻辑
+          }
         } else {
           console.warn('⚠️ [FRONTEND_UPLOAD] 健康检查状态异常:', healthCheck.status);
         }
