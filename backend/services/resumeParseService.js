@@ -253,23 +253,64 @@ ${text}
       
       console.log('🤖 AI原始响应:', response.substring(0, 500) + '...');
       
-      // 尝试解析JSON
+      // 🔧 增强版JSON解析（多重容错处理）
       let structuredData;
+      let rawContent = response;
+      
       try {
-        // 清理可能的markdown代码块标记
-        const cleanedResponse = response.replace(/```json\n?|\n?```/g, '').trim();
+        // 步骤1：基础清理
+        console.log('🧹 开始JSON清理和解析...');
+        let cleanedResponse = response
+          .replace(/```json\n?|\n?```/g, '') // 移除代码块标记
+          .replace(/^[^{]*/, '') // 移除开头的非JSON内容
+          .replace(/[^}]*$/, '') // 移除结尾的非JSON内容
+          .trim();
+        
+        console.log('📏 清理后JSON长度:', cleanedResponse.length);
+        console.log('🔍 JSON开头100字符:', cleanedResponse.substring(0, 100));
+        console.log('🔍 JSON结尾100字符:', cleanedResponse.substring(cleanedResponse.length - 100));
+        
         structuredData = JSON.parse(cleanedResponse);
-        console.log('✅ JSON解析成功');
+        console.log('✅ 基础JSON解析成功');
+        
       } catch (parseError) {
-        console.error('❌ JSON解析失败，尝试修复:', parseError);
-        // 如果直接解析失败，尝试提取JSON部分
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          structuredData = JSON.parse(jsonMatch[0]);
-          console.log('✅ JSON修复解析成功');
-        } else {
-          console.error('❌ 无法提取有效JSON');
-          throw new Error('AI返回的不是有效的JSON格式');
+        console.error('❌ 基础JSON解析失败:', parseError.message);
+        console.error('❌ 错误位置:', parseError.message.match(/position (\d+)/)?.[1] || '未知');
+        
+        try {
+          // 步骤2：智能JSON修复
+          console.log('🔧 开始智能JSON修复...');
+          let fixedJson = this.smartFixJSON(rawContent);
+          
+          structuredData = JSON.parse(fixedJson);
+          console.log('✅ 智能修复解析成功');
+          
+        } catch (fixError) {
+          console.error('❌ 智能修复失败:', fixError.message);
+          
+          try {
+            // 步骤3：提取JSON片段
+            console.log('🔧 尝试提取JSON片段...');
+            const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              let extractedJson = jsonMatch[0];
+              // 尝试修复常见的JSON错误
+              extractedJson = this.repairCommonJSONErrors(extractedJson);
+              
+              structuredData = JSON.parse(extractedJson);
+              console.log('✅ JSON片段解析成功');
+            } else {
+              throw new Error('无法提取有效的JSON结构');
+            }
+            
+          } catch (extractError) {
+            console.error('❌ JSON片段解析失败:', extractError.message);
+            console.error('📝 AI原始响应:', rawContent.substring(0, 1000) + '...');
+            
+            // 步骤4：创建默认结构
+            console.warn('⚠️ 所有解析方法失败，创建基础结构');
+            structuredData = this.createFallbackStructure();
+          }
         }
       }
       
@@ -287,6 +328,117 @@ ${text}
       console.error('💥 AI结构化识别失败:', error);
       throw new Error('简历内容结构化识别失败: ' + error.message);
     }
+  }
+
+  /**
+   * 🔧 智能JSON修复
+   * @param {string} rawContent - 原始内容
+   * @returns {string} 修复后的JSON字符串
+   */
+  static smartFixJSON(rawContent) {
+    console.log('🔧 [JSON修复] 开始智能修复...');
+    
+    // 提取最可能的JSON部分
+    let jsonContent = rawContent;
+    
+    // 查找最外层的大括号
+    const firstBrace = jsonContent.indexOf('{');
+    const lastBrace = jsonContent.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+    }
+    
+    // 修复常见的AI生成JSON问题
+    jsonContent = jsonContent
+      // 修复多余的逗号
+      .replace(/,(\s*[}\]])/g, '$1')
+      // 修复缺失的逗号（在对象或数组元素之间）
+      .replace(/("\w+":\s*"[^"]*")\s*\n\s*(")/g, '$1,\n    $2')
+      .replace(/(\]|\})\s*\n\s*(")/g, '$1,\n    $2')
+      // 修复引号问题
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+      // 修复数组末尾的逗号
+      .replace(/,(\s*\])/g, '$1')
+      // 修复对象末尾的逗号
+      .replace(/,(\s*\})/g, '$1');
+    
+    console.log('🔧 [JSON修复] 基础修复完成');
+    return jsonContent;
+  }
+
+  /**
+   * 🔧 修复常见JSON错误
+   * @param {string} jsonStr - JSON字符串
+   * @returns {string} 修复后的JSON字符串
+   */
+  static repairCommonJSONErrors(jsonStr) {
+    console.log('🔧 [JSON修复] 修复常见错误...');
+    
+    let repaired = jsonStr;
+    
+    // 修复1：删除多余的逗号
+    repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+    
+    // 修复2：在缺少逗号的地方添加逗号
+    repaired = repaired.replace(/("|\]|\})(\s*\n\s*)("|\{|\[)/g, '$1,$2$3');
+    
+    // 修复3：修复未闭合的字符串
+    const stringMatches = repaired.match(/"[^"]*$/gm);
+    if (stringMatches) {
+      repaired = repaired.replace(/"([^"]*?)$/gm, '"$1"');
+    }
+    
+    // 修复4：修复未闭合的数组或对象
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/\]/g) || []).length;
+    
+    // 添加缺失的闭合括号
+    for (let i = 0; i < (openBrackets - closeBrackets); i++) {
+      repaired += ']';
+    }
+    for (let i = 0; i < (openBraces - closeBraces); i++) {
+      repaired += '}';
+    }
+    
+    console.log('🔧 [JSON修复] 常见错误修复完成');
+    return repaired;
+  }
+
+  /**
+   * 🔧 创建默认结构（当所有解析都失败时）
+   * @returns {Object} 默认的简历结构
+   */
+  static createFallbackStructure() {
+    console.log('🔧 [JSON修复] 创建默认结构...');
+    
+    return {
+      personalInfo: {
+        name: '解析失败 - 请手动编辑',
+        phone: null,
+        email: null,
+        location: null,
+        summary: '简历解析遇到技术问题，请手动填写个人信息',
+        objective: null
+      },
+      educations: [],
+      workExperiences: [],
+      projects: [],
+      skills: {
+        technical: [],
+        professional: [],
+        soft: [],
+        certifications: []
+      },
+      languages: [],
+      awards: [],
+      publications: [],
+      interests: [],
+      _parseError: true,
+      _errorMessage: 'AI返回的JSON格式存在问题，已创建默认结构'
+    };
   }
 
   /**
