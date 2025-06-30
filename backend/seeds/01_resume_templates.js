@@ -13,7 +13,7 @@ exports.seed = async function(knex) {
       id: 1,
       name: '经典商务',
       description: '简洁专业的商务风格模板，适合大多数行业',
-      preview_image: '/templates/classic-business.png',
+
       template_config: {
         layout: 'single-column',
         colors: {
@@ -37,7 +37,7 @@ exports.seed = async function(knex) {
       id: 2,
       name: '现代创意',
       description: '现代设计风格，适合创意和设计行业',
-      preview_image: '/templates/modern-creative.png',
+
       template_config: {
         layout: 'two-column',
         colors: {
@@ -61,7 +61,7 @@ exports.seed = async function(knex) {
       id: 3,
       name: '技术极简',
       description: '极简风格，专为技术岗位设计',
-      preview_image: '/templates/tech-minimal.png',
+
       template_config: {
         layout: 'single-column',
         colors: {
@@ -85,7 +85,7 @@ exports.seed = async function(knex) {
       id: 4,
       name: '学术研究',
       description: '适合学术界和研究岗位的正式模板',
-      preview_image: '/templates/academic.png',
+
       template_config: {
         layout: 'single-column',
         colors: {
@@ -109,7 +109,7 @@ exports.seed = async function(knex) {
       id: 5,
       name: '销售营销',
       description: '动感活力的设计，适合销售和营销岗位',
-      preview_image: '/templates/sales-marketing.png',
+
       template_config: {
         layout: 'two-column',
         colors: {

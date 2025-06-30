@@ -9,6 +9,16 @@ const ResumeController = require('../controllers/resumeController');
 const AIChatController = require('../controllers/aiChatController');
 const { authenticateToken } = require('../middleware/auth');
 
+// 健康检查端点（无需认证）
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: '服务器运行正常',
+    timestamp: new Date().toISOString(),
+    service: 'resume-api'
+  });
+});
+
 // 演示API已删除 - 统一使用认证后的功能
 
 // 应用认证中间件到需要登录的路由

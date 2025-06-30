@@ -16,7 +16,10 @@ const PORT = process.env.PORT || 8000;
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://localhost:3016', 
+    'http://localhost:3016',
+    'http://localhost:3017',
+    'http://cv.juncaishe.com',
+    'https://cv.juncaishe.com',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true

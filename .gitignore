@@ -200,6 +200,7 @@ backend/migrations/*.backup
 
 # 部署脚本（包含敏感密钥信息）
 deploy-standalone.sh
+deploy.sh
 
 # 部署相关文档（包含敏感信息）
 QUICK_DEPLOY.md

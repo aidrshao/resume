@@ -624,8 +624,9 @@ class ResumeController {
     
     try {
       // 1. 验证用户认证
-      if (!req.user || !req.user.id) {
+      if (!req.user || (!req.user.id && !req.user.userId)) {
         console.error('❌ [SAVE_BASE_RESUME] 用户未认证或用户ID缺失');
+        console.error('❌ [SAVE_BASE_RESUME] req.user:', req.user);
         return res.status(401).json({
           success: false,
           message: '用户未认证',
@@ -633,8 +634,25 @@ class ResumeController {
         });
       }
       
-      const userId = req.user.id;
-      console.log('👤 [SAVE_BASE_RESUME] 用户ID:', userId);
+      // 兼容性处理：支持 req.user.id 和 req.user.userId
+      const userId = parseInt(req.user.id || req.user.userId, 10);
+      console.log('👤 [SAVE_BASE_RESUME] 原始用户信息:', {
+        'req.user.id': req.user.id,
+        'req.user.userId': req.user.userId,
+        'typeof req.user.id': typeof req.user.id,
+        'typeof req.user.userId': typeof req.user.userId
+      });
+      console.log('👤 [SAVE_BASE_RESUME] 处理后用户ID:', userId, '(类型:', typeof userId, ')');
+      
+      // 验证用户ID是否为有效数字
+      if (!userId || isNaN(userId)) {
+        console.error('❌ [SAVE_BASE_RESUME] 用户ID无效:', { userId, originalId: req.user.id || req.user.userId });
+        return res.status(400).json({
+          success: false,
+          message: '用户ID无效',
+          error_code: 'INVALID_USER_ID'
+        });
+      }
       
       // 2. 验证请求数据
       const { resumeData, source, forceOverwrite = false } = req.body;
@@ -654,7 +672,20 @@ class ResumeController {
         });
       }
 
-      // 3. 查询现有基础简历
+      // 3. 验证用户是否存在（避免外键约束错误）
+      console.log('🔍 [SAVE_BASE_RESUME] 验证用户是否存在...');
+      const userExists = await knex('users').where('id', userId).first();
+      if (!userExists) {
+        console.error('❌ [SAVE_BASE_RESUME] 用户不存在:', userId);
+        return res.status(404).json({
+          success: false,
+          message: '用户不存在',
+          error_code: 'USER_NOT_FOUND'
+        });
+      }
+      console.log('✅ [SAVE_BASE_RESUME] 用户存在验证通过:', { userId, email: userExists.email });
+
+      // 4. 查询现有基础简历
       console.log('🔍 [SAVE_BASE_RESUME] 查询用户现有基础简历...');
       const existingBaseResume = await Resume.findBaseResumeByUserId(userId);
       console.log('📊 [SAVE_BASE_RESUME] 现有基础简历查询结果:', existingBaseResume ? `ID: ${existingBaseResume.id}` : '无');
@@ -713,7 +744,7 @@ class ResumeController {
         };
 
         console.log('📝 [SAVE_BASE_RESUME] 准备插入的数据结构:');
-        console.log('  - user_id:', resumeInfo.user_id);
+        console.log('  - user_id:', resumeInfo.user_id, '(类型:', typeof resumeInfo.user_id, ')');
         console.log('  - title:', resumeInfo.title);
         console.log('  - template_id:', resumeInfo.template_id);
         console.log('  - source:', resumeInfo.source);
