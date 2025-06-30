@@ -341,7 +341,12 @@ const LandingPage = () => {
       });
       
       const uploadUrl = '/api/resumes/upload';
+      const fullUrl = window.location.origin + uploadUrl;
       console.log('📤 [FRONTEND_UPLOAD] 准备发送请求到:', uploadUrl);
+      console.log('📤 [FRONTEND_UPLOAD] 完整URL:', fullUrl);
+      console.log('📤 [FRONTEND_UPLOAD] 当前域名:', window.location.origin);
+      console.log('📤 [FRONTEND_UPLOAD] 当前协议:', window.location.protocol);
+      console.log('📤 [FRONTEND_UPLOAD] 当前主机:', window.location.host);
       console.log('📤 [FRONTEND_UPLOAD] 请求方法: POST');
       console.log('📤 [FRONTEND_UPLOAD] 请求头Authorization: Bearer', token.substring(0, 20) + '...');
 
@@ -349,6 +354,28 @@ const LandingPage = () => {
       console.log('📤 [FRONTEND_UPLOAD] UI状态更新为: 正在上传文件...');
       
       // 创建带超时的fetch请求（10分钟超时）
+      // 先测试网络连接
+      console.log('🌐 [FRONTEND_UPLOAD] 测试网络连接...');
+      try {
+        const healthCheck = await fetch('/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000) // 5秒超时
+        });
+        console.log('🌐 [FRONTEND_UPLOAD] 健康检查响应状态:', healthCheck.status);
+        
+        if (healthCheck.ok) {
+          const healthData = await healthCheck.json();
+          console.log('🌐 [FRONTEND_UPLOAD] 健康检查响应:', healthData);
+          console.log('✅ [FRONTEND_UPLOAD] 网络连接正常');
+        } else {
+          console.warn('⚠️ [FRONTEND_UPLOAD] 健康检查状态异常:', healthCheck.status);
+        }
+      } catch (healthError) {
+        console.error('❌ [FRONTEND_UPLOAD] 网络连接测试失败:', healthError);
+        alert('网络连接测试失败，请检查网络后重试: ' + healthError.message);
+        throw healthError;
+      }
+      
       console.log('⏱️ [FRONTEND_UPLOAD] 创建超时控制器...');
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
