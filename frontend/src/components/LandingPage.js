@@ -251,10 +251,15 @@ const LandingPage = () => {
   const handleFileUpload = async (event) => {
     const startTime = Date.now();
     console.log('🚀 [FRONTEND_UPLOAD] ==> 开始文件上传处理');
+    console.log('🚀 [FRONTEND_UPLOAD] 当前时间:', new Date().toISOString());
+    console.log('🚀 [FRONTEND_UPLOAD] 事件对象:', event);
+    console.log('🚀 [FRONTEND_UPLOAD] 事件目标:', event.target);
+    console.log('🚀 [FRONTEND_UPLOAD] 文件列表:', event.target.files);
     
     const file = event.target.files[0];
     if (!file) {
       console.log('❌ [FRONTEND_UPLOAD] 未选择文件');
+      alert('请选择一个文件');
       return;
     }
 
@@ -264,13 +269,27 @@ const LandingPage = () => {
       type: file.type,
       lastModified: new Date(file.lastModified).toISOString()
     });
+    
+    // 文件大小检查
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (file.size > maxSize) {
+      console.error('❌ [FRONTEND_UPLOAD] 文件过大:', file.size, '字节，最大允许:', maxSize, '字节');
+      alert(`文件过大！文件大小：${(file.size / 1024 / 1024).toFixed(2)}MB，最大允许：50MB`);
+      return;
+    }
+    
+    console.log('✅ [FRONTEND_UPLOAD] 文件大小检查通过');
 
     // 检查用户是否已登录
+    console.log('🔑 [FRONTEND_UPLOAD] 开始认证状态检查...');
     const authStatus = isAuthenticated();
-    console.log('🔑 [FRONTEND_UPLOAD] 认证状态检查:', authStatus);
+    console.log('🔑 [FRONTEND_UPLOAD] 认证状态检查结果:', authStatus);
+    console.log('🔑 [FRONTEND_UPLOAD] localStorage token:', localStorage.getItem('token') ? '存在' : '不存在');
+    console.log('🔑 [FRONTEND_UPLOAD] localStorage user:', localStorage.getItem('user') ? '存在' : '不存在');
     
     if (!authStatus) {
-      console.log('🔑 用户未登录，显示登录框');
+      console.log('🔑 [FRONTEND_UPLOAD] 用户未登录，显示登录框');
+      alert('请先登录后再上传文件');
       // 设置待执行的操作并提示登录
       setPendingAction(() => () => {
         const fakeEvent = { target: { files: [file] } };
@@ -280,42 +299,67 @@ const LandingPage = () => {
       setShowAuthModal(true);
       return;
     }
+    
+    console.log('✅ [FRONTEND_UPLOAD] 用户已登录，继续文件上传流程');
 
+    console.log('📋 [FRONTEND_UPLOAD] 设置上传状态...');
     setUploadFile(file);
     setUploadLoading(true);
     setUploadResult(null);
     setUploadProgress(0);
     setUploadStage('准备上传文件...');
+    
+    console.log('📋 [FRONTEND_UPLOAD] UI状态已更新');
 
     try {
       // 双重检查用户认证状态
+      console.log('🔐 [FRONTEND_UPLOAD] 进行二次认证检查...');
       const token = localStorage.getItem('token');
       const user = localStorage.getItem('user');
       
-      console.log('🔐 [FRONTEND_UPLOAD] 认证信息检查:', {
+      console.log('🔐 [FRONTEND_UPLOAD] 认证信息详情:', {
         hasToken: !!token,
         tokenLength: token ? token.length : 0,
         hasUser: !!user,
-        tokenPrefix: token ? token.substring(0, 20) + '...' : '无'
+        tokenPrefix: token ? token.substring(0, 20) + '...' : '无',
+        userInfo: user ? JSON.parse(user) : null
       });
       
       if (!token) {
+        console.error('❌ [FRONTEND_UPLOAD] token缺失');
         throw new Error('认证信息缺失，请重新登录');
       }
 
+      console.log('📦 [FRONTEND_UPLOAD] 创建FormData...');
       const formData = new FormData();
       formData.append('resume', file);
       
-      console.log('📤 [FRONTEND_UPLOAD] 准备发送请求到:', '/api/resumes/upload');
-      console.log('📤 [FRONTEND_UPLOAD] FormData包含文件:', file.name);
+      console.log('📦 [FRONTEND_UPLOAD] FormData创建完成:', {
+        fileName: file.name,
+        fileSize: file.size,
+        formDataKeys: Array.from(formData.keys())
+      });
+      
+      const uploadUrl = '/api/resumes/upload';
+      console.log('📤 [FRONTEND_UPLOAD] 准备发送请求到:', uploadUrl);
+      console.log('📤 [FRONTEND_UPLOAD] 请求方法: POST');
+      console.log('📤 [FRONTEND_UPLOAD] 请求头Authorization: Bearer', token.substring(0, 20) + '...');
 
       setUploadStage('正在上传文件...');
+      console.log('📤 [FRONTEND_UPLOAD] UI状态更新为: 正在上传文件...');
       
       // 创建带超时的fetch请求（10分钟超时）
+      console.log('⏱️ [FRONTEND_UPLOAD] 创建超时控制器...');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10分钟超时
+      const timeoutId = setTimeout(() => {
+        console.warn('⏱️ [FRONTEND_UPLOAD] 请求超时，中断请求...');
+        controller.abort();
+      }, 600000); // 10分钟超时
       
-      const response = await fetch('/api/resumes/upload', {
+      console.log('🚀 [FRONTEND_UPLOAD] 开始发送fetch请求...');
+      const requestStart = Date.now();
+      
+      const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -324,23 +368,36 @@ const LandingPage = () => {
         signal: controller.signal
       });
       
+      const requestDuration = Date.now() - requestStart;
       clearTimeout(timeoutId);
+      
+      console.log('📡 [FRONTEND_UPLOAD] 收到响应 (耗时:', requestDuration, 'ms)');
+      console.log('📡 [FRONTEND_UPLOAD] 响应状态:', response.status, response.statusText);
+      console.log('📡 [FRONTEND_UPLOAD] 响应头:', Object.fromEntries(response.headers.entries()));
+      console.log('📡 [FRONTEND_UPLOAD] 响应是否OK:', response.ok);
 
-      console.log('📡 [FRONTEND_UPLOAD] 收到响应:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries())
-      });
+      if (!response.ok) {
+        console.error('❌ [FRONTEND_UPLOAD] HTTP错误响应:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url
+        });
+      }
 
+      console.log('📄 [FRONTEND_UPLOAD] 开始解析JSON响应...');
       const data = await response.json();
-      console.log('📋 [FRONTEND_UPLOAD] 响应数据:', data);
+      console.log('📋 [FRONTEND_UPLOAD] 响应数据:', JSON.stringify(data, null, 2));
       
       // 处理认证错误
+      console.log('🔐 [FRONTEND_UPLOAD] 检查认证状态...');
       if (response.status === 401 || response.status === 403) {
-        console.log('🔑 认证失败，清除本地认证信息');
+        console.error('🔑 [FRONTEND_UPLOAD] 认证失败，状态码:', response.status);
+        console.log('🔑 [FRONTEND_UPLOAD] 清除本地认证信息');
         // 清除无效的认证信息
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        
+        alert('登录状态已过期，请重新登录');
         
         // 显示登录框
         setPendingAction(() => () => {
@@ -353,39 +410,59 @@ const LandingPage = () => {
         throw new Error('登录状态已过期，请重新登录');
       }
       
-      if (data.success && data.data.taskId) {
+      console.log('✅ [FRONTEND_UPLOAD] 认证检查通过');
+      console.log('📋 [FRONTEND_UPLOAD] 检查响应数据结构...');
+      
+      if (data.success && data.data && data.data.taskId) {
         // 立即开始轮询后端真实进度
         const taskId = data.data.taskId;
         console.log('✅ [FRONTEND_UPLOAD] 上传成功，任务ID:', taskId);
+        console.log('✅ [FRONTEND_UPLOAD] 任务详情:', data.data);
         setUploadStage('文件上传成功，开始解析...');
         
+        console.log('🔄 [FRONTEND_UPLOAD] 开始轮询任务状态...');
         await pollTaskStatus(taskId);
       } else {
-        console.error('❌ [FRONTEND_UPLOAD] 上传失败，服务器响应:', data);
-        throw new Error(data.message || '上传失败');
+        console.error('❌ [FRONTEND_UPLOAD] 上传失败，响应结构异常');
+        console.error('❌ [FRONTEND_UPLOAD] 期望格式: {success: true, data: {taskId: "..."}}');
+        console.error('❌ [FRONTEND_UPLOAD] 实际响应:', data);
+        
+        const errorMsg = data.message || '上传失败：响应格式异常';
+        alert(errorMsg);
+        throw new Error(errorMsg);
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error('❌ [FRONTEND_UPLOAD] 简历解析失败:', error);
-      console.error('❌ [FRONTEND_UPLOAD] 错误详情:', {
-        message: error.message,
-        stack: error.stack,
-        duration: `${duration}ms`
-      });
+      console.error('❌ [FRONTEND_UPLOAD] ==> 发生错误，开始错误处理');
+      console.error('❌ [FRONTEND_UPLOAD] 错误对象:', error);
+      console.error('❌ [FRONTEND_UPLOAD] 错误名称:', error.name);
+      console.error('❌ [FRONTEND_UPLOAD] 错误消息:', error.message);
+      console.error('❌ [FRONTEND_UPLOAD] 错误堆栈:', error.stack);
+      console.error('❌ [FRONTEND_UPLOAD] 总耗时:', `${duration}ms`);
       
       // 根据错误类型显示不同的提示
+      let userMessage = '';
       if (error.name === 'AbortError') {
-        alert('文件上传超时，请检查网络连接或尝试上传较小的文件');
+        userMessage = '文件上传超时，请检查网络连接或尝试上传较小的文件';
+        console.error('❌ [FRONTEND_UPLOAD] 错误类型: 请求超时');
       } else if (error.message.includes('登录') || error.message.includes('认证')) {
-        alert(`${error.message}，请登录后重试`);
+        userMessage = `${error.message}，请登录后重试`;
+        console.error('❌ [FRONTEND_UPLOAD] 错误类型: 认证问题');
       } else if (error.message.includes('Failed to fetch')) {
-        alert('网络连接失败，请检查网络后重试');
+        userMessage = '网络连接失败，请检查网络后重试';
+        console.error('❌ [FRONTEND_UPLOAD] 错误类型: 网络连接失败');
       } else {
-        alert('简历解析失败，请稍后重试');
+        userMessage = `简历解析失败: ${error.message}`;
+        console.error('❌ [FRONTEND_UPLOAD] 错误类型: 其他错误');
       }
       
+      console.error('❌ [FRONTEND_UPLOAD] 显示给用户的错误消息:', userMessage);
+      alert(userMessage);
+      
+      console.log('🧹 [FRONTEND_UPLOAD] 清理UI状态...');
       setUploadStage('');
       setUploadProgress(0);
+      console.log('🧹 [FRONTEND_UPLOAD] UI状态清理完成');
     } finally {
       setTimeout(() => {
         setUploadLoading(false);

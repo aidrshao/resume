@@ -14,20 +14,30 @@ const authUtils = require('../utils/auth');
  */
 const authenticateToken = (req, res, next) => {
   console.log('🔐 [AUTH_MIDDLEWARE] ==> 开始Token验证');
+  console.log('🔐 [AUTH_MIDDLEWARE] 请求ID:', req.requestId);
   console.log('🔐 [AUTH_MIDDLEWARE] 请求路径:', req.method, req.path);
+  console.log('🔐 [AUTH_MIDDLEWARE] 完整URL:', req.originalUrl);
   console.log('🔐 [AUTH_MIDDLEWARE] 请求来源:', req.headers['user-agent'] || '未知');
+  console.log('🔐 [AUTH_MIDDLEWARE] 请求IP:', req.ip || req.connection.remoteAddress);
   
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
   
   console.log('🔐 [AUTH_MIDDLEWARE] 认证头:', authHeader ? 'Bearer ***' : '无');
   console.log('🔐 [AUTH_MIDDLEWARE] Token长度:', token ? token.length : 0);
+  console.log('🔐 [AUTH_MIDDLEWARE] Token前缀:', token ? token.substring(0, 20) + '...' : '无');
 
   if (!token) {
-    console.log('❌ [AUTH_MIDDLEWARE] Token缺失');
+    console.error('❌ [AUTH_MIDDLEWARE] Token缺失');
+    console.error('❌ [AUTH_MIDDLEWARE] 请求ID:', req.requestId);
+    console.error('❌ [AUTH_MIDDLEWARE] 认证失败原因: 无Authorization头或格式不正确');
+    
     return res.status(401).json({
       success: false,
-      message: '访问令牌缺失'
+      message: '访问令牌缺失',
+      error_code: 'TOKEN_MISSING',
+      request_id: req.requestId,
+      timestamp: new Date().toISOString()
     });
   }
 
@@ -51,23 +61,35 @@ const authenticateToken = (req, res, next) => {
     
     next();
   } catch (error) {
-    console.error('❌ [AUTH_MIDDLEWARE] Token验证失败:', {
-      error: error.name,
-      message: error.message,
-      tokenPrefix: token ? token.substring(0, 20) + '...' : '无'
-    });
+    console.error('❌ [AUTH_MIDDLEWARE] ==> Token验证失败');
+    console.error('❌ [AUTH_MIDDLEWARE] 请求ID:', req.requestId);
+    console.error('❌ [AUTH_MIDDLEWARE] 错误类型:', error.name);
+    console.error('❌ [AUTH_MIDDLEWARE] 错误消息:', error.message);
+    console.error('❌ [AUTH_MIDDLEWARE] Token前缀:', token ? token.substring(0, 20) + '...' : '无');
+    console.error('❌ [AUTH_MIDDLEWARE] 错误详情:', error);
     
     // 根据错误类型返回更具体的错误信息
     let errorMessage = '访问令牌无效';
+    let errorCode = 'TOKEN_INVALID';
+    
     if (error.name === 'TokenExpiredError') {
       errorMessage = '访问令牌已过期，请重新登录';
+      errorCode = 'TOKEN_EXPIRED';
+      console.error('❌ [AUTH_MIDDLEWARE] Token过期时间:', new Date(error.expiredAt).toISOString());
     } else if (error.name === 'JsonWebTokenError') {
       errorMessage = '访问令牌格式无效';
+      errorCode = 'TOKEN_MALFORMED';
     }
+    
+    console.error('❌ [AUTH_MIDDLEWARE] 最终错误代码:', errorCode);
+    console.error('❌ [AUTH_MIDDLEWARE] 最终错误消息:', errorMessage);
     
     return res.status(403).json({
       success: false,
-      message: errorMessage
+      message: errorMessage,
+      error_code: errorCode,
+      request_id: req.requestId,
+      timestamp: new Date().toISOString()
     });
   }
 };

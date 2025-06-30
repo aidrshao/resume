@@ -347,94 +347,198 @@ class ResumeController {
    */
   static async uploadAndParseResume(req, res) {
     const startTime = Date.now();
+    const requestId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    
     console.log('🚀 [UPLOAD_RESUME] ==> 开始处理简历上传请求');
-    console.log('📋 [UPLOAD_RESUME] 请求头:', {
+    console.log('🚀 [UPLOAD_RESUME] 请求ID:', requestId);
+    console.log('🚀 [UPLOAD_RESUME] 时间戳:', new Date().toISOString());
+    console.log('🚀 [UPLOAD_RESUME] 请求方法:', req.method);
+    console.log('🚀 [UPLOAD_RESUME] 请求URL:', req.url);
+    console.log('🚀 [UPLOAD_RESUME] 请求IP:', req.ip || req.connection.remoteAddress);
+    
+    console.log('📋 [UPLOAD_RESUME] 请求头详情:', {
       authorization: req.headers.authorization ? 'Bearer ***' : '无',
       contentType: req.headers['content-type'],
-      userAgent: req.headers['user-agent']
+      contentLength: req.headers['content-length'],
+      userAgent: req.headers['user-agent'],
+      host: req.headers.host,
+      origin: req.headers.origin,
+      referer: req.headers.referer
     });
-    console.log('👤 [UPLOAD_RESUME] 用户信息:', req.user ? { id: req.user.id, userId: req.user.userId } : '无');
+    
+    console.log('👤 [UPLOAD_RESUME] 用户认证信息:', req.user ? { 
+      id: req.user.id, 
+      userId: req.user.userId,
+      type: typeof req.user.id,
+      userType: typeof req.user.userId 
+    } : '无用户信息');
     
     const { taskQueueService } = require('../services/taskQueueService');
     
+    console.log('📦 [UPLOAD_RESUME] 开始Multer文件上传中间件处理...');
     const uploadMiddleware = upload.single('resume');
     
     uploadMiddleware(req, res, async function (err) {
+      console.log('📦 [UPLOAD_RESUME] Multer中间件回调触发');
+      
       if (err) {
-        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误:', err);
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误类型:', err.constructor.name);
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误代码:', err.code);
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误:', err.message);
+        console.error('❌ [UPLOAD_RESUME] 文件上传中间件错误堆栈:', err.stack);
+        
         return res.status(400).json({
           success: false,
-          message: err.message
+          message: err.message,
+          error_code: 'FILE_UPLOAD_ERROR',
+          request_id: requestId
         });
       }
       
-      console.log('📁 [UPLOAD_RESUME] 文件上传中间件处理完成');
-      console.log('📄 [UPLOAD_RESUME] 上传文件信息:', req.file ? {
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        path: req.file.path
-      } : '无文件');
+      console.log('✅ [UPLOAD_RESUME] 文件上传中间件处理完成');
+      console.log('📄 [UPLOAD_RESUME] 检查上传的文件...');
+      
+      if (req.file) {
+        console.log('📄 [UPLOAD_RESUME] 上传文件详情:', {
+          fieldname: req.file.fieldname,
+          originalname: req.file.originalname,
+          encoding: req.file.encoding,
+          mimetype: req.file.mimetype,
+          destination: req.file.destination,
+          filename: req.file.filename,
+          path: req.file.path,
+          size: req.file.size,
+          sizeHuman: (req.file.size / 1024 / 1024).toFixed(2) + 'MB'
+        });
+      } else {
+        console.log('📄 [UPLOAD_RESUME] 无文件信息');
+      }
       
       if (!req.file) {
         console.error('❌ [UPLOAD_RESUME] 未检测到上传文件');
+        console.error('❌ [UPLOAD_RESUME] req.body:', req.body);
+        console.error('❌ [UPLOAD_RESUME] req.files:', req.files);
+        
         return res.status(400).json({
           success: false,
-          message: '请选择要上传的简历文件'
+          message: '请选择要上传的简历文件',
+          error_code: 'NO_FILE_UPLOADED',
+          request_id: requestId
         });
       }
       
       try {
+        console.log('✅ [UPLOAD_RESUME] 文件上传成功，开始处理...');
+        
+        // 获取用户ID
         const userId = req.user.id;
         const file = req.file;
         
-        console.log('🔧 [UPLOAD_RESUME] 准备创建解析任务:', {
+        console.log('👤 [UPLOAD_RESUME] 处理用户ID:', {
+          userId: userId,
+          userIdType: typeof userId,
+          userObject: req.user
+        });
+        
+        // 文件路径和类型验证
+        const fileExtension = path.extname(file.originalname).substring(1).toLowerCase();
+        console.log('📄 [UPLOAD_RESUME] 文件扩展名:', fileExtension);
+        
+        const allowedTypes = ['pdf', 'doc', 'docx'];
+        if (!allowedTypes.includes(fileExtension)) {
+          console.error('❌ [UPLOAD_RESUME] 不支持的文件类型:', fileExtension);
+          return res.status(400).json({
+            success: false,
+            message: `不支持的文件类型：${fileExtension}。支持的类型：${allowedTypes.join(', ')}`,
+            error_code: 'UNSUPPORTED_FILE_TYPE',
+            request_id: requestId
+          });
+        }
+        
+        console.log('🔧 [UPLOAD_RESUME] 准备创建解析任务...');
+        console.log('🔧 [UPLOAD_RESUME] 任务参数:', {
           userId: userId,
           filename: file.originalname,
           fileSize: file.size,
-          fileType: path.extname(file.originalname).substring(1)
+          fileType: fileExtension,
+          filePath: file.path
         });
         
         // 创建异步解析任务
+        console.log('📋 [UPLOAD_RESUME] 调用taskQueueService.createTask...');
         const taskId = await taskQueueService.createTask('resume_parse', {
           filePath: file.path,
-          fileType: path.extname(file.originalname).substring(1),
+          fileType: fileExtension,
           originalName: file.originalname,
           userId: userId
         }, userId);
         
-        console.log('✅ [UPLOAD_RESUME] 任务创建成功:', { taskId: taskId });
+        console.log('✅ [UPLOAD_RESUME] 任务创建成功！');
+        console.log('✅ [UPLOAD_RESUME] 任务详情:', { 
+          taskId: taskId,
+          taskIdType: typeof taskId
+        });
         
         const duration = Date.now() - startTime;
-        console.log(`🏁 [UPLOAD_RESUME] 请求处理完成，耗时: ${duration}ms`);
+        console.log(`🏁 [UPLOAD_RESUME] 请求处理完成，总耗时: ${duration}ms`);
         
         // 立即返回任务ID
-        res.json({
+        console.log('📤 [UPLOAD_RESUME] 准备发送成功响应...');
+        const responseData = {
           success: true,
           data: {
             taskId: taskId,
             status: 'processing',
-            message: '简历上传成功，正在后台解析中...'
+            message: '简历上传成功，正在后台解析中...',
+            file_info: {
+              name: file.originalname,
+              size: file.size,
+              type: fileExtension
+            }
           },
-          message: '简历解析任务已创建'
-        });
+          message: '简历解析任务已创建',
+          request_id: requestId,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('📤 [UPLOAD_RESUME] 响应数据:', JSON.stringify(responseData, null, 2));
+        
+        res.json(responseData);
+        
+        console.log('✅ [UPLOAD_RESUME] 成功响应已发送');
         
       } catch (error) {
-        console.error('❌ [UPLOAD_RESUME] 创建简历解析任务失败:', error);
+        console.error('❌ [UPLOAD_RESUME] ==> 发生异常错误');
+        console.error('❌ [UPLOAD_RESUME] 错误名称:', error.name);
+        console.error('❌ [UPLOAD_RESUME] 错误消息:', error.message);
         console.error('❌ [UPLOAD_RESUME] 错误堆栈:', error.stack);
+        console.error('❌ [UPLOAD_RESUME] 错误详情:', error);
         
         // 清理上传的临时文件
         if (req.file) {
+          console.log('🗑️ [UPLOAD_RESUME] 清理临时文件:', req.file.path);
           fs.unlink(req.file.path, (err) => {
-            if (err) console.error('❌ [UPLOAD_RESUME] 删除临时文件失败:', err);
-            else console.log('🗑️ [UPLOAD_RESUME] 临时文件已清理:', req.file.path);
+            if (err) {
+              console.error('❌ [UPLOAD_RESUME] 删除临时文件失败:', err);
+            } else {
+              console.log('✅ [UPLOAD_RESUME] 临时文件已清理:', req.file.path);
+            }
           });
         }
         
-        res.status(500).json({
+        const errorResponse = {
           success: false,
-          message: '创建简历解析任务失败: ' + error.message
-        });
+          message: '创建简历解析任务失败: ' + error.message,
+          error_code: 'TASK_CREATION_FAILED',
+          request_id: requestId,
+          timestamp: new Date().toISOString()
+        };
+        
+        console.log('📤 [UPLOAD_RESUME] 发送错误响应:', JSON.stringify(errorResponse, null, 2));
+        
+        res.status(500).json(errorResponse);
+        
+        console.log('❌ [UPLOAD_RESUME] 错误响应已发送');
       }
     });
   }
