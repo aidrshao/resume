@@ -95,23 +95,35 @@ const LandingPage = () => {
   };
 
   /**
-   * 轮询任务状态
+   * 智能轮询任务状态（渐进式间隔）
    * @param {string} taskId - 任务ID
    */
   const pollTaskStatus = async (taskId) => {
-    console.log('🔄 [POLL_TASK] ==> 开始轮询任务状态:', taskId);
+    console.log('🔄 [POLL_TASK] ==> 开始智能轮询任务状态:', taskId);
     
     return new Promise((resolve, reject) => {
       let pollCount = 0;
+      let currentInterval = 1000; // 初始1秒
+      const maxInterval = 10000;  // 最大10秒
+      const maxPollCount = 60;    // 最大轮询60次
+      let pollTimeout;
       
-      const pollInterval = setInterval(async () => {
+      const executePoll = async () => {
         pollCount++;
-        console.log(`🔄 [POLL_TASK] 第 ${pollCount} 次轮询，任务ID: ${taskId}`);
+        
+        // 只在前10次和后续每5次显示日志，减少日志干扰
+        const shouldLog = pollCount <= 10 || pollCount % 5 === 0;
+        if (shouldLog) {
+          console.log(`🔄 [POLL_TASK] 第 ${pollCount} 次轮询，任务ID: ${taskId}`);
+        }
         
         try {
           const token = localStorage.getItem('token');
           
-          console.log('🔄 [POLL_TASK] 发送状态查询请求...');
+          if (shouldLog) {
+            console.log('🔄 [POLL_TASK] 发送状态查询请求...');
+          }
+          
           const response = await fetch(`/api/tasks/${taskId}/status`, {
             method: 'GET',
             headers: {
@@ -119,23 +131,29 @@ const LandingPage = () => {
             }
           });
           
-          console.log('🔄 [POLL_TASK] 收到响应:', {
-            status: response.status,
-            statusText: response.statusText
-          });
+          if (shouldLog) {
+            console.log('🔄 [POLL_TASK] 收到响应:', {
+              status: response.status,
+              statusText: response.statusText
+            });
+          }
           
           const data = await response.json();
-          console.log('🔄 [POLL_TASK] 响应数据:', data);
+          if (shouldLog) {
+            console.log('🔄 [POLL_TASK] 响应数据:', data);
+          }
           
           if (data.success) {
             const task = data.data;
             
-            console.log('🔄 [POLL_TASK] 任务当前状态:', {
-              status: task.status,
-              progress: task.progress,
-              message: task.message,
-              hasResultData: !!task.resultData
-            });
+            if (shouldLog) {
+              console.log('🔄 [POLL_TASK] 任务当前状态:', {
+                status: task.status,
+                progress: task.progress,
+                message: task.message,
+                hasResultData: !!task.resultData
+              });
+            }
             
             // 更新进度和状态
             setUploadProgress(task.progress || 0);
@@ -144,7 +162,6 @@ const LandingPage = () => {
             // 检查任务是否完成
             if (task.status === 'completed') {
               console.log('✅ [POLL_TASK] 任务完成！');
-              clearInterval(pollInterval);
               setUploadProgress(100);
               setUploadStage('解析完成！');
               
@@ -159,14 +176,29 @@ const LandingPage = () => {
               }
               
               resolve(task);
+              return;
             } else if (task.status === 'failed') {
               console.error('❌ [POLL_TASK] 任务失败:', task.errorMessage);
-              clearInterval(pollInterval);
               throw new Error(task.errorMessage || '解析失败');
             } else {
-              console.log('🔄 [POLL_TASK] 任务仍在处理中，继续轮询...');
+              // 检查是否超过最大轮询次数
+              if (pollCount >= maxPollCount) {
+                console.error('⏰ [POLL_TASK] 超过最大轮询次数:', maxPollCount);
+                throw new Error('处理超时，请稍后重试');
+              }
+              
+              // 渐进式增加轮询间隔
+              if (pollCount > 5) {
+                currentInterval = Math.min(currentInterval + 1000, maxInterval);
+              }
+              
+              if (shouldLog) {
+                console.log(`🔄 [POLL_TASK] 任务处理中，${currentInterval/1000}秒后继续轮询...`);
+              }
+              
+              // 设置下次轮询
+              pollTimeout = setTimeout(executePoll, currentInterval);
             }
-            // 继续轮询处理中的任务
           } else {
             console.error('❌ [POLL_TASK] API返回失败:', data);
             throw new Error(data.message || '获取任务状态失败');
@@ -177,17 +209,39 @@ const LandingPage = () => {
             pollCount: pollCount,
             taskId: taskId
           });
-          clearInterval(pollInterval);
           reject(error);
         }
-      }, 1000); // 每秒轮询一次
+      };
       
-      // 设置超时（5分钟）
-      setTimeout(() => {
-        console.error('⏰ [POLL_TASK] 轮询超时');
-        clearInterval(pollInterval);
-        reject(new Error('解析超时，请稍后重试'));
-      }, 5 * 60 * 1000);
+      // 开始第一次轮询
+      executePoll();
+      
+      // 设置总体超时（3分钟）
+      const overallTimeout = setTimeout(() => {
+        console.error('⏰ [POLL_TASK] 总体超时');
+        if (pollTimeout) clearTimeout(pollTimeout);
+        reject(new Error('处理超时，请稍后重试'));
+      }, 3 * 60 * 1000);
+      
+      // 清理函数
+      const cleanup = () => {
+        if (pollTimeout) clearTimeout(pollTimeout);
+        if (overallTimeout) clearTimeout(overallTimeout);
+      };
+      
+      // 重写Promise的then/catch以确保清理
+      const originalResolve = resolve;
+      const originalReject = reject;
+      
+      resolve = (value) => {
+        cleanup();
+        originalResolve(value);
+      };
+      
+      reject = (error) => {
+        cleanup();
+        originalReject(error);
+      };
     });
   };
 
