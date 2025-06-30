@@ -27,11 +27,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 路由配置
-app.use('/api/auth', authRoutes);
-app.use('/api', resumeRoutes);
-
-// 健康检查端点
+// 健康检查端点（必须在所有路由之前，避免被认证中间件拦截）
 app.get('/health', (req, res) => {
   res.json({
     success: true,
@@ -39,6 +35,10 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// 路由配置
+app.use('/api/auth', authRoutes);
+app.use('/api', resumeRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

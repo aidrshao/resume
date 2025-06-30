@@ -29,7 +29,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB限制
+    fileSize: 50 * 1024 * 1024, // 50MB限制，与Nginx保持一致
   },
   fileFilter: function (req, file, cb) {
     const allowedTypes = /pdf|docx|doc/;

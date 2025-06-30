@@ -311,13 +311,20 @@ const LandingPage = () => {
 
       setUploadStage('正在上传文件...');
       
+      // 创建带超时的fetch请求（10分钟超时）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000); // 10分钟超时
+      
       const response = await fetch('/api/resumes/upload', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         },
         body: formData,
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
 
       console.log('📡 [FRONTEND_UPLOAD] 收到响应:', {
         status: response.status,
@@ -367,8 +374,12 @@ const LandingPage = () => {
       });
       
       // 根据错误类型显示不同的提示
-      if (error.message.includes('登录') || error.message.includes('认证')) {
+      if (error.name === 'AbortError') {
+        alert('文件上传超时，请检查网络连接或尝试上传较小的文件');
+      } else if (error.message.includes('登录') || error.message.includes('认证')) {
         alert(`${error.message}，请登录后重试`);
+      } else if (error.message.includes('Failed to fetch')) {
+        alert('网络连接失败，请检查网络后重试');
       } else {
         alert('简历解析失败，请稍后重试');
       }
