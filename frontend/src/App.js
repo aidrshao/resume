@@ -18,6 +18,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 // 管理员相关组件
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
+import AdminUserManagement from './components/AdminUserManagement';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 /**
@@ -48,6 +49,14 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <AdminDashboard />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/users" 
+            element={
+              <AdminProtectedRoute>
+                <AdminUserManagement />
               </AdminProtectedRoute>
             } 
           />

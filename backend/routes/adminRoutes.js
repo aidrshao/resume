@@ -113,6 +113,64 @@ router.put('/user-memberships/:id', adminAuth, AdminController.updateUserMembers
  */
 router.get('/users', adminAuth, AdminController.getUsers);
 
+/**
+ * 获取用户详情
+ * GET /api/admin/users/:id
+ */
+router.get('/users/:id', adminAuth, AdminController.getUserDetail);
+
+/**
+ * 更新用户信息
+ * PUT /api/admin/users/:id
+ */
+router.put('/users/:id', adminAuth, AdminController.updateUser);
+
+/**
+ * 更新用户状态
+ * PUT /api/admin/users/:id/status
+ */
+router.put('/users/:id/status', adminAuth, AdminController.updateUserStatus);
+
+// ==================== 配额管理 ====================
+
+/**
+ * 获取用户配额
+ * GET /api/admin/users/:id/quotas
+ */
+router.get('/users/:id/quotas', adminAuth, AdminController.getUserQuotas);
+
+/**
+ * 重置用户配额
+ * POST /api/admin/users/:id/quotas/reset
+ */
+router.post('/users/:id/quotas/reset', adminAuth, AdminController.resetUserQuotas);
+
+/**
+ * 更新用户配额限制
+ * PUT /api/admin/users/:id/quotas/:quotaType
+ */
+// router.put('/users/:id/quotas/:quotaType', adminAuth, AdminController.updateUserQuotaLimit);
+
+/**
+ * 获取配额使用统计
+ * GET /api/admin/quotas/statistics
+ */
+// router.get('/quotas/statistics', adminAuth, AdminController.getQuotaStatistics);
+
+// ==================== 操作日志管理 ====================
+
+/**
+ * 获取操作日志列表
+ * GET /api/admin/action-logs
+ */
+// router.get('/action-logs', adminAuth, AdminController.getActionLogs);
+
+/**
+ * 获取操作统计
+ * GET /api/admin/action-logs/statistics
+ */
+// router.get('/action-logs/statistics', adminAuth, AdminController.getActionStatistics);
+
 // ==================== 系统统计 ====================
 
 /**

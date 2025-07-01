@@ -85,7 +85,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/jobs', jobRoutes);
-app.use('/api/resumes', resumeRoutes);  // 改为更具体的路径
+app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
 
 // 404处理
 app.use('*', (req, res) => {

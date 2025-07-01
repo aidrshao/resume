@@ -244,6 +244,62 @@ class User {
       throw error;
     }
   }
+
+  /**
+   * 获取用户列表（简化版本）
+   * @param {Object} options - 查询选项
+   * @param {number} options.page - 页码
+   * @param {number} options.limit - 每页条数
+   * @param {string} options.keyword - 搜索关键词
+   * @returns {Promise<Object>} 用户列表和分页信息
+   */
+  static async findAllSimple(options = {}) {
+    try {
+      const { page = 1, limit = 10, keyword } = options;
+      const offset = (page - 1) * limit;
+
+      let query = db('users')
+        .select(
+          'id',
+          'email', 
+          'email_verified',
+          'created_at',
+          'updated_at'
+        );
+
+      // 关键词搜索（只搜索邮箱）
+      if (keyword) {
+        query = query.where('email', 'ilike', `%${keyword}%`);
+      }
+
+      // 获取总数
+      let countQuery = db('users');
+      if (keyword) {
+        countQuery = countQuery.where('email', 'ilike', `%${keyword}%`);
+      }
+
+      const [{ count }] = await countQuery.count('* as count');
+      const total = parseInt(count);
+
+      // 获取数据
+      const users = await query
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        data: users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = User; 

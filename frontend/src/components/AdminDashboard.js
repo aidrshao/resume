@@ -121,20 +121,23 @@ const AdminDashboard = () => {
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {/* 统计卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* 用户统计 */}
-          <div className="bg-white overflow-hidden shadow rounded-lg">
+          {/* 用户统计 - 可点击跳转到用户管理 */}
+          <div 
+            onClick={() => navigateTo('/admin/users')}
+            className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+          >
             <div className="p-5">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                   </svg>
                 </div>
                 <div className="ml-5 w-0 flex-1">
                   <dl>
-                    <dt className="text-sm font-medium text-gray-500 truncate">总用户数</dt>
+                    <dt className="text-sm font-medium text-gray-500 truncate">用户管理</dt>
                     <dd className="text-lg font-medium text-gray-900">
-                      {statistics?.users?.total_users || 0}
+                      {statistics?.users?.total_users || 0} 个用户
                     </dd>
                   </dl>
                 </div>
@@ -146,6 +149,7 @@ const AdminDashboard = () => {
                   +{statistics?.users?.new_users_week || 0}
                 </span>
                 <span className="text-gray-500"> 本周新增</span>
+                <span className="text-blue-600 float-right">点击管理 →</span>
               </div>
             </div>
           </div>
