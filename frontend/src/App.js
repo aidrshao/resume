@@ -21,6 +21,7 @@ import AdminDashboard from './components/AdminDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminMembershipTiers from './components/AdminMembershipTiers';
 import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
+import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 /**
@@ -85,6 +86,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <ProfilePage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 会员中心 - 需要认证 */}
+          <Route 
+            path="/membership" 
+            element={
+              <ProtectedRoute>
+                <MembershipPage />
               </ProtectedRoute>
             } 
           />

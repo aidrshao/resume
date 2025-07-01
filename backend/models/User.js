@@ -180,19 +180,13 @@ class User {
       let query = db('users')
         .leftJoin('user_memberships', function() {
           this.on('users.id', '=', 'user_memberships.user_id')
-            .andOn('user_memberships.status', '=', db.raw('?', ['active']))
-            .andOn(function() {
-              this.whereNull('user_memberships.end_date')
-                .orWhere('user_memberships.end_date', '>', db.fn.now());
-            });
+            .andOn('user_memberships.status', '=', db.raw('?', ['active']));
         })
         .leftJoin('membership_tiers', 'user_memberships.membership_tier_id', 'membership_tiers.id')
         .select(
           'users.id',
           'users.email',
-          'users.name',
           'users.email_verified',
-          'users.is_admin',
           'users.created_at',
           'user_memberships.status as membership_status',
           'user_memberships.start_date as membership_start_date',
@@ -201,25 +195,19 @@ class User {
           'membership_tiers.name as tier_name',
           'membership_tiers.template_access_level'
         )
-        .where('users.is_admin', false); // 排除管理员账号
+        .whereNotIn('users.email', ['admin@example.com']); // 排除管理员账号
 
-      // 关键词搜索
+      // 关键词搜索（只搜索邮箱）
       if (keyword) {
-        query = query.where(function() {
-          this.where('users.email', 'ilike', `%${keyword}%`)
-            .orWhere('users.name', 'ilike', `%${keyword}%`);
-        });
+        query = query.where('users.email', 'ilike', `%${keyword}%`);
       }
 
       // 获取总数
       const countQuery = db('users')
-        .where('users.is_admin', false);
+        .whereNotIn('users.email', ['admin@example.com']);
       
       if (keyword) {
-        countQuery.where(function() {
-          this.where('users.email', 'ilike', `%${keyword}%`)
-            .orWhere('users.name', 'ilike', `%${keyword}%`);
-        });
+        countQuery.where('users.email', 'ilike', `%${keyword}%`);
       }
 
       const [{ count }] = await countQuery.count('* as count');

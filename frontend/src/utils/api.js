@@ -7,6 +7,9 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
+// 导出API基础URL
+export { API_BASE_URL };
+
 // 创建axios实例
 const api = axios.create({
   baseURL: API_BASE_URL,

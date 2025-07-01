@@ -423,18 +423,26 @@ class AdminController {
       const { page = 1, limit = 10, keyword } = req.query;
       console.log('📝 [GET_USERS] 请求参数:', { page, limit, keyword });
 
-      // 使用简化版本的查询，避免依赖可能不存在的表
-      console.log('🔍 [GET_USERS] 调用User.findAllSimple...');
-      const result = await User.findAllSimple({
+      // 使用包含会员信息的查询方法
+      console.log('🔍 [GET_USERS] 调用User.findAllWithMembership...');
+      const result = await User.findAllWithMembership({
         page: parseInt(page),
         limit: parseInt(limit),
         keyword
       });
       console.log('✅ [GET_USERS] 查询成功，用户数量:', result.data.length);
 
+      // 处理数据格式，确保前端期望的字段名正确
+      const processedUsers = result.data.map(user => ({
+        ...user,
+        current_tier: user.tier_name || '免费版',
+        membership_expires_at: user.membership_end_date,
+        remaining_ai_quota: user.remaining_ai_quota || 0
+      }));
+
       res.json({
         success: true,
-        data: result.data,
+        data: processedUsers,
         pagination: result.pagination,
         message: '获取用户列表成功'
       });
@@ -767,6 +775,249 @@ class AdminController {
       res.status(500).json({
         success: false,
         message: '重置用户配额失败'
+      });
+    }
+  }
+
+  /**
+   * 为用户开通会员
+   * POST /api/admin/grant-membership
+   */
+  static async grantMembership(req, res) {
+    try {
+      const { userId, tierName, durationDays } = req.body;
+      const adminUserId = req.admin.id;
+
+      // 验证必填字段
+      if (!userId || !tierName || durationDays === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: '用户ID、套餐名称和有效期不能为空'
+        });
+      }
+
+      // 验证用户是否存在
+      const user = await User.findById(parseInt(userId));
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: '用户不存在'
+        });
+      }
+
+      // 查找会员套餐
+      const tier = await knex('membership_tiers')
+        .where({ name: tierName, is_active: true })
+        .first();
+
+      if (!tier) {
+        return res.status(404).json({
+          success: false,
+          message: '套餐不存在或已停用'
+        });
+      }
+
+      // 计算到期时间
+      let endDate = null;
+      if (parseInt(durationDays) > 0) {
+        endDate = new Date();
+        endDate.setDate(endDate.getDate() + parseInt(durationDays));
+      }
+
+      // 计算配额重置时间（下个月的第一天）
+      const quotaResetDate = new Date();
+      quotaResetDate.setMonth(quotaResetDate.getMonth() + 1);
+      quotaResetDate.setDate(1);
+      quotaResetDate.setHours(0, 0, 0, 0);
+
+      // 检查用户是否已有活跃会员
+      const existingMembership = await knex('user_memberships')
+        .where({ user_id: parseInt(userId), status: 'active' })
+        .first();
+
+      if (existingMembership) {
+        // 更新现有会员
+        await knex('user_memberships')
+          .where({ id: existingMembership.id })
+          .update({
+            membership_tier_id: tier.id,
+            end_date: endDate,
+            remaining_ai_quota: tier.ai_resume_quota,
+            quota_reset_date: quotaResetDate,
+            status: 'active',
+            updated_at: new Date(),
+            admin_notes: `管理员开通会员: ${tierName} (${durationDays}天)`
+          });
+      } else {
+        // 创建新会员记录
+        await knex('user_memberships').insert({
+          user_id: parseInt(userId),
+          membership_tier_id: tier.id,
+          status: 'active',
+          start_date: new Date(),
+          end_date: endDate,
+          remaining_ai_quota: tier.ai_resume_quota,
+          quota_reset_date: quotaResetDate,
+          payment_status: 'paid',
+          paid_amount: tier.reduction_price || tier.original_price,
+          payment_method: 'admin_grant',
+          admin_notes: `管理员开通会员: ${tierName} (${durationDays}天)`,
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      }
+
+      // 记录操作日志
+      await knex('user_ai_usage_logs').insert({
+        user_id: parseInt(userId),
+        usage_type: 'resume_generation',
+        is_success: true,
+        error_message: null,
+        tokens_used: 0,
+        cost: 0,
+        used_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+
+      res.json({
+        success: true,
+        data: { 
+          message: `成功为用户开通${tierName}会员`,
+          tier_name: tierName,
+          end_date: endDate,
+          quota: tier.ai_resume_quota
+        },
+        message: '会员开通成功'
+      });
+
+    } catch (error) {
+      console.error('❌ [GRANT_MEMBERSHIP] 开通会员失败:', error.message);
+      res.status(500).json({
+        success: false,
+        message: '开通会员失败'
+      });
+    }
+  }
+
+  /**
+   * 为用户分配配额
+   * POST /api/admin/assign-quota
+   */
+  static async assignQuota(req, res) {
+    try {
+      const { userId, quotaAmount, quotaType } = req.body;
+      const adminUserId = req.admin.id;
+
+      // 验证必填字段
+      if (!userId || !quotaAmount || !quotaType) {
+        return res.status(400).json({
+          success: false,
+          message: '用户ID、配额数量和配额类型不能为空'
+        });
+      }
+
+      // 验证配额数量
+      if (parseInt(quotaAmount) <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: '配额数量必须大于0'
+        });
+      }
+
+      // 验证用户是否存在
+      const user = await User.findById(parseInt(userId));
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: '用户不存在'
+        });
+      }
+
+      // 检查用户是否有会员记录
+      let userMembership = await knex('user_memberships')
+        .where({ user_id: parseInt(userId) })
+        .orderBy('created_at', 'desc')
+        .first();
+
+      if (!userMembership) {
+        // 如果用户没有会员记录，创建一个免费版会员记录
+        const freeTier = await knex('membership_tiers')
+          .where({ name: '免费版' })
+          .first();
+
+        if (freeTier) {
+          const membershipResult = await knex('user_memberships').insert({
+            user_id: parseInt(userId),
+            membership_tier_id: freeTier.id,
+            status: 'active',
+            start_date: new Date(),
+            end_date: null, // 永久有效
+            remaining_ai_quota: freeTier.ai_resume_quota,
+            quota_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+            payment_status: 'paid',
+            paid_amount: 0,
+            payment_method: 'admin_grant',
+            admin_notes: `管理员分配配额时自动创建免费会员`,
+            created_at: new Date(),
+            updated_at: new Date()
+          }).returning('id');
+
+          const membershipId = Array.isArray(membershipResult) ? membershipResult[0] : membershipResult.id || membershipResult;
+          userMembership = await knex('user_memberships').where({ id: membershipId }).first();
+        }
+      }
+
+      // 根据配额类型更新配额（简化处理，主要支持AI简历配额）
+      let updateData = {};
+      switch (quotaType) {
+        case 'monthly_ai_resume':
+          updateData.remaining_ai_quota = (userMembership.remaining_ai_quota || 0) + parseInt(quotaAmount);
+          break;
+        default:
+          return res.status(400).json({
+            success: false,
+            message: '当前只支持AI简历生成配额分配'
+          });
+      }
+
+      updateData.updated_at = new Date();
+      updateData.admin_notes = `管理员分配${quotaAmount}个${quotaType}配额`;
+
+      // 更新用户配额
+      await knex('user_memberships')
+        .where({ id: userMembership.id })
+        .update(updateData);
+
+      // 记录操作日志
+      await knex('user_ai_usage_logs').insert({
+        user_id: parseInt(userId),
+        usage_type: 'resume_generation',
+        is_success: true,
+        error_message: null,
+        tokens_used: 0,
+        cost: 0,
+        used_at: new Date(),
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+
+      res.json({
+        success: true,
+        data: { 
+          message: `成功为用户分配${quotaAmount}个${quotaType}配额`,
+          quota_type: quotaType,
+          quota_amount: parseInt(quotaAmount),
+          new_total: updateData.remaining_ai_quota
+        },
+        message: '配额分配成功'
+      });
+
+    } catch (error) {
+      console.error('❌ [ASSIGN_QUOTA] 分配配额失败:', error.message);
+      res.status(500).json({
+        success: false,
+        message: '分配配额失败'
       });
     }
   }

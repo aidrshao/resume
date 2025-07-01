@@ -5,185 +5,356 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getUserProfile } from '../utils/api';
-import { logout } from '../utils/auth';
+import { useAuth } from '../utils/auth';
+import { API_BASE_URL } from '../utils/api';
 
+/**
+ * 个人资料页面组件
+ * 显示用户基本信息、会员状态、可用配额等
+ */
 const ProfilePage = () => {
   const navigate = useNavigate();
-  
-  // 用户信息状态
-  const [userInfo, setUserInfo] = useState(null);
-  
-  // 加载状态
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // 错误信息
+  const { user, logout } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [membershipStatus, setMembershipStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: ''
+  });
 
-  /**
-   * 加载用户信息
-   */
-  const loadUserInfo = async () => {
-    try {
-      setIsLoading(true);
-      const response = await getUserProfile();
-      
-      if (response.success) {
-        setUserInfo(response.data);
-      }
-    } catch (error) {
-      setError('获取用户信息失败：' + error.message);
-      console.error('获取用户信息失败:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * 处理用户登出
-   */
-  const handleLogout = () => {
-    if (window.confirm('确定要退出登录吗？')) {
-      logout();
-    }
-  };
-
-  /**
-   * 格式化日期
-   * @param {string} dateString - 日期字符串
-   * @returns {string} 格式化后的日期
-   */
-  const formatDate = (dateString) => {
-    if (!dateString) return '-';
-    
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
-  // 组件挂载时加载用户信息
   useEffect(() => {
-    loadUserInfo();
+    fetchUserProfile();
+    fetchMembershipStatus();
   }, []);
 
-  if (isLoading) {
+  /**
+   * 获取用户基本信息
+   */
+  const fetchUserProfile = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setProfile(data.data);
+        setFormData({
+          name: data.data.name || '',
+          email: data.data.email || ''
+        });
+      } else {
+        setError(data.message || '获取用户信息失败');
+      }
+    } catch (error) {
+      console.error('获取用户信息失败:', error);
+      setError('网络错误，请稍后重试');
+    }
+  };
+
+  /**
+   * 获取会员状态信息
+   */
+  const fetchMembershipStatus = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/memberships/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setMembershipStatus(data.data);
+      } else {
+        console.warn('获取会员状态失败:', data.message);
+      }
+    } catch (error) {
+      console.error('获取会员状态失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 更新用户信息
+   */
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setProfile(data.data);
+        setIsEditing(false);
+        setError('');
+      } else {
+        setError(data.message || '更新失败');
+      }
+    } catch (error) {
+      console.error('更新用户信息失败:', error);
+      setError('网络错误，请稍后重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * 格式化日期显示
+   */
+  const formatDate = (dateString) => {
+    if (!dateString) return '永久有效';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  /**
+   * 获取会员状态显示文本
+   */
+  const getMembershipStatusText = (status) => {
+    const statusMap = {
+      'active': '有效',
+      'expired': '已过期',
+      'cancelled': '已取消',
+      'pending': '待激活'
+    };
+    return statusMap[status] || '未知';
+  };
+
+  /**
+   * 获取会员状态颜色
+   */
+  const getMembershipStatusColor = (status) => {
+    const colorMap = {
+      'active': 'text-green-600 bg-green-100',
+      'expired': 'text-red-600 bg-red-100',
+      'cancelled': 'text-gray-600 bg-gray-100',
+      'pending': 'text-yellow-600 bg-yellow-100'
+    };
+    return colorMap[status] || 'text-gray-600 bg-gray-100';
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">加载中...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4 max-w-md">
-            <p className="text-red-700">{error}</p>
-            <button
-              onClick={loadUserInfo}
-              className="mt-4 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-            >
-              重试
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 页面标题 */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-900">用户中心</h1>
-          <p className="mt-2 text-sm text-gray-600">管理您的账户信息</p>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">个人资料</h1>
+          <p className="mt-2 text-gray-600">管理您的账户信息和会员状态</p>
         </div>
 
-        {/* 用户信息卡片 */}
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-medium text-gray-900">账户信息</h2>
-              <button
-                onClick={handleLogout}
-                className="bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-              >
-                退出登录
-              </button>
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+            <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* 基本信息卡片 */}
+          <div className="lg:col-span-2">
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">基本信息</h2>
+                <button
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  {isEditing ? '取消' : '编辑'}
+                </button>
+              </div>
+
+              {isEditing ? (
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      姓名
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="请输入您的姓名"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      邮箱
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="请输入您的邮箱"
+                    />
+                  </div>
+                  <div className="flex space-x-4">
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {loading ? '保存中...' : '保存'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditing(false)}
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      姓名
+                    </label>
+                    <p className="text-gray-900">{profile?.name || '未设置'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      邮箱
+                    </label>
+                    <p className="text-gray-900">{profile?.email || '未设置'}</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      注册时间
+                    </label>
+                    <p className="text-gray-900">{formatDate(profile?.created_at)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 会员状态卡片 */}
+          <div className="space-y-6">
+            {/* 当前会员状态 */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">会员状态</h3>
+              
+              {membershipStatus ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      当前套餐
+                    </label>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {membershipStatus.tier_name || '免费版'}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      状态
+                    </label>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getMembershipStatusColor(membershipStatus.status)}`}>
+                      {getMembershipStatusText(membershipStatus.status)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      到期时间
+                    </label>
+                    <p className="text-gray-900">{formatDate(membershipStatus.end_date)}</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      AI简历剩余次数
+                    </label>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {membershipStatus.remaining_ai_quota || 0}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      配额重置时间: {formatDate(membershipStatus.quota_reset_date)}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-gray-500">暂无会员信息</p>
+                </div>
+              )}
+
+              <div className="mt-6">
+                <button
+                  onClick={() => navigate('/membership')}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                >
+                  管理会员
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {/* 用户ID */}
-              <div>
-                <dt className="text-sm font-medium text-gray-500">用户ID</dt>
-                <dd className="mt-1 text-sm text-gray-900">{userInfo?.id || '-'}</dd>
-              </div>
+            {/* 账户操作 */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">账户操作</h3>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => navigate('/resumes')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-md border border-gray-200 transition-colors"
+                >
+                  我的简历
+                </button>
+                
+                <button
+                  onClick={() => navigate('/jobs')}
+                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-md border border-gray-200 transition-colors"
+                >
+                  投递记录
+                </button>
 
-              {/* 邮箱地址 */}
-              <div>
-                <dt className="text-sm font-medium text-gray-500">邮箱地址</dt>
-                <dd className="mt-1 text-sm text-gray-900">{userInfo?.email || '-'}</dd>
-              </div>
-
-              {/* 注册时间 */}
-              <div>
-                <dt className="text-sm font-medium text-gray-500">注册时间</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {formatDate(userInfo?.created_at)}
-                </dd>
-              </div>
-
-              {/* 最后更新时间 */}
-              <div>
-                <dt className="text-sm font-medium text-gray-500">最后更新</dt>
-                <dd className="mt-1 text-sm text-gray-900">
-                  {formatDate(userInfo?.updated_at)}
-                </dd>
+                <button
+                  onClick={logout}
+                  className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
+                >
+                  退出登录
+                </button>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* 操作按钮区域 */}
-        <div className="mt-8 flex justify-center space-x-4">
-          <button
-            onClick={loadUserInfo}
-            className="bg-indigo-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            刷新信息
-          </button>
-          
-          <button
-            onClick={() => navigate('/')}
-            className="bg-gray-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-          >
-            返回首页
-          </button>
-        </div>
-
-        {/* 功能说明 */}
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-md p-4">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">功能说明</h3>
-          <ul className="text-sm text-blue-700 space-y-1">
-            <li>• 这是您的个人账户信息页面</li>
-            <li>• 您可以在这里查看账户的基本信息</li>
-            <li>• 如需修改信息或密码，请联系管理员</li>
-            <li>• 点击"退出登录"可以安全退出系统</li>
-          </ul>
         </div>
       </div>
     </div>

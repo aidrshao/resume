@@ -146,6 +146,18 @@ router.get('/users/:id/quotas', adminAuth, AdminController.getUserQuotas);
 router.post('/users/:id/quotas/reset', adminAuth, AdminController.resetUserQuotas);
 
 /**
+ * 为用户开通会员
+ * POST /api/admin/grant-membership
+ */
+router.post('/grant-membership', adminAuth, AdminController.grantMembership);
+
+/**
+ * 为用户分配配额
+ * POST /api/admin/assign-quota
+ */
+router.post('/assign-quota', adminAuth, AdminController.assignQuota);
+
+/**
  * 更新用户配额限制
  * PUT /api/admin/users/:id/quotas/:quotaType
  */

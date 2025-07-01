@@ -105,4 +105,24 @@ export const clearAuthData = () => {
 export const logout = () => {
   clearAuthData();
   window.location.href = '/login';
+};
+
+/**
+ * React Hook: 获取用户认证状态和相关功能
+ * @returns {Object} 包含用户信息和认证相关函数的对象
+ */
+export const useAuth = () => {
+  // 获取当前用户信息
+  const user = getUser();
+  const isLoggedIn = isAuthenticated();
+
+  return {
+    user,
+    isLoggedIn,
+    logout,
+    isAuthenticated,
+    getToken,
+    clearAuthData,
+    saveAuthData
+  };
 }; 

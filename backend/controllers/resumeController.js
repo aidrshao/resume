@@ -280,6 +280,20 @@ class ResumeController {
       const { id } = req.params;
       const userId = req.user.id;
       
+      // 校验AI配额
+      const MembershipController = require('./membershipController');
+      try {
+        await MembershipController.consumeAIQuota(userId, 'resume_optimization', parseInt(id));
+        console.log('✅ [AI配额] 配额校验通过并已消耗');
+      } catch (quotaError) {
+        console.log('❌ [AI配额] 配额校验失败:', quotaError.message);
+        return res.status(403).json({
+          success: false,
+          message: quotaError.message,
+          error_code: 'QUOTA_EXCEEDED'
+        });
+      }
+      
       const resume = await Resume.findById(id);
       if (!resume || resume.user_id !== userId) {
         return res.status(404).json({
@@ -463,6 +477,30 @@ class ResumeController {
           fileType: fileExtension,
           filePath: file.path
         });
+        
+        // 校验AI配额
+        const MembershipController = require('./membershipController');
+        try {
+          await MembershipController.consumeAIQuota(userId, 'resume_parse');
+          console.log('✅ [AI配额] 简历解析配额校验通过并已消耗');
+        } catch (quotaError) {
+          console.log('❌ [AI配额] 简历解析配额校验失败:', quotaError.message);
+          
+          // 清理上传的文件
+          if (req.file && req.file.path) {
+            fs.unlink(req.file.path, (err) => {
+              if (err) console.error('❌ [CLEANUP] 删除临时文件失败:', err);
+              else console.log('✅ [CLEANUP] 临时文件已清理:', req.file.path);
+            });
+          }
+          
+          return res.status(403).json({
+            success: false,
+            message: quotaError.message,
+            error_code: 'QUOTA_EXCEEDED',
+            request_id: requestId
+          });
+        }
         
         // 创建异步解析任务
         console.log('📋 [UPLOAD_RESUME] 调用taskQueueService.createTask...');
@@ -968,6 +1006,24 @@ class ResumeController {
         targetCompany,
         targetPosition
       });
+
+      // 校验AI配额
+      const MembershipController = require('./membershipController');
+      try {
+        // 确保参数为有效的整数或null，避免NaN
+        const validResumeId = baseResumeId ? parseInt(baseResumeId) : null;
+        const validJobId = jobId ? parseInt(jobId) : null;
+        
+        await MembershipController.consumeAIQuota(userId, 'resume_generation', validResumeId, validJobId);
+        console.log('✅ [AI配额] 配额校验通过并已消耗');
+      } catch (quotaError) {
+        console.log('❌ [AI配额] 配额校验失败:', quotaError.message);
+        return res.status(403).json({
+          success: false,
+          message: quotaError.message,
+          error_code: 'QUOTA_EXCEEDED'
+        });
+      }
 
       // 1. 验证必要参数
       if (!baseResumeId || !targetCompany || !targetPosition) {

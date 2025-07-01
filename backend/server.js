@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resumeRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const membershipRoutes = require('./routes/membershipRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -84,6 +85,7 @@ app.get('/health', (req, res) => {
 // 路由配置
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
+app.use('/api/memberships', membershipRoutes);  // 会员路由
 app.use('/api/jobs', jobRoutes);
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
 
