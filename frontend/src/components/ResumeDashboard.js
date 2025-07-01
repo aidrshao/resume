@@ -60,11 +60,15 @@ const ResumeDashboard = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
-        setJobs(data.data);
+      if (data.success && data.data && Array.isArray(data.data.jobs)) {
+        setJobs(data.data.jobs);
+      } else {
+        console.warn('岗位数据格式异常:', data);
+        setJobs([]); // 确保设置为空数组
       }
     } catch (error) {
       console.error('加载岗位列表失败:', error);
+      setJobs([]); // 确保在错误时设置为空数组
     }
   }, []);
 
@@ -135,10 +139,19 @@ const ResumeDashboard = () => {
       });
 
       const data = await response.json();
-      if (data.success) {
+      
+      if (response.ok && data.success) {
         // 刷新简历列表
         await loadResumes();
-        alert('岗位专属简历生成成功！');
+        
+        if (data.data.status === 'generating') {
+          alert('岗位专属简历生成任务已启动，AI正在优化中，请稍后查看结果！');
+        } else {
+          alert('岗位专属简历生成成功！');
+        }
+      } else if (response.status === 409) {
+        // 已存在相同岗位的专属简历
+        setError(`${data.message}。您可以直接使用现有的专属简历或删除后重新生成。`);
       } else {
         setError(data.message || '生成岗位专属简历失败');
       }
@@ -434,7 +447,7 @@ const ResumeDashboard = () => {
                 </button>
               </div>
 
-              {jobs.length === 0 ? (
+              {Array.isArray(jobs) && jobs.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-4xl mb-4">📝</div>
                   <h4 className="text-lg font-medium text-gray-900 mb-2">暂无岗位信息</h4>
@@ -448,7 +461,7 @@ const ResumeDashboard = () => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {jobs.map((job) => (
+                  {Array.isArray(jobs) && jobs.map((job) => (
                     <div
                       key={job.id}
                       className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"

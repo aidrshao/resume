@@ -7,18 +7,17 @@ const OpenAI = require('openai');
 
 class AIService {
   constructor() {
-    // 优先使用agicto.cn代理服务（按照.cursorrules规范）
+    // 使用成功验证的简化配置（移除timeout）
     this.agictoClient = new OpenAI({
-      apiKey: process.env.AGICTO_API_KEY || "your-agicto-api-key",
-      baseURL: "https://api.agicto.cn/v1",
-      timeout: 150000 // 2.5分钟超时
+      apiKey: process.env.AGICTO_API_KEY || "sk-NKLLp5aHrdNddfM5MXFuoagJXutv8QrPtMdnXy8oFEdTrAUk",
+      baseURL: "https://api.agicto.cn/v1"
+      // 移除timeout设置，使用默认值
     });
 
     // 备用官方OpenAI客户端
     this.openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key",
-      timeout: 150000 // 2.5分钟超时
-      // 使用OpenAI官方API
+      apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key"
+      // 移除timeout设置，使用默认值
     });
   }
 
@@ -52,23 +51,18 @@ class AIService {
         throw new Error(`不支持的模型类型: ${model}`);
       }
 
-      // 使用Promise.race添加超时控制
-      const response = await Promise.race([
-        this.agictoClient.chat.completions.create({
-          messages: [
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          model: primaryModel,
-          temperature: defaultOptions.temperature,
-          max_tokens: defaultOptions.max_tokens
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
-        )
-      ]);
+      // 简化的API调用（移除Promise.race超时控制）
+      const response = await this.agictoClient.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        model: primaryModel,
+        temperature: defaultOptions.temperature,
+        max_tokens: defaultOptions.max_tokens
+      });
 
       console.log('✅ agicto.cn代理服务调用成功');
 
@@ -98,23 +92,18 @@ class AIService {
           fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
         }
 
-        // 同样添加超时控制
-        const response = await Promise.race([
-          this.openaiClient.chat.completions.create({
-            messages: [
-              {
-                role: "user",
-                content: prompt
-              }
-            ],
-            model: fallbackModel,
-            temperature: defaultOptions.temperature,
-            max_tokens: defaultOptions.max_tokens
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Request timed out')), defaultOptions.timeout)
-          )
-        ]);
+        // 简化的备用API调用
+        const response = await this.openaiClient.chat.completions.create({
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          model: fallbackModel,
+          temperature: defaultOptions.temperature,
+          max_tokens: defaultOptions.max_tokens
+        });
 
         console.log('✅ 官方OpenAI API调用成功');
 
@@ -146,70 +135,105 @@ class AIService {
    */
   async optimizeResumeForJob(resumeData, targetCompany, targetPosition, jobDescription, userRequirements = '') {
     const prompt = `
-作为一名专业的简历优化专家，请根据目标岗位要求优化以下简历内容。
+你是一位拥有10年+经验的顶级简历优化专家和人力资源顾问。你深度理解不同行业的招聘偏好，善于挖掘候选人的亮点并精准匹配岗位要求。
 
-目标公司：${targetCompany}
-目标岗位：${targetPosition}
-岗位描述：
+## 📋 任务目标
+为候选人优化简历，使其精准匹配目标岗位，大幅提升面试通过率。
+
+## 🎯 目标岗位信息
+- **目标公司**: ${targetCompany}
+- **目标岗位**: ${targetPosition}
+- **岗位描述**:
 ${jobDescription}
 
-${userRequirements ? `用户特殊要求：
+${userRequirements ? `## 🔥 用户特殊要求
 ${userRequirements}
 
-` : ''}当前简历数据：
+` : ''}## 📊 当前简历数据
 ${JSON.stringify(resumeData, null, 2)}
 
-请按照以下要求优化简历：
+## 🚀 优化策略与要求
 
-1. 个人简介优化：
-   - 突出与目标岗位相关的技能和经验
-   - 体现对目标公司和行业的了解
-   - 展现职业目标与岗位的匹配度
-   ${userRequirements ? '- 重点体现用户特殊要求中提到的技能和经验' : ''}
+### 1. 🎪 个人简介优化 (核心竞争力展示)
+- **关键词匹配**: 精准嵌入岗位JD中的核心关键词和技能要求
+- **价值定位**: 用2-3句话突出最匹配的核心竞争力和独特价值
+- **成果量化**: 用具体数据展示过往成就 (如: 提升XX%效率、负责XX万用户产品)
+- **行业洞察**: 体现对${targetCompany}所在行业和业务的理解
+- **职业目标**: 明确表达与该岗位的契合度和发展规划
+${userRequirements ? '- **个性化**: 重点突出用户特别强调的技能和经验亮点' : ''}
 
-2. 工作经历优化：
-   - 重新组织工作描述，突出相关经验
-   - 量化工作成果，使用具体数据
-   - 调整技能标签，匹配岗位要求
-   ${userRequirements ? '- 根据用户特殊要求调整工作经历的描述重点' : ''}
+### 2. 💼 工作经历优化 (经验价值最大化)
+- **STAR法则**: 用Situation-Task-Action-Result结构重写经历描述
+- **相关性排序**: 将最匹配岗位要求的经历放在前面，调整时间线合理性
+- **成果量化**: 每个经历至少包含2-3个量化成果 (数据、百分比、规模等)
+- **技能映射**: 确保每段经历都能映射到岗位要求的核心技能
+- **问题解决**: 突出解决复杂问题的能力和创新思维
+- **团队协作**: 展现领导力和跨部门协作经验
+${userRequirements ? '- **重点突出**: 根据用户要求调整经历描述的重点和角度' : ''}
 
-3. 项目经历优化：
-   - 突出与目标岗位相关的项目
-   - 详细描述技术栈和解决方案
-   - 强调项目成果和影响
-   ${userRequirements ? '- 特别关注用户要求中提到的项目类型和技术' : ''}
+### 3. 🏗️ 项目经历优化 (技术实力展示)
+- **项目选择**: 优先展示与目标岗位技术栈和业务场景最匹配的项目
+- **技术深度**: 详细描述使用的技术栈、架构设计和解决方案
+- **业务价值**: 强调项目对业务的实际价值和影响
+- **难点突破**: 重点描述遇到的技术难点和创新解决方案
+- **团队角色**: 明确在项目中的角色定位和主要贡献
+- **成果展示**: 用数据说话 (性能提升、用户增长、成本节约等)
+${userRequirements ? '- **技术匹配**: 特别关注用户要求中提到的项目类型和技术栈' : ''}
 
-4. 技能优化：
-   - 重新排序技能，优先展示相关技能
-   - 添加岗位要求的关键技能（如果简历中有体现）
-   - 移除不相关的技能
-   ${userRequirements ? '- 优先展示用户特殊要求中强调的技能' : ''}
+### 4. 🛠️ 技能优化 (能力标签精准化)
+- **优先级排序**: 将岗位要求的核心技能排在前面
+- **技能分层**: 区分核心技能、相关技能和辅助技能
+- **熟练度标注**: 对每个技能标注熟练程度 (精通/熟练/了解)
+- **删繁就简**: 移除与岗位无关或过时的技能
+- **新技能补充**: 基于经历合理推断并添加隐含的相关技能
+- **行业适配**: 使用该行业和岗位的标准技能表述
+${userRequirements ? '- **用户偏好**: 优先展示和强调用户特别要求的技能' : ''}
 
-${userRequirements ? `
-5. 用户特殊要求处理：
-   - 仔细阅读用户的特殊要求
-   - 在简历各个部分中体现这些要求
-   - 确保用户关注的重点得到充分展现
-` : ''}
+### 5. 🎓 教育背景优化
+- **相关性**: 突出与岗位相关的专业课程、毕业设计或学术成果
+- **成绩亮点**: 如有优异成绩或获奖经历，适当展示
+- **持续学习**: 展示相关的培训、认证或自学经历
 
-请返回优化后的完整简历数据，保持原有的JSON结构，并在最后添加一个optimizations字段，说明具体做了哪些优化。
+${userRequirements ? `### 6. 🌟 用户特殊要求处理
+- **深度理解**: 仔细分析用户的特殊要求和关注重点
+- **全面体现**: 在简历的各个模块中巧妙融入用户要求
+- **重点突出**: 确保用户最关心的能力和经验得到充分展现
+- **逻辑一致**: 保持整份简历的逻辑一致性和真实性
 
-返回格式：
+` : ''}## 📝 输出要求
+
+1. **保持结构**: 严格保持原有JSON格式和字段结构
+2. **内容真实**: 在原有经历基础上优化，不编造虚假信息
+3. **语言精炼**: 使用简洁有力的专业表述
+4. **关键词优化**: 自然融入岗位相关关键词，提高ATS通过率
+5. **详细说明**: 在optimizations字段中详细说明每项优化的理由和效果
+
+## 🎯 返回格式
+
+请严格按照以下JSON格式返回，不要包含任何其他文字或解释：
+
 {
-  "personalInfo": { ... },
-  "educations": [ ... ],
-  "workExperiences": [ ... ],
-  "projects": [ ... ],
-  "skills": [ ... ],
-  "languages": [ ... ],
+  "personalInfo": {
+    "name": "姓名",
+    "phone": "电话", 
+    "email": "邮箱",
+    "location": "地址",
+    "summary": "重新优化的个人简介，突出与${targetPosition}岗位的匹配度"
+  },
+  "educations": [...],
+  "workExperiences": [...],
+  "projects": [...],
+  "skills": [...],
+  "languages": [...],
   "optimizations": [
-    "优化说明1",
-    "优化说明2",
-    ...
+    "个人简介：基于${targetCompany}${targetPosition}岗位要求，重新定位核心竞争力...",
+    "工作经历：将最相关的XX经历提前，用STAR法则重写描述...",
+    "项目经历：突出XX技术栈项目，强调与目标岗位的技术匹配度...",
+    "技能优化：重新排序技能标签，优先展示${targetPosition}核心技能...",
+    "关键词优化：在各模块中自然融入岗位JD中的关键词...",
+    "数据量化：为XX%的经历添加了具体的数据和成果指标..."
   ]
 }
-
-只返回JSON，不要包含任何解释文字。
 `;
 
     try {
@@ -218,20 +242,80 @@ ${userRequirements ? `
         max_tokens: 6000
       });
 
-      // 解析优化后的简历数据
+      // 🔧 解析优化后的简历数据（使用解析简历的成功经验）
       let optimizedData;
+      let rawContent = response;
+      
       try {
-        const cleanedResponse = response.replace(/```json\n?|\n?```/g, '').trim();
+        // 步骤1：基础清理
+        console.log('🧹 开始JSON清理和解析...');
+        let cleanedResponse = response
+          .replace(/```json\n?|\n?```/g, '') // 移除代码块标记
+          .replace(/^[^{]*/, '') // 移除开头的非JSON内容
+          .replace(/[^}]*$/, '') // 移除结尾的非JSON内容
+          .trim();
+        
+        console.log('📏 清理后JSON长度:', cleanedResponse.length);
+        console.log('🔍 JSON开头100字符:', cleanedResponse.substring(0, 100));
+        console.log('🔍 JSON结尾100字符:', cleanedResponse.substring(cleanedResponse.length - 100));
+        
         optimizedData = JSON.parse(cleanedResponse);
+        console.log('✅ 基础JSON解析成功');
+        
       } catch (parseError) {
-        console.error('简历优化结果JSON解析失败:', parseError);
-        const jsonMatch = response.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          optimizedData = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error('AI返回的简历优化结果不是有效的JSON格式');
+        console.error('❌ 基础JSON解析失败:', parseError.message);
+        console.error('❌ 错误位置:', parseError.message.match(/position (\d+)/)?.[1] || '未知');
+        
+        try {
+          // 步骤2：智能JSON修复
+          console.log('🔧 开始智能JSON修复...');
+          let fixedJson = this.smartFixJSON(rawContent);
+          
+          optimizedData = JSON.parse(fixedJson);
+          console.log('✅ 智能修复解析成功');
+          
+        } catch (fixError) {
+          console.error('❌ 智能修复失败:', fixError.message);
+          
+          try {
+            // 步骤3：提取JSON片段
+            console.log('🔧 尝试提取JSON片段...');
+            const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              let extractedJson = jsonMatch[0];
+              // 尝试修复常见的JSON错误
+              extractedJson = this.repairCommonJSONErrors(extractedJson);
+              
+              optimizedData = JSON.parse(extractedJson);
+              console.log('✅ JSON片段解析成功');
+            } else {
+              throw new Error('无法提取有效的JSON结构');
+            }
+            
+          } catch (extractError) {
+            console.error('❌ JSON片段解析失败:', extractError.message);
+            console.error('📝 AI原始响应:', rawContent.substring(0, 1000) + '...');
+            
+            // 步骤4：使用原始简历数据作为回退
+            console.warn('⚠️ 所有解析方法失败，使用原始简历数据');
+            optimizedData = {
+              ...resumeData,
+              optimizations: ['AI优化解析失败，保持原始简历内容'],
+              _parseError: true,
+              _errorMessage: 'AI返回的JSON格式存在问题，已使用原始数据'
+            };
+          }
         }
       }
+      
+      // 验证关键字段
+      if (!optimizedData.personalInfo) {
+        console.warn('⚠️ 缺少个人信息字段，使用原始数据补充');
+        optimizedData.personalInfo = resumeData.personalInfo || {};
+      }
+      
+      console.log('📊 优化后简历字段:', Object.keys(optimizedData));
+      console.log('📊 个人信息:', JSON.stringify(optimizedData.personalInfo, null, 2));
 
       return optimizedData;
 
@@ -239,6 +323,83 @@ ${userRequirements ? `
       console.error('简历优化失败:', error);
       throw new Error('简历AI优化失败');
     }
+  }
+
+  /**
+   * 🔧 智能JSON修复（从解析简历的成功经验中学习）
+   * @param {string} rawContent - 原始内容
+   * @returns {string} 修复后的JSON字符串
+   */
+  smartFixJSON(rawContent) {
+    console.log('🔧 [JSON修复] 开始智能修复...');
+    
+    // 提取最可能的JSON部分
+    let jsonContent = rawContent;
+    
+    // 查找最外层的大括号
+    const firstBrace = jsonContent.indexOf('{');
+    const lastBrace = jsonContent.lastIndexOf('}');
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonContent = jsonContent.substring(firstBrace, lastBrace + 1);
+    }
+    
+    // 修复常见的AI生成JSON问题
+    jsonContent = jsonContent
+      // 修复多余的逗号
+      .replace(/,(\s*[}\]])/g, '$1')
+      // 修复缺失的逗号（在对象或数组元素之间）
+      .replace(/("\w+":\s*"[^"]*")\s*\n\s*(")/g, '$1,\n    $2')
+      .replace(/(\]|\})\s*\n\s*(")/g, '$1,\n    $2')
+      // 修复引号问题
+      .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
+      // 修复数组末尾的逗号
+      .replace(/,(\s*\])/g, '$1')
+      // 修复对象末尾的逗号
+      .replace(/,(\s*\})/g, '$1');
+    
+    console.log('🔧 [JSON修复] 基础修复完成');
+    return jsonContent;
+  }
+
+  /**
+   * 🔧 修复常见JSON错误（从解析简历的成功经验中学习）
+   * @param {string} jsonStr - JSON字符串
+   * @returns {string} 修复后的JSON字符串
+   */
+  repairCommonJSONErrors(jsonStr) {
+    console.log('🔧 [JSON修复] 修复常见错误...');
+    
+    let repaired = jsonStr;
+    
+    // 修复1：删除多余的逗号
+    repaired = repaired.replace(/,(\s*[}\]])/g, '$1');
+    
+    // 修复2：在缺少逗号的地方添加逗号
+    repaired = repaired.replace(/("|\]|\})(\s*\n\s*)("|\{|\[)/g, '$1,$2$3');
+    
+    // 修复3：修复未闭合的字符串
+    const stringMatches = repaired.match(/"[^"]*$/gm);
+    if (stringMatches) {
+      repaired = repaired.replace(/"([^"]*?)$/gm, '"$1"');
+    }
+    
+    // 修复4：修复未闭合的数组或对象
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/\]/g) || []).length;
+    
+    // 补充缺失的闭合括号
+    if (openBraces > closeBraces) {
+      repaired += '}'.repeat(openBraces - closeBraces);
+    }
+    if (openBrackets > closeBrackets) {
+      repaired += ']'.repeat(openBrackets - closeBrackets);
+    }
+    
+    console.log('🔧 [JSON修复] 常见错误修复完成');
+    return repaired;
   }
 
   /**

@@ -1052,12 +1052,15 @@ class ResumeController {
           
           console.log('✅ [生成岗位专属简历] AI优化完成');
           
-          // 更新简历数据
-          await Resume.update(newResume.id, {
-            resume_data: optimizedData,
-            ai_optimizations: optimizedData.optimizations || [],
+          // 更新简历数据，确保JSON格式正确
+          const updateData = {
+            resume_data: JSON.stringify(optimizedData),  // 确保转换为JSON字符串
+            ai_optimizations: JSON.stringify(optimizedData.optimizations || []),  // 确保数组也转为JSON
             status: 'completed'
-          });
+          };
+          
+          console.log('📝 [生成岗位专属简历] 准备更新数据库...');
+          await Resume.update(newResume.id, updateData);
           
           console.log('🎊 [生成岗位专属简历] 岗位专属简历生成完成:', newResume.id);
           
