@@ -15,11 +15,18 @@ import ResumeEdit from './components/ResumeEdit';
 import AIChatPage from './components/AIChatPage';
 import JobsPage from './components/JobsPage';
 import ProtectedRoute from './components/ProtectedRoute';
+// 管理员相关组件
+import AdminLogin from './components/AdminLogin';
+import AdminDashboard from './components/AdminDashboard';
+import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 /**
  * 主应用组件
  */
 function App() {
+  // 添加调试日志
+  console.log('🚀 [APP] 应用启动，配置路由...');
+  
   return (
     <Router>
       <div className="App">
@@ -32,6 +39,18 @@ function App() {
           
           {/* 独立的注册页面（保留，用于直接访问） */}
           <Route path="/register" element={<RegisterPage />} />
+          
+          {/* 管理员路由 */}
+          <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
+            } 
+          />
           
           {/* 用户中心 - 需要认证 */}
           <Route 

@@ -9,6 +9,7 @@ const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resumeRoutes');
 const jobRoutes = require('./routes/jobRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -82,8 +83,9 @@ app.get('/health', (req, res) => {
 
 // 路由配置
 app.use('/api/auth', authRoutes);
-app.use('/api', resumeRoutes);
+app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/jobs', jobRoutes);
+app.use('/api/resumes', resumeRoutes);  // 改为更具体的路径
 
 // 404处理
 app.use('*', (req, res) => {

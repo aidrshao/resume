@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 管理员前端流程测试</title>
+    <style>
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .test-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .test-button {
+            background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .test-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        .test-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Monaco', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .status.success { background: #4CAF50; color: white; }
+        .status.error { background: #f44336; color: white; }
+        .status.pending { background: #ff9800; color: white; }
+        .info {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #4ECDC4;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .links {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .links a {
+            color: #4ECDC4;
+            text-decoration: none;
+            margin: 0 15px;
+            padding: 10px 20px;
+            border: 2px solid #4ECDC4;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+        }
+        .links a:hover {
+            background: #4ECDC4;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 管理员前端流程测试</h1>
+        
+        <div class="info">
+            📋 <strong>测试目的</strong>: 验证管理员登录和页面跳转是否正常工作
+        </div>
+
+        <!-- 服务状态检查 -->
+        <div class="test-section">
+            <h3>🚀 1. 服务状态检查</h3>
+            <button class="test-button" onclick="checkServices()">检查前后端服务</button>
+            <div id="serviceStatus" class="result"></div>
+        </div>
+
+        <!-- localStorage状态 -->
+        <div class="test-section">
+            <h3>💾 2. localStorage状态</h3>
+            <button class="test-button" onclick="checkLocalStorage()">检查存储状态</button>
+            <button class="test-button" onclick="clearStorage()">清理存储</button>
+            <div id="storageStatus" class="result"></div>
+        </div>
+
+        <!-- 登录流程测试 -->
+        <div class="test-section">
+            <h3>🔐 3. 管理员登录测试</h3>
+            <button class="test-button" onclick="testAdminLogin()">执行登录流程</button>
+            <div id="loginResult" class="result"></div>
+        </div>
+
+        <!-- 权限验证测试 -->
+        <div class="test-section">
+            <h3>🛡️ 4. 权限验证测试</h3>
+            <button class="test-button" onclick="testAdminAuth()">验证管理员权限</button>
+            <div id="authResult" class="result"></div>
+        </div>
+
+        <!-- 仪表板数据测试 -->
+        <div class="test-section">
+            <h3>📊 5. 仪表板数据测试</h3>
+            <button class="test-button" onclick="testDashboardStats()">获取仪表板数据</button>
+            <div id="dashboardResult" class="result"></div>
+        </div>
+
+        <!-- 快速链接 -->
+        <div class="links">
+            <a href="http://localhost:3016/" target="_blank">🏠 主页</a>
+            <a href="http://localhost:3016/admin/login" target="_blank">🔐 管理员登录</a>
+            <a href="http://localhost:3016/admin/dashboard" target="_blank">📊 管理后台</a>
+        </div>
+    </div>
+
+    <script>
+        let isLoggedIn = false;
+        let adminToken = null;
+
+        // 检查服务状态
+        async function checkServices() {
+            const statusDiv = document.getElementById('serviceStatus');
+            statusDiv.innerHTML = '🔄 正在检查服务状态...';
+
+            try {
+                // 检查后端服务
+                const backendResponse = await fetch('http://localhost:8000/health');
+                const backendData = await backendResponse.json();
+                
+                // 检查前端服务
+                const frontendResponse = await fetch('http://localhost:3016/');
+                
+                statusDiv.innerHTML = `
+✅ 后端服务 (8000): ${backendData.success ? '正常' : '异常'}
+  - 状态: ${backendData.message}
+  - 时间: ${backendData.timestamp}
+  - 环境: ${backendData.node_env}
+
+✅ 前端服务 (3016): ${frontendResponse.ok ? '正常' : '异常'}
+  - 状态码: ${frontendResponse.status}
+                `;
+            } catch (error) {
+                statusDiv.innerHTML = `❌ 服务检查失败: ${error.message}`;
+            }
+        }
+
+        // 检查localStorage状态
+        function checkLocalStorage() {
+            const statusDiv = document.getElementById('storageStatus');
+            const adminToken = localStorage.getItem('adminToken');
+            const adminInfo = localStorage.getItem('adminInfo');
+            
+            statusDiv.innerHTML = `
+🔑 Admin Token: ${adminToken ? '存在' : '不存在'}
+${adminToken ? `  - 长度: ${adminToken.length} 字符` : ''}
+
+👤 Admin Info: ${adminInfo ? '存在' : '不存在'}
+${adminInfo ? `  - 内容: ${adminInfo}` : ''}
+
+📊 当前登录状态: ${isLoggedIn ? '已登录' : '未登录'}
+            `;
+        }
+
+        // 清理存储
+        function clearStorage() {
+            localStorage.removeItem('adminToken');
+            localStorage.removeItem('adminInfo');
+            isLoggedIn = false;
+            adminToken = null;
+            
+            document.getElementById('storageStatus').innerHTML = '🧹 存储已清理';
+            setTimeout(checkLocalStorage, 1000);
+        }
+
+        // 测试管理员登录
+        async function testAdminLogin() {
+            const resultDiv = document.getElementById('loginResult');
+            resultDiv.innerHTML = '🔄 正在执行登录流程...';
+
+            try {
+                const response = await fetch('/api/admin/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@example.com',
+                        password: 'admin123456'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    adminToken = data.data.token;
+                    localStorage.setItem('adminToken', adminToken);
+                    localStorage.setItem('adminInfo', JSON.stringify(data.data.admin));
+                    isLoggedIn = true;
+
+                    resultDiv.innerHTML = `
+✅ 登录成功!
+  - Token: ${adminToken ? '已获取' : '未获取'}
+  - 管理员ID: ${data.data.admin.id}
+  - 邮箱: ${data.data.admin.email}
+  - 角色: ${data.data.admin.role}
+  - 姓名: ${data.data.admin.name}
+  - 最后登录: ${data.data.admin.lastLoginAt}
+
+💾 数据已保存到 localStorage
+                    `;
+                } else {
+                    resultDiv.innerHTML = `❌ 登录失败: ${data.message}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 登录请求失败: ${error.message}`;
+            }
+        }
+
+        // 测试管理员权限
+        async function testAdminAuth() {
+            const resultDiv = document.getElementById('authResult');
+            
+            if (!adminToken) {
+                resultDiv.innerHTML = '❌ 请先执行登录流程';
+                return;
+            }
+
+            resultDiv.innerHTML = '🔄 正在验证管理员权限...';
+
+            try {
+                const response = await fetch('/api/admin/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+✅ 权限验证成功!
+  - 管理员ID: ${data.data.id}
+  - 邮箱: ${data.data.email}
+  - 角色: ${data.data.role}
+  - 验证时间: ${new Date().toLocaleString()}
+                    `;
+                } else {
+                    resultDiv.innerHTML = `❌ 权限验证失败: ${data.message}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 权限验证请求失败: ${error.message}`;
+            }
+        }
+
+        // 测试仪表板数据
+        async function testDashboardStats() {
+            const resultDiv = document.getElementById('dashboardResult');
+            
+            if (!adminToken) {
+                resultDiv.innerHTML = '❌ 请先执行登录流程';
+                return;
+            }
+
+            resultDiv.innerHTML = '🔄 正在获取仪表板数据...';
+
+            try {
+                const response = await fetch('/api/admin/dashboard/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.data;
+                    resultDiv.innerHTML = `
+✅ 仪表板数据获取成功!
+
+👥 用户统计:
+  - 总用户数: ${stats.users.total_users}
+  - 本周新增: ${stats.users.new_users_week}
+  - 管理员数: ${stats.users.admin_count}
+  - 已验证用户: ${stats.users.verified_users}
+
+💎 会员统计:
+  - 总会员数: ${stats.memberships.total_memberships}
+  - 活跃会员: ${stats.memberships.active_memberships}
+  - 过期会员: ${stats.memberships.expired_memberships}
+
+📦 套餐统计:
+  - 总套餐数: ${stats.tiers.total_tiers}
+  - 活跃套餐: ${stats.tiers.active_tiers}
+
+💰 收入统计:
+  - 付费订单: ${stats.revenue.paid_orders}
+  - 总收入: ¥${stats.revenue.total_revenue}
+
+🔧 系统状态:
+  - 数据库状态: ${stats.system.database_status}
+  - 最后更新: ${stats.system.last_updated}
+                    `;
+                } else {
+                    resultDiv.innerHTML = `❌ 获取仪表板数据失败: ${data.message}`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `❌ 仪表板数据请求失败: ${error.message}`;
+            }
+        }
+
+        // 页面加载时检查服务状态
+        window.onload = function() {
+            console.log('🧪 [TEST] 管理员前端测试页面加载完成');
+            checkServices();
+            checkLocalStorage();
+        };
+    </script>
+</body>
+</html> 

@@ -163,6 +163,87 @@ class User {
       throw error;
     }
   }
+
+  /**
+   * 获取用户列表（包含会员信息）
+   * @param {Object} options - 查询选项
+   * @param {number} options.page - 页码
+   * @param {number} options.limit - 每页条数
+   * @param {string} options.keyword - 搜索关键词
+   * @returns {Promise<Object>} 用户列表和分页信息
+   */
+  static async findAllWithMembership(options = {}) {
+    try {
+      const { page = 1, limit = 10, keyword } = options;
+      const offset = (page - 1) * limit;
+
+      let query = db('users')
+        .leftJoin('user_memberships', function() {
+          this.on('users.id', '=', 'user_memberships.user_id')
+            .andOn('user_memberships.status', '=', db.raw('?', ['active']))
+            .andOn(function() {
+              this.whereNull('user_memberships.end_date')
+                .orWhere('user_memberships.end_date', '>', db.fn.now());
+            });
+        })
+        .leftJoin('membership_tiers', 'user_memberships.membership_tier_id', 'membership_tiers.id')
+        .select(
+          'users.id',
+          'users.email',
+          'users.name',
+          'users.email_verified',
+          'users.is_admin',
+          'users.created_at',
+          'user_memberships.status as membership_status',
+          'user_memberships.start_date as membership_start_date',
+          'user_memberships.end_date as membership_end_date',
+          'user_memberships.remaining_ai_quota',
+          'membership_tiers.name as tier_name',
+          'membership_tiers.template_access_level'
+        )
+        .where('users.is_admin', false); // 排除管理员账号
+
+      // 关键词搜索
+      if (keyword) {
+        query = query.where(function() {
+          this.where('users.email', 'ilike', `%${keyword}%`)
+            .orWhere('users.name', 'ilike', `%${keyword}%`);
+        });
+      }
+
+      // 获取总数
+      const countQuery = db('users')
+        .where('users.is_admin', false);
+      
+      if (keyword) {
+        countQuery.where(function() {
+          this.where('users.email', 'ilike', `%${keyword}%`)
+            .orWhere('users.name', 'ilike', `%${keyword}%`);
+        });
+      }
+
+      const [{ count }] = await countQuery.count('* as count');
+      const total = parseInt(count);
+
+      // 获取数据
+      const users = await query
+        .orderBy('users.created_at', 'desc')
+        .limit(limit)
+        .offset(offset);
+
+      return {
+        data: users,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = User; 

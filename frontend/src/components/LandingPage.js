@@ -742,6 +742,16 @@ const LandingPage = () => {
                   >
                     注册
                   </button>
+                  <button
+                    onClick={() => {
+                      console.log('🔧 [管理员按钮] 点击管理员按钮，准备跳转到管理员登录页面');
+                      navigate('/admin/login');
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 border border-amber-600"
+                    title="管理员入口"
+                  >
+                    🔐 管理员
+                  </button>
                 </div>
               )}
             </div>

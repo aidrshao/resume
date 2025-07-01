@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理员登录测试</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      max-width: 500px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 16px;
+      box-sizing: border-box;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4F46E5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+    button {
+      width: 100%;
+      background: #4F46E5;
+      color: white;
+      padding: 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover {
+      background: #3730A3;
+    }
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+    .message {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    .success {
+      background: #D1FAE5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+    }
+    .error {
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+    }
+    .info {
+      background: #DBEAFE;
+      color: #1E40AF;
+      border: 1px solid #93C5FD;
+    }
+    .credentials {
+      background: #F3F4F6;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .credentials h3 {
+      margin: 0 0 10px 0;
+      color: #374151;
+    }
+    .credentials p {
+      margin: 5px 0;
+      font-family: monospace;
+      color: #6B7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 管理员系统测试</h1>
+    
+    <div class="credentials">
+      <h3>测试账号信息：</h3>
+      <p>邮箱: admin@example.com</p>
+      <p>密码: admin123456</p>
+    </div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">管理员邮箱</label>
+        <input type="email" id="email" value="admin@example.com" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="password">密码</label>
+        <input type="password" id="password" value="admin123456" required>
+      </div>
+      
+      <button type="submit" id="loginBtn">登录管理系统</button>
+    </form>
+
+    <div id="message"></div>
+    
+    <div id="adminInfo" style="display: none;">
+      <h3>✅ 登录成功！管理员信息：</h3>
+      <div id="adminDetails"></div>
+      <button onclick="testDashboard()" style="margin-top: 15px;">测试仪表板数据</button>
+      <button onclick="logout()" style="margin-top: 10px; background: #DC2626;">退出登录</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'http://localhost:8000/api';
+    let authToken = null;
+
+    // 显示消息
+    function showMessage(text, type = 'info') {
+      const messageDiv = document.getElementById('message');
+      messageDiv.textContent = text;
+      messageDiv.className = `message ${type}`;
+      
+      // 3秒后清除错误消息
+      if (type === 'error') {
+        setTimeout(() => {
+          messageDiv.textContent = '';
+          messageDiv.className = '';
+        }, 3000);
+      }
+    }
+
+    // 管理员登录
+    async function adminLogin(email, password) {
+      try {
+        showMessage('正在登录...', 'info');
+        
+        const response = await fetch(`${API_BASE}/admin/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          authToken = data.data.token;
+          showMessage('登录成功！', 'success');
+          
+          // 显示管理员信息
+          document.getElementById('loginForm').style.display = 'none';
+          document.getElementById('adminInfo').style.display = 'block';
+          document.getElementById('adminDetails').innerHTML = `
+            <p><strong>ID:</strong> ${data.data.admin.id}</p>
+            <p><strong>邮箱:</strong> ${data.data.admin.email}</p>
+            <p><strong>姓名:</strong> ${data.data.admin.name}</p>
+            <p><strong>角色:</strong> ${data.data.admin.role}</p>
+            <p><strong>登录时间:</strong> ${new Date(data.data.admin.lastLoginAt).toLocaleString()}</p>
+          `;
+        } else {
+          showMessage(`登录失败: ${data.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('登录错误:', error);
+        showMessage(`网络错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 测试仪表板数据
+    async function testDashboard() {
+      if (!authToken) {
+        showMessage('请先登录', 'error');
+        return;
+      }
+
+      try {
+        showMessage('正在获取仪表板数据...', 'info');
+        
+        const response = await fetch(`${API_BASE}/admin/dashboard/stats`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          showMessage('仪表板数据获取成功！', 'success');
+          console.log('仪表板数据:', data.data);
+          
+          // 显示统计信息
+          const stats = data.data;
+          alert(`系统统计信息:
+总用户数: ${stats.users.total_users}
+本周新用户: ${stats.users.new_users_week}
+管理员数量: ${stats.users.admin_count}
+总套餐数: ${stats.tiers.total_tiers}
+数据库状态: ${stats.system.database_status}`);
+        } else {
+          showMessage(`获取数据失败: ${data.message}`, 'error');
+        }
+      } catch (error) {
+        console.error('仪表板错误:', error);
+        showMessage(`网络错误: ${error.message}`, 'error');
+      }
+    }
+
+    // 退出登录
+    function logout() {
+      authToken = null;
+      document.getElementById('loginForm').style.display = 'block';
+      document.getElementById('adminInfo').style.display = 'none';
+      document.getElementById('message').textContent = '';
+      document.getElementById('message').className = '';
+      showMessage('已退出登录', 'info');
+    }
+
+    // 表单提交事件
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      if (!email || !password) {
+        showMessage('请填写邮箱和密码', 'error');
+        return;
+      }
+
+      await adminLogin(email, password);
+    });
+
+    // 页面加载时的提示
+    window.addEventListener('load', () => {
+      showMessage('请使用测试账号登录管理系统', 'info');
+    });
+  </script>
+</body>
+</html> 
