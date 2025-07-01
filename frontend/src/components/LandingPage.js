@@ -104,9 +104,59 @@ const LandingPage = () => {
     return new Promise((resolve, reject) => {
       let pollCount = 0;
       let currentInterval = 1000; // 初始1秒
-      const maxInterval = 10000;  // 最大10秒
-      const maxPollCount = 60;    // 最大轮询60次
+      const maxInterval = 15000;  // 最大15秒（AI分析阶段用更长间隔）
+      const maxPollCount = 150;   // 最大轮询150次（约10分钟）
       let pollTimeout;
+      let lastProgress = 0;
+      let aiAnalysisStartTime = null;
+      let stageStartTime = Date.now(); // 当前阶段开始时间
+      let lastStage = 'init'; // 记录当前阶段
+      
+      // 进度阶段定义
+      const stages = {
+        'init': { name: '初始化', range: [0, 10], color: '#3B82F6' },
+        'extract': { name: '文本提取', range: [10, 30], color: '#8B5CF6' },
+        'ai_analysis': { name: 'AI分析', range: [30, 85], color: '#F59E0B' },
+        'cleanup': { name: '数据处理', range: [85, 100], color: '#10B981' }
+      };
+      
+      // 根据进度判断当前阶段
+      const getCurrentStage = (progress) => {
+        if (progress < 10) return 'init';
+        if (progress < 30) return 'extract';
+        if (progress < 85) return 'ai_analysis';
+        return 'cleanup';
+      };
+      
+      // 友好的状态消息映射
+      const friendlyMessages = {
+        'init': [
+          '🚀 正在启动解析引擎...',
+          '📋 正在验证文件格式...',
+          '🔍 正在准备处理流程...'
+        ],
+        'extract': [
+          '📄 正在读取文档内容...',
+          '🔤 正在识别文本信息...',
+          '📝 正在整理文档结构...',
+          '⚡ 正在优化文本质量...'
+        ],
+        'ai_analysis': [
+          '🤖 AI正在理解简历结构...',
+          '🧠 AI正在分析个人信息...',
+          '💼 AI正在识别工作经历...',
+          '🎓 AI正在解析教育背景...',
+          '⚙️ AI正在提取技能信息...',
+          '🏆 AI正在分析项目经验...',
+          '🔍 AI正在验证数据准确性...',
+          '✨ AI正在优化数据结构...'
+        ],
+        'cleanup': [
+          '🧹 正在清理数据格式...',
+          '📊 正在验证信息完整性...',
+          '✅ 正在完成最后处理...'
+        ]
+      };
       
       const executePoll = async () => {
         pollCount++;
@@ -145,31 +195,117 @@ const LandingPage = () => {
           
           if (data.success) {
             const task = data.data;
+            const currentProgress = task.progress || 0;
+            const currentStage = getCurrentStage(currentProgress);
+            
+            // 检测阶段变化
+            if (currentStage !== lastStage) {
+              stageStartTime = Date.now();
+              lastStage = currentStage;
+              console.log(`🎯 [POLL_TASK] 进入新阶段: ${stages[currentStage].name} (${currentProgress}%)`);
+            }
             
             if (shouldLog) {
               console.log('🔄 [POLL_TASK] 任务当前状态:', {
                 status: task.status,
-                progress: task.progress,
+                progress: currentProgress,
+                stage: currentStage,
                 message: task.message,
-                hasResultData: !!task.resultData
+                hasResultData: !!task.resultData,
+                pollCount: pollCount
               });
             }
             
-            // 更新进度和状态
-            setUploadProgress(task.progress || 0);
-            setUploadStage(task.message || '处理中...');
+            // 检测是否进入AI分析阶段
+            const isAIAnalysisStage = currentStage === 'ai_analysis';
+            if (isAIAnalysisStage && !aiAnalysisStartTime) {
+              aiAnalysisStartTime = Date.now();
+              console.log('🤖 [POLL_TASK] 进入AI分析阶段，这可能需要3-5分钟...');
+            }
+            
+            // 更新进度条
+            setUploadProgress(currentProgress);
+            
+            // 生成友好的状态消息
+            let displayMessage = task.message || '处理中...';
+            
+            // 如果是后端的原始消息，尝试美化
+            if (task.message && task.message.includes('🤖')) {
+              // AI分析阶段的特殊处理
+              const elapsedTime = aiAnalysisStartTime ? 
+                Math.round((Date.now() - aiAnalysisStartTime) / 1000) : 0;
+              
+              if (elapsedTime > 0) {
+                const minutes = Math.floor(elapsedTime / 60);
+                const seconds = elapsedTime % 60;
+                const timeStr = minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`;
+                
+                // 随机选择一个友好的AI消息
+                const aiMessages = friendlyMessages.ai_analysis;
+                const randomMessage = aiMessages[Math.floor(Math.random() * aiMessages.length)];
+                displayMessage = `${randomMessage} (已用时${timeStr})`;
+                
+                // 给用户一些提示和鼓励
+                if (elapsedTime > 120) { // 超过2分钟
+                  displayMessage += ' - AI正在深度分析，请耐心等待...';
+                } else if (elapsedTime > 60) { // 超过1分钟
+                  displayMessage += ' - 分析中，马上就好...';
+                }
+              } else {
+                displayMessage = friendlyMessages.ai_analysis[0];
+              }
+            } else {
+              // 其他阶段使用友好消息
+              const stageMessages = friendlyMessages[currentStage] || ['正在处理中...'];
+              
+              // 根据时间轮换消息
+              const messageIndex = Math.floor(pollCount / 3) % stageMessages.length;
+              const baseMessage = stageMessages[messageIndex];
+              
+              // 添加阶段进度信息
+              const stageRange = stages[currentStage].range;
+              const stageProgress = Math.round(((currentProgress - stageRange[0]) / (stageRange[1] - stageRange[0])) * 100);
+              const clampedStageProgress = Math.max(0, Math.min(100, stageProgress));
+              
+              const stageElapsed = Math.round((Date.now() - stageStartTime) / 1000);
+              if (stageElapsed > 10) { // 超过10秒显示耗时
+                displayMessage = `${baseMessage} (${stageElapsed}s)`;
+              } else {
+                displayMessage = baseMessage;
+              }
+            }
+            
+            setUploadStage(displayMessage);
             
             // 检查任务是否完成
             if (task.status === 'completed') {
               console.log('✅ [POLL_TASK] 任务完成！');
               setUploadProgress(100);
-              setUploadStage('解析完成！');
+              
+              // 显示完成消息和性能统计
+              let completionMessage = '🎉 解析完成！';
+              if (task.resultData && task.resultData.performance) {
+                const totalSeconds = Math.round(task.resultData.performance.totalDuration / 1000);
+                completionMessage += ` 总耗时${totalSeconds}秒`;
+              }
+              setUploadStage(completionMessage);
               
               // 设置解析结果
               if (task.resultData && task.resultData.structuredData) {
                 console.log('📄 [POLL_TASK] 设置解析结果...');
                 setTimeout(() => {
                   setUploadResult(task.resultData.structuredData);
+                  
+                  // 显示性能统计（可选）
+                  if (task.resultData.performance) {
+                    const perf = task.resultData.performance;
+                    console.log('📊 [POLL_TASK] 性能统计:', {
+                      总耗时: Math.round(perf.totalDuration / 1000) + '秒',
+                      文本提取: Math.round(perf.stages.textExtraction / 1000) + '秒',
+                      AI分析: Math.round(perf.stages.aiAnalysis / 1000) + '秒',
+                      数据清理: Math.round(perf.stages.dataCleanup / 1000) + '秒'
+                    });
+                  }
                 }, 300);
               } else {
                 console.warn('⚠️ [POLL_TASK] 任务完成但缺少结构化数据');
@@ -179,17 +315,36 @@ const LandingPage = () => {
               return;
             } else if (task.status === 'failed') {
               console.error('❌ [POLL_TASK] 任务失败:', task.errorMessage);
-              throw new Error(task.errorMessage || '解析失败');
+              
+              // 友好的错误提示
+              let errorMessage = '解析失败';
+              if (task.errorMessage) {
+                if (task.errorMessage.includes('超时')) {
+                  errorMessage = '⏰ 处理超时，文件可能过大或过于复杂';
+                } else if (task.errorMessage.includes('AI')) {
+                  errorMessage = '🤖 AI服务暂时繁忙，请稍后重试';
+                } else if (task.errorMessage.includes('格式')) {
+                  errorMessage = '📄 文件格式不支持或已损坏';
+                } else {
+                  errorMessage = `❌ ${task.errorMessage}`;
+                }
+              }
+              
+              throw new Error(errorMessage);
             } else {
               // 检查是否超过最大轮询次数
               if (pollCount >= maxPollCount) {
                 console.error('⏰ [POLL_TASK] 超过最大轮询次数:', maxPollCount);
-                throw new Error('处理超时，请稍后重试');
+                throw new Error('处理时间过长，请联系技术支持');
               }
               
-              // 渐进式增加轮询间隔
-              if (pollCount > 5) {
-                currentInterval = Math.min(currentInterval + 1000, maxInterval);
+              // 智能调整轮询间隔
+              if (isAIAnalysisStage) {
+                // AI分析阶段使用较长间隔（5-15秒）
+                currentInterval = Math.min(5000 + (pollCount * 500), maxInterval);
+              } else if (pollCount > 5) {
+                // 其他阶段渐进式增加间隔
+                currentInterval = Math.min(currentInterval + 1000, 8000);
               }
               
               if (shouldLog) {
@@ -199,6 +354,8 @@ const LandingPage = () => {
               // 设置下次轮询
               pollTimeout = setTimeout(executePoll, currentInterval);
             }
+            
+            lastProgress = currentProgress;
           } else {
             console.error('❌ [POLL_TASK] API返回失败:', data);
             throw new Error(data.message || '获取任务状态失败');
@@ -216,12 +373,12 @@ const LandingPage = () => {
       // 开始第一次轮询
       executePoll();
       
-      // 设置总体超时（3分钟）
+      // 设置总体超时（10分钟，给AI充足时间）
       const overallTimeout = setTimeout(() => {
-        console.error('⏰ [POLL_TASK] 总体超时');
+        console.error('⏰ [POLL_TASK] 总体超时（10分钟）');
         if (pollTimeout) clearTimeout(pollTimeout);
-        reject(new Error('处理超时，请稍后重试'));
-      }, 3 * 60 * 1000);
+        reject(new Error('AI分析时间过长，可能是服务器负载较高。您的简历仍在后台处理中，请稍后刷新页面查看结果。'));
+      }, 10 * 60 * 1000);
       
       // 清理函数
       const cleanup = () => {
@@ -488,6 +645,13 @@ const LandingPage = () => {
       } else if (error.message.includes('Failed to fetch')) {
         userMessage = '网络连接失败，请检查网络后重试';
         console.error('❌ [FRONTEND_UPLOAD] 错误类型: 网络连接失败');
+      } else if (error.message && (
+        error.message.includes('AI分析时间过长') || 
+        error.message.includes('处理时间过长') ||
+        error.message.includes('处理超时')
+      )) {
+        userMessage = '⏰ AI处理超时提示：您的简历可能仍在后台处理中，请稍后刷新页面查看结果。如果长时间未完成，请联系技术支持。';
+        console.error('❌ [FRONTEND_UPLOAD] 错误类型: AI处理超时');
       } else {
         userMessage = `简历解析失败: ${error.message}`;
         console.error('❌ [FRONTEND_UPLOAD] 错误类型: 其他错误');

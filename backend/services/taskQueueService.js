@@ -285,7 +285,9 @@ class TaskQueueService extends EventEmitter {
    * @param {Object} taskData - 任务数据
    */
   async executeResumeParseTask(taskId, taskData) {
+    const startTime = Date.now();
     console.log('🔧 [RESUME_PARSE_TASK] ==> 开始执行简历解析任务');
+    console.log('🔧 [RESUME_PARSE_TASK] 开始时间:', new Date().toISOString());
     console.log('🔧 [RESUME_PARSE_TASK] 任务参数:', {
       taskId: taskId,
       taskData: {
@@ -297,9 +299,44 @@ class TaskQueueService extends EventEmitter {
     });
     
     const ResumeParseService = require('./resumeParseService');
+    let stageStartTime = Date.now();
+    
+    // 状态文本轮换数组
+    const progressMessages = {
+      init: [
+        '🚀 正在初始化解析引擎...',
+        '📋 正在验证文件完整性...',
+        '🔍 正在检查文件格式...'
+      ],
+      extract: [
+        '📄 正在提取文档内容...',
+        '🔤 正在识别文本信息...',
+        '📝 正在整理文档结构...',
+        '⚡ 正在优化文本质量...'
+      ],
+      ai_analysis: [
+        '🤖 AI正在理解简历结构...',
+        '🧠 AI正在识别个人信息...',
+        '💼 AI正在分析工作经历...',
+        '🎓 AI正在解析教育背景...',
+        '⚙️ AI正在提取技能信息...',
+        '🏆 AI正在识别项目经验...',
+        '🔍 AI正在验证数据准确性...',
+        '✨ AI正在优化数据结构...'
+      ],
+      cleanup: [
+        '🧹 正在清理和验证数据...',
+        '📊 正在格式化输出结果...',
+        '✅ 正在完成最后检查...'
+      ]
+    };
     
     try {
       const { filePath, fileType } = taskData;
+      
+      // === 阶段1: 初始化验证 (0%-10%) ===
+      console.log('⏱️ [PERFORMANCE] 阶段1-初始化验证 开始');
+      await this.updateTask(taskId, 'processing', 2, progressMessages.init[0]);
       
       console.log('🔧 [RESUME_PARSE_TASK] 验证文件存在性...');
       const fs = require('fs');
@@ -307,72 +344,201 @@ class TaskQueueService extends EventEmitter {
         throw new Error(`文件不存在: ${filePath}`);
       }
       
-      // 更新进度：开始文本提取
-      console.log('🔧 [RESUME_PARSE_TASK] 开始文本提取...');
-      await this.updateTask(taskId, 'processing', 15, '正在提取文件文本...');
+      await this.updateTask(taskId, 'processing', 5, progressMessages.init[1]);
       
-      // 提取文本
+      // 获取文件信息
+      const fileStats = fs.statSync(filePath);
+      console.log('📄 [RESUME_PARSE_TASK] 文件信息:', {
+        size: fileStats.size,
+        sizeHuman: (fileStats.size / 1024).toFixed(2) + 'KB',
+        modified: fileStats.mtime
+      });
+      
+      await this.updateTask(taskId, 'processing', 8, progressMessages.init[2]);
+      
+      const stage1Duration = Date.now() - stageStartTime;
+      console.log(`⏱️ [PERFORMANCE] 阶段1完成，耗时: ${stage1Duration}ms`);
+      
+      // === 阶段2: 文本提取 (10%-30%) ===
+      stageStartTime = Date.now();
+      console.log('⏱️ [PERFORMANCE] 阶段2-文本提取 开始');
+      await this.updateTask(taskId, 'processing', 12, progressMessages.extract[0]);
+      
       let extractedText = '';
+      const extractStartTime = Date.now();
+      
       switch (fileType.toLowerCase()) {
         case 'pdf':
           console.log('🔧 [RESUME_PARSE_TASK] 提取PDF文本...');
+          await this.updateTask(taskId, 'processing', 15, '📄 正在解析PDF文档...');
           extractedText = await ResumeParseService.extractTextFromPDF(filePath);
           break;
         case 'docx':
         case 'doc':
           console.log('🔧 [RESUME_PARSE_TASK] 提取Word文本...');
+          await this.updateTask(taskId, 'processing', 15, '📄 正在解析Word文档...');
           extractedText = await ResumeParseService.extractTextFromWord(filePath);
           break;
         case 'txt':
           console.log('🔧 [RESUME_PARSE_TASK] 读取TXT文本...');
+          await this.updateTask(taskId, 'processing', 15, '📄 正在读取文本文件...');
           extractedText = await ResumeParseService.extractTextFromTXT(filePath);
           break;
         default:
           throw new Error(`不支持的文件类型: ${fileType}`);
       }
 
+      const extractDuration = Date.now() - extractStartTime;
+      console.log(`⏱️ [PERFORMANCE] 文本提取耗时: ${extractDuration}ms`);
       console.log('🔧 [RESUME_PARSE_TASK] 文本提取完成:', {
         textLength: extractedText.length,
+        extractTime: extractDuration + 'ms',
         preview: extractedText.substring(0, 100) + '...'
       });
 
-      // 更新进度：文本提取完成
-      await this.updateTask(taskId, 'processing', 35, `文本提取完成，长度: ${extractedText.length} 字符`);
+      await this.updateTask(taskId, 'processing', 25, progressMessages.extract[2]);
+      await this.updateTask(taskId, 'processing', 30, `✅ 文本提取完成 (${extractedText.length}字符, ${extractDuration}ms)`);
 
-      // 更新进度：开始AI结构化
+      const stage2Duration = Date.now() - stageStartTime;
+      console.log(`⏱️ [PERFORMANCE] 阶段2完成，耗时: ${stage2Duration}ms`);
+
+      // === 阶段3: AI智能分析 (30%-85%) ===
+      stageStartTime = Date.now();
+      console.log('⏱️ [PERFORMANCE] 阶段3-AI分析 开始');
       console.log('🔧 [RESUME_PARSE_TASK] 开始AI结构化分析...');
-      await this.updateTask(taskId, 'processing', 50, '正在进行AI智能结构化分析...');
+      
+      let currentProgress = 32;
+      let messageIndex = 0;
+      
+      // 启动AI分析
+      await this.updateTask(taskId, 'processing', currentProgress, progressMessages.ai_analysis[0]);
 
-      // AI结构化
-      const structuredData = await ResumeParseService.structureResumeText(extractedText);
-      console.log('🔧 [RESUME_PARSE_TASK] AI结构化完成:', {
-        hasPersonalInfo: !!(structuredData && structuredData.personalInfo),
-        hasExperiences: !!(structuredData && structuredData.experiences),
-        hasEducations: !!(structuredData && structuredData.educations)
-      });
+      // 创建动态进度更新定时器
+      const progressInterval = setInterval(async () => {
+        try {
+          // 渐进式增加进度 (每次1-3%)
+          const increment = Math.random() * 2 + 1;
+          currentProgress = Math.min(currentProgress + increment, 82);
+          
+          // 轮换状态文本
+          messageIndex = (messageIndex + 1) % progressMessages.ai_analysis.length;
+          const currentMessage = progressMessages.ai_analysis[messageIndex];
+          
+          const elapsedTime = Math.round((Date.now() - stageStartTime) / 1000);
+          const statusMessage = `${currentMessage} (${elapsedTime}s)`;
+          
+          await this.updateTask(taskId, 'processing', Math.round(currentProgress), statusMessage);
+          
+          console.log(`🤖 [AI_PROGRESS] 进度: ${Math.round(currentProgress)}%, 耗时: ${elapsedTime}s, 消息: ${currentMessage}`);
+        } catch (err) {
+          console.warn('AI进度更新失败:', err.message);
+        }
+      }, 3000); // 每3秒更新一次
 
-      // 更新进度：AI分析完成
-      await this.updateTask(taskId, 'processing', 80, 'AI分析完成，正在清理数据...');
+      try {
+        // 实际AI调用 - 增加超时控制
+        console.log('🤖 [AI_CALL] 开始调用AI服务...');
+        const aiCallStartTime = Date.now();
+        
+        // 设置AI调用超时 (5分钟)
+        const AI_TIMEOUT = 5 * 60 * 1000;
+        const aiCallPromise = ResumeParseService.structureResumeText(extractedText);
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('AI调用超时 (5分钟)')), AI_TIMEOUT);
+        });
+        
+        const structuredData = await Promise.race([aiCallPromise, timeoutPromise]);
+        
+        const aiCallDuration = Date.now() - aiCallStartTime;
+        console.log(`⏱️ [PERFORMANCE] AI调用耗时: ${aiCallDuration}ms (${(aiCallDuration/1000).toFixed(1)}s)`);
+        
+        // 清除进度定时器
+        clearInterval(progressInterval);
+        
+        console.log('🔧 [RESUME_PARSE_TASK] AI结构化完成:', {
+          hasPersonalInfo: !!(structuredData && structuredData.personalInfo),
+          hasWorkExperiences: !!(structuredData && structuredData.workExperiences),
+          hasEducations: !!(structuredData && structuredData.educations),
+          aiCallTime: aiCallDuration + 'ms'
+        });
 
-      // 清理和验证数据
-      console.log('🔧 [RESUME_PARSE_TASK] 开始数据清理验证...');
-      const cleanedData = ResumeParseService.validateAndCleanData(structuredData);
+        // AI分析完成
+        await this.updateTask(taskId, 'processing', 85, `✅ AI分析完成 (耗时${(aiCallDuration/1000).toFixed(1)}s)`);
+        
+        const stage3Duration = Date.now() - stageStartTime;
+        console.log(`⏱️ [PERFORMANCE] 阶段3完成，总耗时: ${stage3Duration}ms`);
+        
+        // === 阶段4: 数据清理验证 (85%-100%) ===
+        stageStartTime = Date.now();
+        console.log('⏱️ [PERFORMANCE] 阶段4-数据清理 开始');
+        
+        await this.updateTask(taskId, 'processing', 88, progressMessages.cleanup[0]);
+        
+        console.log('🔧 [RESUME_PARSE_TASK] 开始数据清理验证...');
+        const cleanupStartTime = Date.now();
+        const cleanedData = ResumeParseService.validateAndCleanData(structuredData);
+        const cleanupDuration = Date.now() - cleanupStartTime;
+        
+        console.log(`⏱️ [PERFORMANCE] 数据清理耗时: ${cleanupDuration}ms`);
+        
+        await this.updateTask(taskId, 'processing', 95, progressMessages.cleanup[1]);
+        await this.updateTask(taskId, 'processing', 98, progressMessages.cleanup[2]);
+        
+        const stage4Duration = Date.now() - stageStartTime;
+        console.log(`⏱️ [PERFORMANCE] 阶段4完成，耗时: ${stage4Duration}ms`);
+        
+        // === 任务完成统计 ===
+        const totalDuration = Date.now() - startTime;
+        console.log('✅ [RESUME_PARSE_TASK] 简历解析完成');
+        console.log(`⏱️ [PERFORMANCE] 总耗时统计:`);
+        console.log(`  - 阶段1(初始化): ${stage1Duration}ms`);
+        console.log(`  - 阶段2(文本提取): ${stage2Duration}ms (${((stage2Duration/totalDuration)*100).toFixed(1)}%)`);
+        console.log(`  - 阶段3(AI分析): ${stage3Duration}ms (${((stage3Duration/totalDuration)*100).toFixed(1)}%)`);
+        console.log(`  - 阶段4(数据清理): ${stage4Duration}ms`);
+        console.log(`  - 总计: ${totalDuration}ms (${(totalDuration/1000).toFixed(1)}s)`);
+        
+        // 完成任务
+        await this.updateTask(taskId, 'completed', 100, `🎉 解析完成！总耗时${(totalDuration/1000).toFixed(1)}秒`, {
+          extractedText,
+          structuredData: cleanedData,
+          performance: {
+            totalDuration,
+            stages: {
+              initialization: stage1Duration,
+              textExtraction: stage2Duration,
+              aiAnalysis: stage3Duration,
+              dataCleanup: stage4Duration
+            }
+          }
+        });
 
-      console.log('✅ [RESUME_PARSE_TASK] 简历解析完成');
-      // 任务完成
-      await this.updateTask(taskId, 'completed', 100, '简历解析完成', {
-        extractedText,
-        structuredData: cleanedData
-      });
+      } catch (aiError) {
+        // 清除进度定时器
+        clearInterval(progressInterval);
+        
+        const aiErrorDuration = Date.now() - stageStartTime;
+        console.error(`❌ [AI_ERROR] AI分析失败，耗时: ${aiErrorDuration}ms`);
+        console.error('❌ [AI_ERROR] 错误详情:', aiError.message);
+        
+        throw aiError;
+      }
 
     } catch (error) {
+      const errorDuration = Date.now() - startTime;
       console.error('❌ [RESUME_PARSE_TASK] 简历解析任务失败:', {
         taskId: taskId,
         error: error.message,
+        totalDuration: errorDuration + 'ms',
         stack: error.stack,
         taskData: taskData
       });
-      await this.updateTask(taskId, 'failed', 100, '简历解析失败', null, error.message);
+      
+      let errorMessage = error.message;
+      if (error.message.includes('超时')) {
+        errorMessage = `处理超时: ${error.message}。建议简化简历内容或稍后重试。`;
+      }
+      
+      await this.updateTask(taskId, 'failed', 100, '❌ 解析失败', null, errorMessage);
     } finally {
       // 清理临时文件
       try {

@@ -29,71 +29,154 @@ class AIService {
    * @returns {Promise<string>} 生成的文本
    */
   async generateText(prompt, model = 'deepseek', options = {}) {
+    const startTime = Date.now();
+    const requestId = `AI_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    console.log(`🚀 [AI_CALL] ==> 开始AI文本生成`);
+    console.log(`🚀 [AI_CALL] 请求ID: ${requestId}`);
+    console.log(`🚀 [AI_CALL] 时间: ${new Date().toISOString()}`);
+    console.log(`🚀 [AI_CALL] 模型: ${model}`);
+    console.log(`🚀 [AI_CALL] 提示词长度: ${prompt.length} 字符`);
+    
     const defaultOptions = {
       temperature: 0.7,
       max_tokens: 4000,
-      timeout: 150000, // 增加超时时间到2.5分钟
+      timeout: 150000, // 基础超时2.5分钟
+      maxRetries: 2, // 最大重试次数
       ...options
     };
 
-    const errors = {};
+    console.log(`🚀 [AI_CALL] 配置参数:`, {
+      temperature: defaultOptions.temperature,
+      max_tokens: defaultOptions.max_tokens,
+      timeout: defaultOptions.timeout + 'ms',
+      maxRetries: defaultOptions.maxRetries
+    });
 
-    // 优先使用agicto.cn代理服务（更稳定）
+    const errors = {};
+    let attemptCount = 0;
+
+    // 重试机制包装器
+    const callWithRetry = async (apiCall, serviceName, maxRetries = defaultOptions.maxRetries) => {
+      for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+        const attemptStartTime = Date.now();
+        attemptCount++;
+        
+        try {
+          console.log(`🔄 [AI_CALL] ${serviceName} 第${attempt}次尝试 (总第${attemptCount}次)`);
+          
+          const result = await apiCall();
+          
+          const attemptDuration = Date.now() - attemptStartTime;
+          console.log(`✅ [AI_CALL] ${serviceName} 第${attempt}次尝试成功，耗时: ${attemptDuration}ms`);
+          
+          return result;
+          
+        } catch (error) {
+          const attemptDuration = Date.now() - attemptStartTime;
+          console.error(`❌ [AI_CALL] ${serviceName} 第${attempt}次尝试失败，耗时: ${attemptDuration}ms`);
+          console.error(`❌ [AI_CALL] 错误详情:`, error.message);
+          
+          if (attempt === maxRetries + 1) {
+            throw error; // 最后一次尝试，直接抛出错误
+          }
+          
+          // 指数退避重试延迟
+          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
+          console.log(`⏳ [AI_CALL] ${serviceName} ${retryDelay}ms后重试...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+    };
+
+    // === 优先使用agicto.cn代理服务 ===
     try {
-      console.log(`🚀 优先使用agicto.cn代理服务 (${model})`);
+      console.log(`🎯 [AI_CALL] 步骤1: 尝试agicto.cn代理服务`);
+      const agictoStartTime = Date.now();
       
       let primaryModel;
       if (model === 'deepseek') {
         primaryModel = 'deepseek-v3';
       } else if (model === 'gpt') {
-        primaryModel = 'gpt-4o-2024-11-20'; // 使用最新的gpt-4o模型
+        primaryModel = 'gpt-4o-2024-11-20';
       } else {
         throw new Error(`不支持的模型类型: ${model}`);
       }
 
-      // 简化的API调用（移除Promise.race超时控制）
-      const response = await this.agictoClient.chat.completions.create({
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        model: primaryModel,
-        temperature: defaultOptions.temperature,
-        max_tokens: defaultOptions.max_tokens
-      });
+      console.log(`🎯 [AI_CALL] 使用模型: ${primaryModel}`);
 
-      console.log('✅ agicto.cn代理服务调用成功');
+      const result = await callWithRetry(async () => {
+        // 使用Promise.race实现超时控制
+        const apiPromise = this.agictoClient.chat.completions.create({
+          messages: [
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          model: primaryModel,
+          temperature: defaultOptions.temperature,
+          max_tokens: defaultOptions.max_tokens
+        });
 
-      // 检查是否有错误
-      if (response.error) {
-        throw new Error(`agicto API错误: ${response.error.message}`);
-      }
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`agicto API超时 (${defaultOptions.timeout}ms)`)), defaultOptions.timeout);
+        });
 
-      if (!response.choices || response.choices.length === 0) {
-        throw new Error('agicto API返回空响应');
-      }
+        const response = await Promise.race([apiPromise, timeoutPromise]);
 
-      return response.choices[0].message.content;
-      
-    } catch (agictoError) {
-      errors.agicto = `agicto API错误: ${agictoError.response?.data?.error?.message || agictoError.message}`;
-      console.warn(`⚠️ agicto.cn代理失败，切换到官方OpenAI API: ${agictoError.message}`);
-      
-      // 只有当agicto失败时才使用官方OpenAI API
-      try {
-        console.log(`🔄 使用官方OpenAI API备用服务 (${model})`);
-        
-        let fallbackModel;
-        if (model === 'deepseek') {
-          fallbackModel = 'gpt-3.5-turbo'; // DeepSeek使用gpt-3.5-turbo作为备用
-        } else if (model === 'gpt') {
-          fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
+        // 验证响应
+        if (response.error) {
+          throw new Error(`agicto API错误: ${response.error.message}`);
         }
 
-        // 简化的备用API调用
-        const response = await this.openaiClient.chat.completions.create({
+        if (!response.choices || response.choices.length === 0) {
+          throw new Error('agicto API返回空响应');
+        }
+
+        return response.choices[0].message.content;
+      }, 'agicto', defaultOptions.maxRetries);
+
+      const agictoDuration = Date.now() - agictoStartTime;
+      const totalDuration = Date.now() - startTime;
+      
+      console.log(`✅ [AI_CALL] agicto.cn调用成功！`);
+      console.log(`⏱️ [AI_PERFORMANCE] 性能统计:`);
+      console.log(`  - agicto调用耗时: ${agictoDuration}ms`);
+      console.log(`  - 总耗时: ${totalDuration}ms`);
+      console.log(`  - 尝试次数: ${attemptCount}`);
+      console.log(`  - 响应长度: ${result.length} 字符`);
+      console.log(`  - 平均速度: ${(result.length / (totalDuration / 1000)).toFixed(1)} 字符/秒`);
+
+      return result;
+      
+    } catch (agictoError) {
+      const agictoFailDuration = Date.now() - startTime;
+      errors.agicto = `agicto失败 (${agictoFailDuration}ms): ${agictoError.message}`;
+      console.warn(`⚠️ [AI_CALL] agicto.cn代理失败，耗时: ${agictoFailDuration}ms`);
+      console.warn(`⚠️ [AI_CALL] 错误: ${agictoError.message}`);
+      console.warn(`⚠️ [AI_CALL] 切换到官方OpenAI API...`);
+    }
+
+    // === 备用: 官方OpenAI API ===
+    try {
+      console.log(`🔄 [AI_CALL] 步骤2: 尝试官方OpenAI API备用服务`);
+      const openaiStartTime = Date.now();
+      
+      let fallbackModel;
+      if (model === 'deepseek') {
+        fallbackModel = 'gpt-3.5-turbo'; // DeepSeek使用gpt-3.5-turbo作为备用
+      } else if (model === 'gpt') {
+        fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
+      }
+
+      console.log(`🔄 [AI_CALL] 备用模型: ${fallbackModel}`);
+
+      const result = await callWithRetry(async () => {
+        // 增加官方API的超时时间
+        const extendedTimeout = defaultOptions.timeout * 1.5;
+        
+        const apiPromise = this.openaiClient.chat.completions.create({
           messages: [
             {
               role: "user",
@@ -105,23 +188,57 @@ class AIService {
           max_tokens: defaultOptions.max_tokens
         });
 
-        console.log('✅ 官方OpenAI API调用成功');
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error(`OpenAI API超时 (${extendedTimeout}ms)`)), extendedTimeout);
+        });
+
+        const response = await Promise.race([apiPromise, timeoutPromise]);
 
         if (!response.choices || response.choices.length === 0) {
           throw new Error('OpenAI API返回空响应');
         }
 
         return response.choices[0].message.content;
+      }, 'OpenAI', Math.max(1, defaultOptions.maxRetries - 1)); // 备用API减少重试次数
+
+      const openaiDuration = Date.now() - openaiStartTime;
+      const totalDuration = Date.now() - startTime;
+      
+      console.log(`✅ [AI_CALL] 官方OpenAI API调用成功！`);
+      console.log(`⏱️ [AI_PERFORMANCE] 性能统计:`);
+      console.log(`  - OpenAI调用耗时: ${openaiDuration}ms`);
+      console.log(`  - 总耗时(含agicto失败): ${totalDuration}ms`);
+      console.log(`  - 总尝试次数: ${attemptCount}`);
+      console.log(`  - 响应长度: ${result.length} 字符`);
+      console.log(`  - 平均速度: ${(result.length / (totalDuration / 1000)).toFixed(1)} 字符/秒`);
+
+      return result;
         
-      } catch (openaiError) {
-        errors.openai = openaiError.message;
-        console.error(`❌ 官方OpenAI API失败:`, openaiError.message);
-      }
+    } catch (openaiError) {
+      const openaiFailDuration = Date.now() - startTime;
+      errors.openai = `OpenAI失败 (${openaiFailDuration}ms): ${openaiError.message}`;
+      console.error(`❌ [AI_CALL] 官方OpenAI API失败，耗时: ${openaiFailDuration}ms`);
+      console.error(`❌ [AI_CALL] 错误: ${openaiError.message}`);
     }
 
-    // 所有API都失败了
-    console.error(`❌ 所有AI服务都失败了:`, errors);
-    throw new Error(`AI服务调用失败: agicto(${errors.agicto}) + openai(${errors.openai})`);
+    // === 所有API都失败 ===
+    const totalFailDuration = Date.now() - startTime;
+    console.error(`❌ [AI_CALL] 所有AI服务都失败！`);
+    console.error(`❌ [AI_CALL] 总耗时: ${totalFailDuration}ms`);
+    console.error(`❌ [AI_CALL] 总尝试次数: ${attemptCount}`);
+    console.error(`❌ [AI_CALL] 错误汇总:`, errors);
+    
+    // 根据错误类型构造更友好的错误信息
+    let userFriendlyError = 'AI服务暂时不可用';
+    if (Object.values(errors).some(err => err.includes('超时'))) {
+      userFriendlyError = `AI处理超时 (总耗时${(totalFailDuration/1000).toFixed(1)}秒)，请稍后重试或简化输入内容`;
+    } else if (Object.values(errors).some(err => err.includes('网络'))) {
+      userFriendlyError = 'AI服务网络连接异常，请检查网络连接后重试';
+    } else if (Object.values(errors).some(err => err.includes('quota') || err.includes('limit'))) {
+      userFriendlyError = 'AI服务配额不足，请联系管理员';
+    }
+    
+    throw new Error(`${userFriendlyError}。详细错误: agicto(${errors.agicto}) + openai(${errors.openai})`);
   }
 
   /**
@@ -350,7 +467,7 @@ ${userRequirements ? `### 6. 🌟 用户特殊要求处理
       .replace(/,(\s*[}\]])/g, '$1')
       // 修复缺失的逗号（在对象或数组元素之间）
       .replace(/("\w+":\s*"[^"]*")\s*\n\s*(")/g, '$1,\n    $2')
-      .replace(/(\]|\})\s*\n\s*(")/g, '$1,\n    $2')
+      .replace(/(\]|\})(\s*\n\s*)(")/g, '$1,\n    $2')
       // 修复引号问题
       .replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3')
       // 修复数组末尾的逗号
