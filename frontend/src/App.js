@@ -19,6 +19,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './components/AdminDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
+import AdminMembershipTiers from './components/AdminMembershipTiers';
+import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 
 /**
@@ -57,6 +59,22 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <AdminUserManagement />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/membership-tiers" 
+            element={
+              <AdminProtectedRoute>
+                <AdminMembershipTiers />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/user-memberships" 
+            element={
+              <AdminProtectedRoute>
+                <AdminUserMembershipManagement />
               </AdminProtectedRoute>
             } 
           />

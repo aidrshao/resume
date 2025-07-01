@@ -4,13 +4,14 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { login, loginWithCode, sendVerificationCode } from '../utils/api';
 import { validateLoginForm, validateCodeLoginForm, validateSendCodeForm } from '../utils/validation';
 import { saveAuthData } from '../utils/auth';
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   
   // 登录模式：'password' | 'code'
   const [loginMode, setLoginMode] = useState('password');
@@ -184,7 +185,22 @@ const LoginPage = () => {
         });
         
         console.log('⏰ LoginPage: 设置延迟跳转');
-        setTimeout(() => navigate('/profile'), 1500);
+        
+        // 智能跳转逻辑
+        setTimeout(() => {
+          // 检查是否有来源状态（比如从注册页面过来）
+          const fromState = location.state;
+          
+          if (fromState && fromState.message && fromState.message.includes('注册成功')) {
+            // 来自注册页面，跳转到落地页
+            console.log('🎯 从注册页面来的用户，跳转到落地页');
+            navigate('/');
+          } else {
+            // 直接访问登录页面的用户，跳转到简历列表
+            console.log('🎯 直接访问登录页面的用户，跳转到简历列表');
+            navigate('/resumes');
+          }
+        }, 1500);
       } else {
         console.log('❌ LoginPage: API返回失败', response);
         setMessage({
