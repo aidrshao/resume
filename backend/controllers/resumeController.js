@@ -943,6 +943,155 @@ class ResumeController {
       // 这里不抛出错误，因为主要的简历保存已经成功
     }
   }
+
+  /**
+   * 为指定岗位生成专属简历
+   * POST /api/resumes/generate-for-job
+   */
+  static async generateJobSpecificResume(req, res) {
+    try {
+      const userId = req.user.id;
+      const { 
+        baseResumeId, 
+        jobId, 
+        targetCompany, 
+        targetPosition, 
+        jobDescription, 
+        jobRequirements,
+        userRequirements 
+      } = req.body;
+
+      console.log('🎯 [生成岗位专属简历] 开始生成:', {
+        userId,
+        baseResumeId,
+        jobId,
+        targetCompany,
+        targetPosition
+      });
+
+      // 1. 验证必要参数
+      if (!baseResumeId || !targetCompany || !targetPosition) {
+        return res.status(400).json({
+          success: false,
+          message: '缺少必要参数：基础简历ID、目标公司、目标岗位'
+        });
+      }
+
+      // 2. 获取基础简历
+      const baseResume = await Resume.findById(baseResumeId);
+      if (!baseResume || baseResume.user_id !== userId) {
+        return res.status(404).json({
+          success: false,
+          message: '基础简历不存在或无权访问'
+        });
+      }
+
+      console.log('📄 [生成岗位专属简历] 获取基础简历成功:', {
+        id: baseResume.id,
+        title: baseResume.title
+      });
+
+      // 3. 检查是否已存在相同岗位的专属简历
+      const existingJobResume = await knex('resumes')
+        .where({
+          user_id: userId,
+          target_company: targetCompany,
+          target_position: targetPosition
+        })
+        .first();
+
+      if (existingJobResume) {
+        console.log('⚠️ [生成岗位专属简历] 已存在相同岗位的专属简历');
+        return res.status(409).json({
+          success: false,
+          message: `已存在针对${targetCompany}的${targetPosition}岗位的专属简历`,
+          data: { existingResumeId: existingJobResume.id }
+        });
+      }
+
+      // 4. 构建完整的岗位描述
+      const fullJobDescription = [
+        jobDescription,
+        jobRequirements && `岗位要求：${jobRequirements}`
+      ].filter(Boolean).join('\n\n');
+
+      // 5. 创建新的岗位专属简历记录
+      const jobSpecificResumeData = {
+        user_id: userId,
+        template_id: baseResume.template_id,
+        title: `${targetPosition} - ${targetCompany}`,
+        generation_mode: 'advanced', // 使用高级模式
+        target_company: targetCompany,
+        target_position: targetPosition,
+        job_description: fullJobDescription,
+        resume_data: baseResume.resume_data, // 先用基础简历数据
+        status: 'generating',
+        source: 'job_specific_generation'
+      };
+
+      const newResume = await Resume.create(jobSpecificResumeData);
+      
+      console.log('✅ [生成岗位专属简历] 创建新简历记录成功:', {
+        id: newResume.id,
+        title: newResume.title
+      });
+
+      // 6. 异步进行AI优化
+      setImmediate(async () => {
+        try {
+          console.log('🤖 [生成岗位专属简历] 开始AI优化...');
+          
+          // 使用AI优化简历内容
+          const optimizedData = await aiService.optimizeResumeForJob(
+            baseResume.resume_data,
+            targetCompany,
+            targetPosition,
+            fullJobDescription,
+            userRequirements
+          );
+          
+          console.log('✅ [生成岗位专属简历] AI优化完成');
+          
+          // 更新简历数据
+          await Resume.update(newResume.id, {
+            resume_data: optimizedData,
+            ai_optimizations: optimizedData.optimizations || [],
+            status: 'completed'
+          });
+          
+          console.log('🎊 [生成岗位专属简历] 岗位专属简历生成完成:', newResume.id);
+          
+        } catch (error) {
+          console.error('❌ [生成岗位专属简历] AI优化失败:', error);
+          await Resume.update(newResume.id, {
+            status: 'failed',
+            generation_log: `AI优化失败: ${error.message}`
+          });
+        }
+      });
+
+      // 7. 立即返回成功响应
+      res.json({
+        success: true,
+        data: {
+          id: newResume.id,
+          title: newResume.title,
+          target_company: targetCompany,
+          target_position: targetPosition,
+          status: 'generating'
+        },
+        message: '岗位专属简历生成任务已启动，请稍后查看结果'
+      });
+
+    } catch (error) {
+      console.error('❌ [生成岗位专属简历] 生成失败:', error);
+      res.status(500).json({
+        success: false,
+        message: '生成岗位专属简历失败',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ResumeController; 

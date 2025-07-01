@@ -17,9 +17,23 @@ const { registerSchema, loginSchema } = require('../utils/validation');
  */
 const sendVerificationCode = async (req, res) => {
   try {
+    console.log('🔥 [DEBUG] sendVerificationCode函数被调用');
+    console.log('🔥 [DEBUG] req.body:', JSON.stringify(req.body, null, 2));
+    console.log('🔥 [DEBUG] emailService 对象:', typeof emailService);
+    console.log('🔥 [DEBUG] emailService.constructor:', typeof emailService.constructor);
+    
     const { email, type } = req.body;
 
     console.log(`📧 [SEND_CODE] 开始发送验证码: ${email}, 类型: ${type}`);
+    
+    // 验证基本参数
+    if (!email || !type) {
+      console.error('❌ [SEND_CODE] 缺少必需参数:', { email: !!email, type: !!type });
+      return res.status(400).json({
+        success: false,
+        message: '邮箱和类型都不能为空'
+      });
+    }
 
     // 验证邮箱格式
     if (!emailService.constructor.isValidEmail(email)) {
@@ -108,10 +122,14 @@ const sendVerificationCode = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('发送验证码错误:', error);
+    console.error('❌ [SEND_CODE] 发送验证码错误:', error);
+    console.error('❌ [SEND_CODE] 错误名称:', error.name);
+    console.error('❌ [SEND_CODE] 错误消息:', error.message);
+    console.error('❌ [SEND_CODE] 错误堆栈:', error.stack);
     res.status(500).json({
       success: false,
-      message: '服务器内部错误'
+      message: '服务器内部错误',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

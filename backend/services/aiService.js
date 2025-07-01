@@ -141,9 +141,10 @@ class AIService {
    * @param {string} targetCompany - 目标公司
    * @param {string} targetPosition - 目标岗位
    * @param {string} jobDescription - 岗位描述
+   * @param {string} userRequirements - 用户额外要求
    * @returns {Promise<Object>} 优化后的简历数据
    */
-  async optimizeResumeForJob(resumeData, targetCompany, targetPosition, jobDescription) {
+  async optimizeResumeForJob(resumeData, targetCompany, targetPosition, jobDescription, userRequirements = '') {
     const prompt = `
 作为一名专业的简历优化专家，请根据目标岗位要求优化以下简历内容。
 
@@ -152,7 +153,10 @@ class AIService {
 岗位描述：
 ${jobDescription}
 
-当前简历数据：
+${userRequirements ? `用户特殊要求：
+${userRequirements}
+
+` : ''}当前简历数据：
 ${JSON.stringify(resumeData, null, 2)}
 
 请按照以下要求优化简历：
@@ -161,21 +165,32 @@ ${JSON.stringify(resumeData, null, 2)}
    - 突出与目标岗位相关的技能和经验
    - 体现对目标公司和行业的了解
    - 展现职业目标与岗位的匹配度
+   ${userRequirements ? '- 重点体现用户特殊要求中提到的技能和经验' : ''}
 
 2. 工作经历优化：
    - 重新组织工作描述，突出相关经验
    - 量化工作成果，使用具体数据
    - 调整技能标签，匹配岗位要求
+   ${userRequirements ? '- 根据用户特殊要求调整工作经历的描述重点' : ''}
 
 3. 项目经历优化：
    - 突出与目标岗位相关的项目
    - 详细描述技术栈和解决方案
    - 强调项目成果和影响
+   ${userRequirements ? '- 特别关注用户要求中提到的项目类型和技术' : ''}
 
 4. 技能优化：
    - 重新排序技能，优先展示相关技能
    - 添加岗位要求的关键技能（如果简历中有体现）
    - 移除不相关的技能
+   ${userRequirements ? '- 优先展示用户特殊要求中强调的技能' : ''}
+
+${userRequirements ? `
+5. 用户特殊要求处理：
+   - 仔细阅读用户的特殊要求
+   - 在简历各个部分中体现这些要求
+   - 确保用户关注的重点得到充分展现
+` : ''}
 
 请返回优化后的完整简历数据，保持原有的JSON结构，并在最后添加一个optimizations字段，说明具体做了哪些优化。
 

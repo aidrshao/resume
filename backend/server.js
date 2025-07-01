@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resumeRoutes');
+const jobRoutes = require('./routes/jobRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -82,6 +83,7 @@ app.get('/health', (req, res) => {
 // 路由配置
 app.use('/api/auth', authRoutes);
 app.use('/api', resumeRoutes);
+app.use('/api/jobs', jobRoutes);
 
 // 404处理
 app.use('*', (req, res) => {

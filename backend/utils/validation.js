@@ -156,11 +156,250 @@ const resetPasswordSchema = Joi.object({
     })
 });
 
+/**
+ * 岗位创建数据验证规则
+ */
+const jobCreateSchema = Joi.object({
+  user_id: Joi.number()
+    .integer()
+    .positive()
+    .required()
+    .messages({
+      'number.base': '用户ID必须为数字',
+      'number.integer': '用户ID必须为整数',
+      'number.positive': '用户ID必须为正数',
+      'any.required': '用户ID为必填项'
+    }),
+  title: Joi.string()
+    .trim()
+    .min(1)
+    .max(255)
+    .required()
+    .messages({
+      'string.empty': '职位名称不能为空',
+      'string.min': '职位名称不能为空',
+      'string.max': '职位名称最多255个字符',
+      'any.required': '职位名称为必填项'
+    }),
+  company: Joi.string()
+    .trim()
+    .min(1)
+    .max(255)
+    .required()
+    .messages({
+      'string.empty': '公司名称不能为空',
+      'string.min': '公司名称不能为空',
+      'string.max': '公司名称最多255个字符',
+      'any.required': '公司名称为必填项'
+    }),
+  description: Joi.string()
+    .allow('')
+    .max(5000)
+    .messages({
+      'string.max': '职位描述最多5000个字符'
+    }),
+  requirements: Joi.string()
+    .allow('')
+    .max(5000)
+    .messages({
+      'string.max': '岗位要求最多5000个字符'
+    }),
+  salary_range: Joi.string()
+    .allow('')
+    .max(100)
+    .messages({
+      'string.max': '薪资范围最多100个字符'
+    }),
+  location: Joi.string()
+    .allow('')
+    .max(255)
+    .messages({
+      'string.max': '工作地点最多255个字符'
+    }),
+  job_type: Joi.string()
+    .valid('full-time', 'part-time', 'contract', 'remote')
+    .default('full-time')
+    .messages({
+      'any.only': '工作类型必须为全职、兼职、合同工或远程工作中的一种'
+    }),
+  source_type: Joi.string()
+    .valid('text', 'file', 'image')
+    .required()
+    .messages({
+      'any.only': '来源类型必须为文本、文件或图片中的一种',
+      'any.required': '来源类型为必填项'
+    }),
+  source_file_path: Joi.string()
+    .allow('')
+    .max(500)
+    .messages({
+      'string.max': '文件路径最多500个字符'
+    }),
+  original_content: Joi.string()
+    .allow('')
+    .messages({}),
+  status: Joi.string()
+    .valid('active', 'applied', 'archived')
+    .default('active')
+    .messages({
+      'any.only': '状态必须为活跃、已投递或已归档中的一种'
+    }),
+  priority: Joi.number()
+    .integer()
+    .min(1)
+    .max(5)
+    .default(1)
+    .messages({
+      'number.base': '优先级必须为数字',
+      'number.integer': '优先级必须为整数',
+      'number.min': '优先级最小为1',
+      'number.max': '优先级最大为5'
+    }),
+  application_deadline: Joi.date()
+    .allow(null)
+    .messages({
+      'date.base': '申请截止日期格式不正确'
+    }),
+  notes: Joi.string()
+    .allow('')
+    .max(1000)
+    .messages({
+      'string.max': '备注最多1000个字符'
+    })
+});
+
+/**
+ * 岗位更新数据验证规则
+ */
+const jobUpdateSchema = Joi.object({
+  title: Joi.string()
+    .trim()
+    .min(1)
+    .max(255)
+    .messages({
+      'string.empty': '职位名称不能为空',
+      'string.min': '职位名称不能为空',
+      'string.max': '职位名称最多255个字符'
+    }),
+  company: Joi.string()
+    .trim()
+    .min(1)
+    .max(255)
+    .messages({
+      'string.empty': '公司名称不能为空',
+      'string.min': '公司名称不能为空',
+      'string.max': '公司名称最多255个字符'
+    }),
+  description: Joi.string()
+    .allow('')
+    .max(5000)
+    .messages({
+      'string.max': '职位描述最多5000个字符'
+    }),
+  requirements: Joi.string()
+    .allow('')
+    .max(5000)
+    .messages({
+      'string.max': '岗位要求最多5000个字符'
+    }),
+  salary_range: Joi.string()
+    .allow('')
+    .max(100)
+    .messages({
+      'string.max': '薪资范围最多100个字符'
+    }),
+  location: Joi.string()
+    .allow('')
+    .max(255)
+    .messages({
+      'string.max': '工作地点最多255个字符'
+    }),
+  job_type: Joi.string()
+    .valid('full-time', 'part-time', 'contract', 'remote')
+    .messages({
+      'any.only': '工作类型必须为全职、兼职、合同工或远程工作中的一种'
+    }),
+  status: Joi.string()
+    .valid('active', 'applied', 'archived')
+    .messages({
+      'any.only': '状态必须为活跃、已投递或已归档中的一种'
+    }),
+  priority: Joi.number()
+    .integer()
+    .min(1)
+    .max(5)
+    .messages({
+      'number.base': '优先级必须为数字',
+      'number.integer': '优先级必须为整数',
+      'number.min': '优先级最小为1',
+      'number.max': '优先级最大为5'
+    }),
+  application_deadline: Joi.date()
+    .allow(null)
+    .messages({
+      'date.base': '申请截止日期格式不正确'
+    }),
+  notes: Joi.string()
+    .allow('')
+    .max(1000)
+    .messages({
+      'string.max': '备注最多1000个字符'
+    })
+}).min(1).messages({
+  'object.min': '至少需要提供一个字段进行更新'
+});
+
+/**
+ * 验证岗位创建数据
+ * @param {object} data - 要验证的数据
+ * @returns {object} 验证结果
+ */
+function validateJobData(data) {
+  const { error, value } = jobCreateSchema.validate(data, { abortEarly: false });
+  
+  if (error) {
+    return {
+      isValid: false,
+      errors: error.details.map(detail => detail.message)
+    };
+  }
+  
+  return {
+    isValid: true,
+    data: value
+  };
+}
+
+/**
+ * 验证岗位更新数据
+ * @param {object} data - 要验证的数据
+ * @returns {object} 验证结果
+ */
+function validateJobUpdate(data) {
+  const { error, value } = jobUpdateSchema.validate(data, { abortEarly: false });
+  
+  if (error) {
+    return {
+      isValid: false,
+      errors: error.details.map(detail => detail.message)
+    };
+  }
+  
+  return {
+    isValid: true,
+    data: value
+  };
+}
+
 module.exports = {
   registerSchema,
   loginSchema,
   sendCodeSchema,
   verifyCodeSchema,
   loginWithCodeSchema,
-  resetPasswordSchema
+  resetPasswordSchema,
+  jobCreateSchema,
+  jobUpdateSchema,
+  validateJobData,
+  validateJobUpdate
 }; 

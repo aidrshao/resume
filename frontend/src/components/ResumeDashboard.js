@@ -1,16 +1,21 @@
 /**
  * 简历仪表板
- * 显示用户的所有简历，提供创建、编辑、删除功能
+ * 显示基础简历和岗位专属简历，提供创建、编辑、删除功能
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import * as api from '../utils/api';
 
 const ResumeDashboard = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showJobSelectModal, setShowJobSelectModal] = useState(false);
+  const [baseResume, setBaseResume] = useState(null);
+  const [generatingJobSpecific, setGeneratingJobSpecific] = useState({});
 
   /**
    * 加载用户的简历列表
@@ -23,32 +28,54 @@ const ResumeDashboard = () => {
         return;
       }
 
-      const response = await fetch('/api/resumes', {
+      // 使用封装的API工具
+      const data = await api.getResumes();
+      
+      if (data.success) {
+        setResumes(data.data);
+        // 找出基础简历
+        const base = data.data.find(resume => resume.is_base || (!resume.target_company && !resume.target_position));
+        setBaseResume(base);
+      } else {
+        setError(data.message || '加载简历列表失败');
+      }
+    } catch (error) {
+      console.error('加载简历列表失败:', error);
+      setError(error.message || '加载简历列表失败');
+    }
+  }, [navigate]);
+
+  /**
+   * 加载用户的岗位列表
+   */
+  const loadJobs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('/api/jobs', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
       const data = await response.json();
-      
       if (data.success) {
-        setResumes(data.data);
-      } else {
-        setError(data.message);
+        setJobs(data.data);
       }
     } catch (error) {
-      console.error('加载简历列表失败:', error);
-      setError('加载简历列表失败');
-    } finally {
-      setLoading(false);
+      console.error('加载岗位列表失败:', error);
     }
-  }, [navigate]);
+  }, []);
 
   useEffect(() => {
-    loadResumes();
-  }, [loadResumes]);
-
-
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([loadResumes(), loadJobs()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [loadResumes, loadJobs]);
 
   /**
    * 删除简历
@@ -59,24 +86,67 @@ const ResumeDashboard = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/resumes/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
+      // 使用封装的API工具
+      const data = await api.deleteResume(id);
       
       if (data.success) {
         setResumes(resumes.filter(resume => resume.id !== id));
+        // 如果删除的是基础简历，重新设置
+        if (baseResume && baseResume.id === id) {
+          setBaseResume(null);
+        }
       } else {
-        setError(data.message);
+        setError(data.message || '删除简历失败');
       }
     } catch (error) {
       console.error('删除简历失败:', error);
-      setError('删除简历失败');
+      setError(error.message || '删除简历失败');
+    }
+  };
+
+  /**
+   * 为指定岗位生成专属简历
+   */
+  const generateJobSpecificResume = async (job) => {
+    if (!baseResume) {
+      alert('请先创建基础简历');
+      return;
+    }
+
+    setGeneratingJobSpecific(prev => ({ ...prev, [job.id]: true }));
+    setShowJobSelectModal(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/resumes/generate-for-job', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          baseResumeId: baseResume.id,
+          jobId: job.id,
+          targetCompany: job.company,
+          targetPosition: job.title,
+          jobDescription: job.description,
+          jobRequirements: job.requirements
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        // 刷新简历列表
+        await loadResumes();
+        alert('岗位专属简历生成成功！');
+      } else {
+        setError(data.message || '生成岗位专属简历失败');
+      }
+    } catch (error) {
+      console.error('生成岗位专属简历失败:', error);
+      setError(error.message || '生成岗位专属简历失败');
+    } finally {
+      setGeneratingJobSpecific(prev => ({ ...prev, [job.id]: false }));
     }
   };
 
@@ -106,6 +176,11 @@ const ResumeDashboard = () => {
     return styleMap[status] || 'bg-gray-100 text-gray-800';
   };
 
+  // 分离基础简历和岗位专属简历
+  const jobSpecificResumes = resumes.filter(resume => 
+    resume.target_company || resume.target_position
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -125,9 +200,15 @@ const ResumeDashboard = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">我的简历</h1>
-              <p className="mt-1 text-sm text-gray-500">管理您的所有简历</p>
+              <p className="mt-1 text-sm text-gray-500">管理您的基础简历和岗位专属简历</p>
             </div>
             <div className="flex space-x-3">
+              <Link
+                to="/jobs"
+                className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 transition-colors"
+              >
+                岗位管理
+              </Link>
               <Link
                 to="/create-resume"
                 className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
@@ -153,112 +234,261 @@ const ResumeDashboard = () => {
           </div>
         )}
 
-        {resumes.length === 0 ? (
-          // 空状态
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">没有简历</h3>
-            <p className="mt-1 text-sm text-gray-500">开始创建您的第一份AI简历吧！</p>
-            <div className="mt-6 flex justify-center space-x-3">
-              <Link
-                to="/create-resume"
-                className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
+        {/* 基础简历区域 */}
+        <div className="mb-12">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">基础简历</h2>
+            {baseResume && (
+              <button
+                onClick={() => setShowJobSelectModal(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors"
               >
-                创建简历
-              </Link>
-              <Link
-                to="/ai-chat"
-                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
-              >
-                AI问答创建
-              </Link>
-            </div>
+                🎯 生成岗位专属简历
+              </button>
+            )}
           </div>
-        ) : (
-          // 简历列表
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {resumes.map((resume) => (
-              <div
-                key={resume.id}
-                className="bg-white rounded-lg shadow hover:shadow-md transition-shadow"
-              >
-                <div className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="text-lg font-medium text-gray-900 truncate">
-                        {resume.title}
-                      </h3>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {resume.template_name || '无模板'}
-                      </p>
-                      <div className="mt-2 flex items-center">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(resume.status)}`}
-                        >
-                          {getStatusText(resume.status)}
-                        </span>
-                        {resume.generation_mode === 'advanced' && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            AI优化
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
-                  {resume.target_company && (
-                    <div className="mt-4 text-sm text-gray-600">
-                      <p><span className="font-medium">目标公司:</span> {resume.target_company}</p>
-                      {resume.target_position && (
-                        <p><span className="font-medium">目标岗位:</span> {resume.target_position}</p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="mt-4 text-xs text-gray-500">
-                    创建时间: {new Date(resume.created_at).toLocaleDateString()}
-                  </div>
-
-                  <div className="mt-6 flex justify-between">
-                    <div className="flex space-x-2">
-                      <Link
-                        to={`/resume/${resume.id}`}
-                        className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+          {!baseResume ? (
+            <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+              <div className="text-4xl mb-4">📄</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">暂无基础简历</h3>
+              <p className="text-gray-500 mb-6">基础简历是生成岗位专属简历的基础，请先创建一份基础简历</p>
+              <div className="flex justify-center space-x-4">
+                <Link
+                  to="/create-resume"
+                  className="bg-indigo-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
+                >
+                  创建基础简历
+                </Link>
+                <Link
+                  to="/ai-chat"
+                  className="bg-green-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+                >
+                  AI创建简历
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow">
+              <div className="p-6">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-gray-900 truncate">
+                      {baseResume.title}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {baseResume.template_name || '默认模板'}
+                    </p>
+                    <div className="mt-2 flex items-center">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(baseResume.status)}`}
                       >
-                        查看
-                      </Link>
-                      <Link
-                        to={`/resume/${resume.id}/edit`}
-                        className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-                      >
-                        编辑
-                      </Link>
+                        {getStatusText(baseResume.status)}
+                      </span>
+                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        基础简历
+                      </span>
                     </div>
-                    <button
-                      onClick={() => deleteResume(resume.id)}
-                      className="text-red-600 hover:text-red-900 text-sm font-medium"
-                    >
-                      删除
-                    </button>
                   </div>
                 </div>
+
+                <div className="mt-4 text-xs text-gray-500">
+                  创建时间: {new Date(baseResume.created_at).toLocaleDateString()}
+                </div>
+
+                <div className="mt-6 flex justify-between">
+                  <div className="flex space-x-2">
+                    <Link
+                      to={`/resume/${baseResume.id}`}
+                      className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                    >
+                      查看
+                    </Link>
+                    <Link
+                      to={`/resume/${baseResume.id}/edit`}
+                      className="text-gray-600 hover:text-gray-900 text-sm font-medium"
+                    >
+                      编辑
+                    </Link>
+                  </div>
+                  <button
+                    onClick={() => deleteResume(baseResume.id)}
+                    className="text-red-600 hover:text-red-900 text-sm font-medium"
+                  >
+                    删除
+                  </button>
+                </div>
               </div>
-            ))}
+            </div>
+          )}
+        </div>
+
+        {/* 岗位专属简历区域 */}
+        <div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold text-gray-900">岗位专属简历</h2>
+            <span className="text-sm text-gray-500">
+              根据具体岗位优化的定制简历
+            </span>
           </div>
-        )}
+
+          {jobSpecificResumes.length === 0 ? (
+            <div className="bg-white rounded-lg border-2 border-dashed border-gray-300 p-12 text-center">
+              <div className="text-4xl mb-4">🎯</div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">暂无岗位专属简历</h3>
+              <p className="text-gray-500 mb-6">
+                {baseResume 
+                  ? '基于基础简历，为具体岗位生成定制化的专属简历，提高求职成功率'
+                  : '请先创建基础简历，然后选择岗位生成专属简历'
+                }
+              </p>
+              {baseResume && (
+                <button
+                  onClick={() => setShowJobSelectModal(true)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+                >
+                  🎯 生成岗位专属简历
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {jobSpecificResumes.map((resume) => (
+                <div
+                  key={resume.id}
+                  className="bg-white rounded-lg shadow hover:shadow-md transition-shadow"
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-medium text-gray-900 truncate">
+                          {resume.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {resume.template_name || '默认模板'}
+                        </p>
+                        <div className="mt-2 flex items-center">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(resume.status)}`}
+                          >
+                            {getStatusText(resume.status)}
+                          </span>
+                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            岗位专属
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 text-sm text-gray-600">
+                      <p><span className="font-medium">目标公司:</span> {resume.target_company}</p>
+                      <p><span className="font-medium">目标岗位:</span> {resume.target_position}</p>
+                    </div>
+
+                    <div className="mt-4 text-xs text-gray-500">
+                      创建时间: {new Date(resume.created_at).toLocaleDateString()}
+                    </div>
+
+                    <div className="mt-6 flex justify-between">
+                      <div className="flex space-x-2">
+                        <Link
+                          to={`/resume/${resume.id}`}
+                          className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
+                        >
+                          查看
+                        </Link>
+                        <Link
+                          to={`/resume/${resume.id}/edit`}
+                          className="text-gray-600 hover:text-gray-900 text-sm font-medium"
+                        >
+                          编辑
+                        </Link>
+                      </div>
+                      <button
+                        onClick={() => deleteResume(resume.id)}
+                        className="text-red-600 hover:text-red-900 text-sm font-medium"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* 选择岗位生成简历的弹窗 */}
+      {showJobSelectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-medium text-gray-900">选择岗位生成专属简历</h3>
+                <button
+                  onClick={() => setShowJobSelectModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {jobs.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-4">📝</div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">暂无岗位信息</h4>
+                  <p className="text-gray-500 mb-6">请先在岗位管理中添加意向岗位</p>
+                  <Link
+                    to="/jobs"
+                    className="bg-purple-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-purple-700"
+                  >
+                    前往岗位管理
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {jobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 cursor-pointer transition-colors"
+                      onClick={() => generateJobSpecificResume(job)}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{job.title}</h4>
+                          <p className="text-sm text-gray-600">{job.company}</p>
+                        </div>
+                        {generatingJobSpecific[job.id] && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        )}
+                      </div>
+                      
+                      {job.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2">
+                          {job.description.substring(0, 100)}...
+                        </p>
+                      )}
+                      
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-xs text-gray-400">
+                          {new Date(job.created_at).toLocaleDateString()}
+                        </span>
+                        <button
+                          disabled={generatingJobSpecific[job.id]}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium disabled:opacity-50"
+                        >
+                          {generatingJobSpecific[job.id] ? '生成中...' : '生成简历'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -13,6 +13,7 @@ import ResumeDashboard from './components/ResumeDashboard';
 import ResumeView from './components/ResumeView';
 import ResumeEdit from './components/ResumeEdit';
 import AIChatPage from './components/AIChatPage';
+import JobsPage from './components/JobsPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 /**
@@ -78,6 +79,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <AIChatPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 岗位管理页面 - 需要认证 */}
+          <Route 
+            path="/jobs" 
+            element={
+              <ProtectedRoute>
+                <JobsPage />
               </ProtectedRoute>
             } 
           />

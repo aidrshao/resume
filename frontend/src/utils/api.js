@@ -130,4 +130,173 @@ export const getUserProfile = () => {
   return api.get('/profile');
 };
 
+// ===== 岗位管理相关API =====
+
+/**
+ * 获取岗位列表
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码
+ * @param {number} params.limit - 每页数量
+ * @param {string} params.status - 状态过滤
+ * @param {number} params.priority - 优先级过滤
+ * @param {string} params.search - 搜索关键词
+ * @returns {Promise} API响应
+ */
+export const getJobs = (params = {}) => {
+  console.log('🌐 API: 获取岗位列表', params);
+  return api.get('/jobs', { params });
+};
+
+/**
+ * 获取岗位详情
+ * @param {number} jobId - 岗位ID
+ * @returns {Promise} API响应
+ */
+export const getJobById = (jobId) => {
+  console.log('🌐 API: 获取岗位详情', jobId);
+  return api.get(`/jobs/${jobId}`);
+};
+
+/**
+ * 创建新岗位（文本输入）
+ * @param {Object} jobData - 岗位数据
+ * @param {string} jobData.title - 职位名称
+ * @param {string} jobData.company - 公司名称
+ * @param {string} jobData.description - 职位描述
+ * @param {string} jobData.requirements - 岗位要求
+ * @param {string} jobData.salary_range - 薪资范围
+ * @param {string} jobData.location - 工作地点
+ * @param {string} jobData.job_type - 工作类型
+ * @param {number} jobData.priority - 优先级
+ * @param {string} jobData.application_deadline - 申请截止日期
+ * @param {string} jobData.notes - 备注
+ * @returns {Promise} API响应
+ */
+export const createJob = (jobData) => {
+  console.log('🌐 API: 创建新岗位', jobData);
+  return api.post('/jobs', jobData);
+};
+
+/**
+ * 上传文件创建岗位
+ * @param {FormData} formData - 包含文件和基本信息的FormData对象
+ * @returns {Promise} API响应
+ */
+export const uploadJobFile = (formData) => {
+  console.log('🌐 API: 上传岗位文件');
+  return api.post('/jobs/upload', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
+/**
+ * 更新岗位信息
+ * @param {number} jobId - 岗位ID
+ * @param {Object} updateData - 要更新的数据
+ * @returns {Promise} API响应
+ */
+export const updateJob = (jobId, updateData) => {
+  console.log('🌐 API: 更新岗位信息', jobId, updateData);
+  return api.put(`/jobs/${jobId}`, updateData);
+};
+
+/**
+ * 删除岗位
+ * @param {number} jobId - 岗位ID
+ * @returns {Promise} API响应
+ */
+export const deleteJob = (jobId) => {
+  console.log('🌐 API: 删除岗位', jobId);
+  return api.delete(`/jobs/${jobId}`);
+};
+
+/**
+ * 批量更新岗位状态
+ * @param {Array} jobIds - 岗位ID数组
+ * @param {string} status - 新状态
+ * @returns {Promise} API响应
+ */
+export const batchUpdateJobStatus = (jobIds, status) => {
+  console.log('🌐 API: 批量更新岗位状态', jobIds, status);
+  return api.patch('/jobs/batch-status', { job_ids: jobIds, status });
+};
+
+/**
+ * 获取岗位统计信息
+ * @returns {Promise} API响应
+ */
+export const getJobStats = () => {
+  console.log('🌐 API: 获取岗位统计');
+  return api.get('/jobs/stats');
+};
+
+// ===== 简历管理相关API =====
+
+/**
+ * 获取简历列表
+ * @param {Object} params - 查询参数
+ * @returns {Promise} API响应
+ */
+export const getResumes = (params = {}) => {
+  console.log('🌐 API: 获取简历列表', params);
+  return api.get('/resumes', { params });
+};
+
+/**
+ * 获取简历详情
+ * @param {number} resumeId - 简历ID
+ * @returns {Promise} API响应
+ */
+export const getResumeById = (resumeId) => {
+  console.log('🌐 API: 获取简历详情', resumeId);
+  return api.get(`/resumes/${resumeId}`);
+};
+
+/**
+ * 创建新简历
+ * @param {Object} resumeData - 简历数据
+ * @returns {Promise} API响应
+ */
+export const createResume = (resumeData) => {
+  console.log('🌐 API: 创建新简历', resumeData);
+  return api.post('/resumes', resumeData);
+};
+
+/**
+ * 更新简历信息
+ * @param {number} resumeId - 简历ID
+ * @param {Object} updateData - 要更新的数据
+ * @returns {Promise} API响应
+ */
+export const updateResume = (resumeId, updateData) => {
+  console.log('🌐 API: 更新简历信息', resumeId, updateData);
+  return api.put(`/resumes/${resumeId}`, updateData);
+};
+
+/**
+ * 删除简历
+ * @param {number} resumeId - 简历ID
+ * @returns {Promise} API响应
+ */
+export const deleteResume = (resumeId) => {
+  console.log('🌐 API: 删除简历', resumeId);
+  return api.delete(`/resumes/${resumeId}`);
+};
+
+/**
+ * 生成岗位专属简历
+ * @param {Object} data - 生成参数
+ * @param {number} data.baseResumeId - 基础简历ID
+ * @param {string} data.targetCompany - 目标公司
+ * @param {string} data.targetPosition - 目标职位
+ * @param {string} data.userRequirements - 用户额外要求
+ * @returns {Promise} API响应
+ */
+export const generateJobSpecificResume = (data) => {
+  console.log('🌐 API: 生成岗位专属简历', data);
+  return api.post('/resumes/generate-for-job', data);
+};
+
 export default api; 

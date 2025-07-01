@@ -696,52 +696,7 @@ const LandingPage = () => {
     setEditedResult(null);
   };
 
-  /**
-   * 临时诊断函数 - 检查认证状态
-   */
-  const handleDiagnosis = async () => {
-    console.log('🔍 开始认证诊断...');
-    
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    console.log('Token:', token ? '存在' : '不存在');
-    console.log('User:', user ? '存在' : '不存在');
-    console.log('isAuthenticated():', isAuthenticated());
-    
-    if (token) {
-      try {
-        // 测试API调用
-        const response = await fetch('/api/resumes', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        const data = await response.json();
-        console.log('API测试结果:', response.status, data);
-        
-        alert(`诊断结果：
-Token: ${token ? '存在' : '不存在'}
-User: ${user ? '存在' : '不存在'}  
-认证检查: ${isAuthenticated() ? '通过' : '失败'}
-API测试: ${response.status} - ${data.message || '成功'}`);
-      } catch (error) {
-        console.error('API测试失败:', error);
-        alert(`诊断结果：
-Token: ${token ? '存在' : '不存在'}
-User: ${user ? '存在' : '不存在'}
-认证检查: ${isAuthenticated() ? '通过' : '失败'}
-API测试: 失败 - ${error.message}`);
-      }
-    } else {
-      alert(`诊断结果：
-Token: 不存在
-User: ${user ? '存在' : '不存在'}
-认证检查: 失败
-需要先登录！`);
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-white">
@@ -764,13 +719,6 @@ User: ${user ? '存在' : '不存在'}
                     我的简历
                   </button>
                   <button
-                    onClick={handleDiagnosis}
-                    className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
-                    title="诊断认证状态"
-                  >
-                    🔍诊断
-                  </button>
-                  <button
                     onClick={handleLogout}
                     className="text-gray-500 hover:text-gray-700 text-sm"
                   >
@@ -779,13 +727,6 @@ User: ${user ? '存在' : '不存在'}
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
-                  <button
-                    onClick={handleDiagnosis}
-                    className="text-yellow-600 hover:text-yellow-800 text-sm font-medium"
-                    title="诊断认证状态"
-                  >
-                    🔍诊断
-                  </button>
                   <button
                     onClick={() => {
                       setAuthMode('login');
@@ -809,378 +750,496 @@ User: ${user ? '存在' : '不存在'}
       </nav>
 
       {/* 主要内容区域 */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* 标题区域 */}
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 mb-6">
-            通过 AI 创建简历
-          </h1>
-        </div>
-
-        {/* 产品亮点 - 三步流程 */}
-        <div className="mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="p-6">
-              <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-indigo-600">1</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">采集经历</h3>
-              <p className="text-gray-600">上传现有简历或通过对话收集工作经历</p>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* 顶部大标题区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center mb-24">
+          {/* 左侧文案 */}
+          <div>
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight whitespace-nowrap">
+              一键定制岗位专属简历
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 leading-relaxed">
+              AI智能分析岗位需求，让每份简历都精准匹配目标职位，智能解析您的现有简历内容，轻松创建结构化简历
+            </p>
+            <div className="relative">
+              <button
+                onClick={() => handleModeSelect('upload')}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:scale-105 relative overflow-hidden"
+              >
+                <span className="relative z-10">立即开始体验</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-600 opacity-0 hover:opacity-100 transition-opacity duration-300"></div>
+              </button>
             </div>
-
-            <div className="p-6">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">2</span>
+          </div>
+          
+          {/* 右侧简历对比 */}
+          <div className="relative">
+            <div className="flex space-x-4">
+              {/* 原始简历 */}
+              <div className="flex-1 bg-gray-50 rounded-xl p-4 border border-gray-200 relative">
+                <div className="text-center mb-3">
+                  <div className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full inline-block">
+                    原始简历 • 匹配度45%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-300 rounded w-full"></div>
+                  <div className="h-3 bg-gray-300 rounded w-3/4"></div>
+                  <div className="h-2 bg-gray-200 rounded w-full"></div>
+                  <div className="h-2 bg-gray-200 rounded w-2/3"></div>
+                  <div className="h-2 bg-gray-200 rounded w-4/5"></div>
+                  <div className="mt-3 space-y-1">
+                    <div className="h-2 bg-gray-200 rounded w-1/2"></div>
+                    <div className="h-2 bg-gray-200 rounded w-3/5"></div>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">润色亮点</h3>
-              <p className="text-gray-600">AI智能优化简历内容，突出个人亮点</p>
+
+              {/* 箭头 */}
+              <div className="flex items-center">
+                <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center">
+                  <span className="text-sm">→</span>
+                </div>
+              </div>
+
+              {/* 定制简历 */}
+              <div className="flex-1 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 relative">
+                <div className="text-center mb-3">
+                  <div className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full inline-block">
+                    定制简历 • 匹配度92%
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-3 bg-blue-300 rounded w-full"></div>
+                  <div className="h-3 bg-blue-300 rounded w-4/5"></div>
+                  <div className="h-2 bg-green-200 rounded w-full"></div>
+                  <div className="h-2 bg-green-200 rounded w-3/4"></div>
+                  <div className="h-2 bg-purple-200 rounded w-4/5"></div>
+                  <div className="mt-3 space-y-1">
+                    <div className="h-2 bg-green-200 rounded w-3/4"></div>
+                    <div className="h-2 bg-blue-200 rounded w-2/3"></div>
+                  </div>
+                </div>
+                <div className="absolute -top-1 -right-1 bg-yellow-400 rounded-full w-5 h-5 flex items-center justify-center">
+                  <span className="text-xs">✨</span>
+                </div>
+              </div>
             </div>
-
-            <div className="p-6">
-              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-purple-600">3</span>
+            
+            {/* AI优化标签 */}
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+              <div className="bg-white px-3 py-1 rounded-full shadow-md border border-gray-200">
+                <span className="text-xs font-medium text-gray-600">AI智能优化</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">岗位定制</h3>
-              <p className="text-gray-600">根据目标岗位定制专属简历版本</p>
             </div>
           </div>
         </div>
 
-        {!selectedMode ? (
-          /* 选择信息采集方式 */
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4">选择信息采集方式</h2>
-              <p className="text-lg text-gray-600">选择一种方式开始创建您的专业简历</p>
+        {/* 简单三步，打造专属简历 */}
+        <div className="mb-24">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">简单三步，打造专属简历</h2>
+            <p className="text-xl text-gray-600">AI智能解析与优化，让您的简历更加专业</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            {/* 连接线 */}
+            <div className="hidden md:block absolute top-1/2 left-1/3 w-1/3 h-0.5 bg-gradient-to-r from-blue-200 to-green-200 transform -translate-y-1/2"></div>
+            <div className="hidden md:block absolute top-1/2 right-1/3 w-1/3 h-0.5 bg-gradient-to-r from-green-200 to-purple-200 transform -translate-y-1/2"></div>
+            
+            <div className="text-center bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 relative z-10">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <span className="text-3xl">📤</span>
+              </div>
+              <div className="bg-blue-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4">1</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">上传现有简历</h3>
+              <p className="text-gray-600 leading-relaxed">支持PDF、Word等格式，AI智能解析简历内容</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* 导入现有简历 */}
-              <div 
-                onClick={() => handleModeSelect('upload')}
-                className="bg-gray-50 rounded-2xl p-8 cursor-pointer hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-indigo-200"
-              >
-                <div className="text-center">
-                  <div className="text-5xl mb-6">📄</div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">导入现有简历</h3>
-                  <p className="text-gray-600 mb-6">
-                    上传您的简历文件，AI将智能解析并优化内容
-                  </p>
-                  <div className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium inline-block">
-                    选择此方式
-                  </div>
-                </div>
+            <div className="text-center bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 relative z-10">
+              <div className="bg-gradient-to-br from-green-500 to-green-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <span className="text-3xl">🎯</span>
               </div>
-
-              {/* 通过对话创建 */}
-              <div 
-                onClick={() => handleModeSelect('chat')}
-                className="bg-gray-50 rounded-2xl p-8 cursor-pointer hover:bg-gray-100 transition-colors border-2 border-transparent hover:border-green-200"
-              >
-                <div className="text-center">
-                  <div className="text-5xl mb-6">🤖</div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-3">通过对话创建简历</h3>
-                  <p className="text-gray-600 mb-6">
-                    与AI助手对话，逐步收集您的工作经历和技能
-                  </p>
-                  <div className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium inline-block">
-                    选择此方式
-                  </div>
-                </div>
-              </div>
+              <div className="bg-green-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4">2</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">输入目标岗位</h3>
+              <p className="text-gray-600 leading-relaxed">AI分析岗位需求，定制优化策略</p>
             </div>
 
-            <div className="text-center mt-8">
-              <p className="text-gray-500 text-sm">
-                💡 无需注册即可体验，完整功能需要登录
+            <div className="text-center bg-white rounded-2xl p-8 shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 relative z-10">
+              <div className="bg-gradient-to-br from-purple-500 to-purple-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <span className="text-3xl">⚡</span>
+              </div>
+              <div className="bg-purple-500 text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-4">3</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">一键生成简历</h3>
+              <p className="text-gray-600 leading-relaxed">智能优化内容，生成专属定制简历</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 功能特色模块 */}
+        <div className="mb-24">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">强大功能特色</h2>
+            <p className="text-xl text-gray-600">全方位AI驱动，为您提供最优质的简历优化体验</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* AI智能优化 */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl p-8 text-center border border-blue-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+              <div className="bg-blue-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-3xl">🤖</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">AI智能优化</h3>
+              <p className="text-gray-600 leading-relaxed">
+                智能分析您的技能与岗位匹配度，优化语言表达，突出核心优势，让简历更具竞争力
+              </p>
+            </div>
+
+            {/* 多种模板选择 */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-8 text-center border border-green-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+              <div className="bg-green-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-3xl">📋</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">多种模板选择</h3>
+              <p className="text-gray-600 leading-relaxed">
+                提供多种专业简历模板，适配不同行业和职位需求，让您的简历脱颖而出
+              </p>
+            </div>
+
+            {/* 快速高效 */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-8 text-center border border-purple-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1">
+              <div className="bg-purple-500 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-3xl">⚡</span>
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">快速高效</h3>
+              <p className="text-gray-600 leading-relaxed">
+                30秒完成简历优化，支持批量生成多个岗位的定制简历，大大提升求职效率
               </p>
             </div>
           </div>
-        ) : (
-          /* 展开的功能界面 */
-          <div className="max-w-4xl mx-auto">
-            {/* 返回选择按钮 */}
-            <div className="mb-6">
-              <button
-                onClick={() => setSelectedMode(null)}
-                className="text-indigo-600 hover:text-indigo-800 font-medium flex items-center"
-              >
-                ← 重新选择采集方式
-              </button>
-            </div>
+        </div>
 
-            {selectedMode === 'upload' && (
-              /* 简历上传解析界面 */
-              <div className="bg-gray-50 rounded-2xl p-8">
-                <div className="text-center mb-8">
-                  <div className="text-4xl mb-4">📄</div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">导入现有简历</h2>
-                  <p className="text-gray-600">支持PDF、Word等格式，AI将智能解析您的简历</p>
-                </div>
 
-                {!uploadResult ? (
-                  <div>
-                    {/* 文件上传区域 */}
-                    <div 
-                      className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-400 transition-colors cursor-pointer"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <div className="text-4xl mb-4">📁</div>
-                      <p className="text-lg font-medium text-gray-900 mb-2">
-                        点击上传简历文件
-                      </p>
-                      <p className="text-gray-500 mb-4">
-                        支持 PDF、Word、TXT 格式，文件大小不超过 10MB
-                      </p>
-                      <div className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium inline-block">
-                        选择文件
-                      </div>
-                    </div>
 
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.doc,.docx,.txt"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-
-                    {/* 进度条 */}
-                    {uploadLoading && (
-                      <div className="mt-8">
-                        <div className="bg-white rounded-lg p-6 border border-gray-200">
-                          <div className="flex items-center justify-between mb-4">
-                            <span className="text-sm font-medium text-gray-700">{uploadStage}</span>
-                            <span className="text-sm font-medium text-indigo-600">{uploadProgress}%</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out" 
-                              style={{ width: `${uploadProgress}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  /* 解析结果展示 */
-                  <div className="bg-white rounded-xl border border-gray-200 p-6">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-gray-900">📋 解析结果</h3>
-                      <div className="text-sm text-gray-500">
-                        文件：{uploadFile?.name}
-                      </div>
-                    </div>
-
-                    {/* 个人信息 */}
-                    {uploadResult.personalInfo && (
-                      <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-medium text-blue-900 mb-3">👤 个人信息</h4>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          {uploadResult.personalInfo.name && (
-                            <div><span className="font-medium">姓名：</span>{uploadResult.personalInfo.name}</div>
-                          )}
-                          {uploadResult.personalInfo.phone && (
-                            <div><span className="font-medium">电话：</span>{uploadResult.personalInfo.phone}</div>
-                          )}
-                          {uploadResult.personalInfo.email && (
-                            <div><span className="font-medium">邮箱：</span>{uploadResult.personalInfo.email}</div>
-                          )}
-                          {uploadResult.personalInfo.location && (
-                            <div><span className="font-medium">地址：</span>{uploadResult.personalInfo.location}</div>
-                          )}
-                        </div>
-                        {uploadResult.personalInfo.summary && (
-                          <div className="mt-3">
-                            <span className="font-medium">个人简介：</span>
-                            <p className="text-gray-700 mt-1">{uploadResult.personalInfo.summary}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* 教育经历 */}
-                    {uploadResult.educations && uploadResult.educations.length > 0 && (
-                      <div className="mb-6 p-4 bg-green-50 rounded-lg">
-                        <h4 className="font-medium text-green-900 mb-3">🎓 教育经历</h4>
-                        {uploadResult.educations.map((edu, index) => (
-                          <div key={index} className="mb-3 last:mb-0">
-                            <div className="font-medium">{edu.school} - {edu.major}</div>
-                            <div className="text-sm text-gray-600">
-                              {edu.degree} | {edu.startDate} - {edu.endDate}
-                              {edu.gpa && ` | GPA: ${edu.gpa}`}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 工作经历 */}
-                    {uploadResult.workExperiences && uploadResult.workExperiences.length > 0 && (
-                      <div className="mb-6 p-4 bg-purple-50 rounded-lg">
-                        <h4 className="font-medium text-purple-900 mb-3">💼 工作经历</h4>
-                        {uploadResult.workExperiences.map((work, index) => (
-                          <div key={index} className="mb-3 last:mb-0">
-                            <div className="font-medium">{work.company} - {work.position}</div>
-                            <div className="text-sm text-gray-600">
-                              {work.startDate} - {work.endDate}
-                            </div>
-                            {work.description && (
-                              <div className="text-sm text-gray-700 mt-1">{work.description}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 项目经历 */}
-                    {uploadResult.projects && uploadResult.projects.length > 0 && (
-                      <div className="mb-6 p-4 bg-orange-50 rounded-lg">
-                        <h4 className="font-medium text-orange-900 mb-3">🚀 项目经历</h4>
-                        {uploadResult.projects.map((project, index) => (
-                          <div key={index} className="mb-3 last:mb-0">
-                            <div className="font-medium">{project.name}</div>
-                            {project.role && (
-                              <div className="text-sm text-gray-600">担任角色：{project.role}</div>
-                            )}
-                            {project.description && (
-                              <div className="text-sm text-gray-700 mt-1">{project.description}</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* 技能 */}
-                    {uploadResult.skills && (
-                      <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
-                        <h4 className="font-medium text-indigo-900 mb-3">💪 技能</h4>
-                        <div className="space-y-2 text-sm">
-                          {uploadResult.skills.technical && uploadResult.skills.technical.length > 0 && (
-                            <div>
-                              <span className="font-medium">技术技能：</span>
-                              {uploadResult.skills.technical.join(', ')}
-                            </div>
-                          )}
-                          {uploadResult.skills.professional && uploadResult.skills.professional.length > 0 && (
-                            <div>
-                              <span className="font-medium">专业技能：</span>
-                              {uploadResult.skills.professional.join(', ')}
-                            </div>
-                          )}
-                          {uploadResult.skills.soft && uploadResult.skills.soft.length > 0 && (
-                            <div>
-                              <span className="font-medium">软技能：</span>
-                              {uploadResult.skills.soft.join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 操作按钮 */}
-                    <div className="flex space-x-4">
-                      <button
-                        onClick={() => {
-                          setEditedResult(uploadResult);
-                          setShowEditModal(true);
-                        }}
-                        className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-                      >
-                        ✏️ 编辑信息
-                      </button>
-                      <button
-                        onClick={() => handleSaveBaseResume()}
-                        disabled={isSaving}
-                        className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                      >
-                        {isSaving ? '保存中...' : '💾 保存简历'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {selectedMode === 'chat' && (
-              /* AI对话界面 */
-              <div className="bg-gray-50 rounded-2xl p-8">
-                <div className="text-center mb-8">
-                  <div className="text-4xl mb-4">🤖</div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">通过对话创建简历</h2>
-                  <p className="text-gray-600">AI助手将引导您完善简历信息</p>
-                </div>
-
-                {/* 对话界面 */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-                  {/* 对话区域 */}
-                  <div className="h-80 overflow-y-auto p-6 space-y-4">
-                    {chatMessages.map((message, index) => (
-                      <div
-                        key={index}
-                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-sm px-4 py-3 rounded-lg ${
-                            message.type === 'user'
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-gray-100 text-gray-900'
-                          }`}
-                        >
-                          {message.content}
-                        </div>
-                      </div>
-                    ))}
-                    {chatLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-100 px-4 py-3 rounded-lg">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 输入区域 */}
-                  <div className="border-t border-gray-200 p-4">
-                    <div className="flex space-x-3">
-                      <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyPress={handleChatKeyPress}
-                        placeholder="输入您的回答..."
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        disabled={chatLoading}
-                      />
-                      <button
-                        onClick={handleChatSubmit}
-                        disabled={!chatInput.trim() || chatLoading}
-                        className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                      >
-                        发送
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-center">
+                  {!selectedMode ? (
+            /* 底部CTA区域 */
+            <div>
+              {/* 底部渐变CTA */}
+              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-3xl p-12 text-center text-white relative overflow-hidden">
+                <div className="absolute inset-0 bg-black opacity-10"></div>
+                <div className="relative z-10">
+                  <h2 className="text-3xl font-bold mb-4">准备好提升您的简历了吗？</h2>
+                  <p className="text-xl mb-8 text-blue-100">AI智能优化，让您的简历脱颖而出</p>
                   <button
-                    onClick={() => {
-                      setIsSaving(true);
-                      // 这里需要实现保存对话记录并生成简历的逻辑
-                    }}
-                    className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    onClick={() => handleModeSelect('upload')}
+                    className="bg-white text-purple-600 text-lg font-semibold px-10 py-4 rounded-full hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
                   >
-                    保存对话记录并生成简历
+                    立即开始体验
                   </button>
                 </div>
+                {/* 装饰性元素 */}
+                <div className="absolute top-4 right-4 w-16 h-16 bg-white bg-opacity-10 rounded-full"></div>
+                <div className="absolute bottom-4 left-4 w-20 h-20 bg-white bg-opacity-5 rounded-full"></div>
               </div>
-            )}
+            </div>
+          ) : (
+          /* 弹窗背景遮罩 */
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              {selectedMode === 'upload' && (
+                /* 简历上传解析界面 */
+                <div className="p-8">
+                  {/* 弹窗标题栏 */}
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-3xl font-bold text-gray-900 flex items-center">
+                        <span className="text-4xl mr-3">📄</span>
+                        导入现有简历
+                      </h2>
+                      <p className="text-gray-600 mt-2">支持PDF、Word等格式，AI将智能解析您的简历</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedMode(null)}
+                      className="text-gray-400 hover:text-gray-600 text-3xl font-light"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {!uploadResult ? (
+                    <div>
+                      {/* 文件上传区域 */}
+                      <div 
+                        className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-indigo-400 transition-colors cursor-pointer"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <div className="text-4xl mb-4">📁</div>
+                        <p className="text-lg font-medium text-gray-900 mb-2">
+                          点击上传简历文件
+                        </p>
+                        <p className="text-gray-500 mb-4">
+                          支持 PDF、Word、TXT 格式，文件大小不超过 10MB
+                        </p>
+                        <div className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium inline-block">
+                          选择文件
+                        </div>
+                      </div>
+
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+
+                      {/* 进度条 */}
+                      {uploadLoading && (
+                        <div className="mt-8">
+                          <div className="bg-white rounded-lg p-6 border border-gray-200">
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-sm font-medium text-gray-700">{uploadStage}</span>
+                              <span className="text-sm font-medium text-indigo-600">{uploadProgress}%</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out" 
+                                style={{ width: `${uploadProgress}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    /* 解析结果展示 */
+                    <div className="bg-white rounded-xl border border-gray-200 p-6">
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold text-gray-900">📋 解析结果</h3>
+                        <div className="text-sm text-gray-500">
+                          文件：{uploadFile?.name}
+                        </div>
+                      </div>
+
+                      {/* 个人信息 */}
+                      {uploadResult.personalInfo && (
+                        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                          <h4 className="font-medium text-blue-900 mb-3">👤 个人信息</h4>
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            {uploadResult.personalInfo.name && (
+                              <div><span className="font-medium">姓名：</span>{uploadResult.personalInfo.name}</div>
+                            )}
+                            {uploadResult.personalInfo.phone && (
+                              <div><span className="font-medium">电话：</span>{uploadResult.personalInfo.phone}</div>
+                            )}
+                            {uploadResult.personalInfo.email && (
+                              <div><span className="font-medium">邮箱：</span>{uploadResult.personalInfo.email}</div>
+                            )}
+                            {uploadResult.personalInfo.location && (
+                              <div><span className="font-medium">地址：</span>{uploadResult.personalInfo.location}</div>
+                            )}
+                          </div>
+                          {uploadResult.personalInfo.summary && (
+                            <div className="mt-3">
+                              <span className="font-medium">个人简介：</span>
+                              <p className="text-gray-700 mt-1">{uploadResult.personalInfo.summary}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 教育经历 */}
+                      {uploadResult.educations && uploadResult.educations.length > 0 && (
+                        <div className="mb-6 p-4 bg-green-50 rounded-lg">
+                          <h4 className="font-medium text-green-900 mb-3">🎓 教育经历</h4>
+                          {uploadResult.educations.map((edu, index) => (
+                            <div key={index} className="mb-3 last:mb-0">
+                              <div className="font-medium">{edu.school} - {edu.major}</div>
+                              <div className="text-sm text-gray-600">
+                                {edu.degree} | {edu.startDate} - {edu.endDate}
+                                {edu.gpa && ` | GPA: ${edu.gpa}`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 工作经历 */}
+                      {uploadResult.workExperiences && uploadResult.workExperiences.length > 0 && (
+                        <div className="mb-6 p-4 bg-purple-50 rounded-lg">
+                          <h4 className="font-medium text-purple-900 mb-3">💼 工作经历</h4>
+                          {uploadResult.workExperiences.map((work, index) => (
+                            <div key={index} className="mb-3 last:mb-0">
+                              <div className="font-medium">{work.company} - {work.position}</div>
+                              <div className="text-sm text-gray-600">
+                                {work.startDate} - {work.endDate}
+                              </div>
+                              {work.description && (
+                                <div className="text-sm text-gray-700 mt-1">{work.description}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 项目经历 */}
+                      {uploadResult.projects && uploadResult.projects.length > 0 && (
+                        <div className="mb-6 p-4 bg-orange-50 rounded-lg">
+                          <h4 className="font-medium text-orange-900 mb-3">🚀 项目经历</h4>
+                          {uploadResult.projects.map((project, index) => (
+                            <div key={index} className="mb-3 last:mb-0">
+                              <div className="font-medium">{project.name}</div>
+                              {project.role && (
+                                <div className="text-sm text-gray-600">担任角色：{project.role}</div>
+                              )}
+                              {project.description && (
+                                <div className="text-sm text-gray-700 mt-1">{project.description}</div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* 技能 */}
+                      {uploadResult.skills && (
+                        <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
+                          <h4 className="font-medium text-indigo-900 mb-3">💪 技能</h4>
+                          <div className="space-y-2 text-sm">
+                            {uploadResult.skills.technical && uploadResult.skills.technical.length > 0 && (
+                              <div>
+                                <span className="font-medium">技术技能：</span>
+                                {uploadResult.skills.technical.join(', ')}
+                              </div>
+                            )}
+                            {uploadResult.skills.professional && uploadResult.skills.professional.length > 0 && (
+                              <div>
+                                <span className="font-medium">专业技能：</span>
+                                {uploadResult.skills.professional.join(', ')}
+                              </div>
+                            )}
+                            {uploadResult.skills.soft && uploadResult.skills.soft.length > 0 && (
+                              <div>
+                                <span className="font-medium">软技能：</span>
+                                {uploadResult.skills.soft.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 操作按钮 */}
+                      <div className="flex space-x-4">
+                        <button
+                          onClick={() => {
+                            setEditedResult(uploadResult);
+                            setShowEditModal(true);
+                          }}
+                          className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                        >
+                          ✏️ 编辑信息
+                        </button>
+                        <button
+                          onClick={() => handleSaveBaseResume()}
+                          disabled={isSaving}
+                          className="flex-1 bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                        >
+                          {isSaving ? '保存中...' : '💾 保存简历'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedMode === 'chat' && (
+                /* AI对话界面 */
+                <div className="p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-3xl font-bold text-gray-900 flex items-center">
+                        <span className="text-4xl mr-3">🤖</span>
+                        通过对话创建简历
+                      </h2>
+                      <p className="text-gray-600 mt-2">AI助手将引导您完善简历信息</p>
+                    </div>
+                    <button
+                      onClick={() => setSelectedMode(null)}
+                      className="text-gray-400 hover:text-gray-600 text-3xl font-light"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* 对话界面 */}
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+                    {/* 对话区域 */}
+                    <div className="h-80 overflow-y-auto p-6 space-y-4">
+                      {chatMessages.map((message, index) => (
+                        <div
+                          key={index}
+                          className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-sm px-4 py-3 rounded-lg ${
+                              message.type === 'user'
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                            }`}
+                          >
+                            {message.content}
+                          </div>
+                        </div>
+                      ))}
+                      {chatLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-gray-100 px-4 py-3 rounded-lg">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 输入区域 */}
+                    <div className="border-t border-gray-200 p-4">
+                      <div className="flex space-x-3">
+                        <input
+                          type="text"
+                          value={chatInput}
+                          onChange={(e) => setChatInput(e.target.value)}
+                          onKeyPress={handleChatKeyPress}
+                          placeholder="输入您的回答..."
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          disabled={chatLoading}
+                        />
+                        <button
+                          onClick={handleChatSubmit}
+                          disabled={!chatInput.trim() || chatLoading}
+                          className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          发送
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-center">
+                    <button
+                      onClick={() => {
+                        setIsSaving(true);
+                        // 这里需要实现保存对话记录并生成简历的逻辑
+                      }}
+                      className="bg-green-600 text-white px-8 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                    >
+                      保存对话记录并生成简历
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

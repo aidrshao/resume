@@ -120,5 +120,6 @@ const optionalAuth = (req, res, next) => {
 
 module.exports = {
   authenticateToken,
+  verifyToken: authenticateToken, // 别名，保持兼容性
   optionalAuth
 }; 
