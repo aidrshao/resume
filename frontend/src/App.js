@@ -21,6 +21,7 @@ import AdminDashboard from './components/AdminDashboard';
 import AdminUserManagement from './components/AdminUserManagement';
 import AdminMembershipTiers from './components/AdminMembershipTiers';
 import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
+import AdminAIPromptManagement from './components/AdminAIPromptManagement';
 import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 // 测试页面
@@ -81,6 +82,14 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <AdminUserMembershipManagement />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/ai-prompts" 
+            element={
+              <AdminProtectedRoute>
+                <AdminAIPromptManagement />
               </AdminProtectedRoute>
             } 
           />

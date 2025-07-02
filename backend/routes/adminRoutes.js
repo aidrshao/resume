@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const AdminController = require('../controllers/adminController');
 const { adminAuth, superAdminAuth } = require('../middleware/adminAuth');
+const AdminAIPromptController = require('../controllers/adminAIPromptController');
 
 // ==================== 认证相关路由 ====================
 
@@ -190,6 +191,56 @@ router.post('/assign-quota', adminAuth, AdminController.assignQuota);
  * GET /api/admin/statistics
  */
 router.get('/statistics', adminAuth, AdminController.getStatistics);
+
+// ==================== AI提示词管理 ====================
+
+/**
+ * 获取AI提示词类别列表
+ * GET /api/admin/ai-prompts/categories
+ */
+router.get('/ai-prompts/categories', AdminAIPromptController.getCategories);
+
+/**
+ * 测试渲染AI提示词
+ * POST /api/admin/ai-prompts/test-render
+ */
+router.post('/ai-prompts/test-render', AdminAIPromptController.testRender);
+
+/**
+ * 批量操作AI提示词
+ * POST /api/admin/ai-prompts/batch
+ */
+router.post('/ai-prompts/batch', AdminAIPromptController.batchOperation);
+
+/**
+ * 获取所有AI提示词
+ * GET /api/admin/ai-prompts
+ */
+router.get('/ai-prompts', AdminAIPromptController.getAllPrompts);
+
+/**
+ * 获取单个AI提示词
+ * GET /api/admin/ai-prompts/:id
+ */
+router.get('/ai-prompts/:id', AdminAIPromptController.getPromptById);
+
+/**
+ * 创建AI提示词
+ * POST /api/admin/ai-prompts
+ */
+router.post('/ai-prompts', AdminAIPromptController.createPrompt);
+
+/**
+ * 更新AI提示词
+ * PUT /api/admin/ai-prompts/:id
+ */
+router.put('/ai-prompts/:id', AdminAIPromptController.updatePrompt);
+
+/**
+ * 删除AI提示词
+ * DELETE /api/admin/ai-prompts/:id
+ */
+router.delete('/ai-prompts/:id', AdminAIPromptController.deletePrompt);
 
 // ==================== 错误处理 ====================
 

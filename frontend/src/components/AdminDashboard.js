@@ -307,6 +307,24 @@ const AdminDashboard = () => {
                 </div>
               </button>
 
+              {/* AI提示词管理 */}
+              <button
+                onClick={() => navigateTo('/admin/ai-prompts')}
+                className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div>
+                  <span className="rounded-lg inline-flex p-3 bg-purple-50 text-purple-600 ring-4 ring-white">
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </span>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-lg font-medium text-gray-900">AI提示词管理</h3>
+                  <p className="mt-2 text-sm text-gray-500">管理AI模型提示词模板和配置</p>
+                </div>
+              </button>
+
               {/* 系统设置（如果是超级管理员） */}
               {adminInfo?.role === 'super_admin' && (
                 <button
