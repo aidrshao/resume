@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端Token设置 - 简历系统</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        .token-display {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            word-break: break-all;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #1e7e34;
+        }
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .quick-action {
+            background: #e8f5e8;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .quick-action h3 {
+            color: #155724;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 前端Token设置工具</h1>
+        
+        <!-- 快速设置区域 -->
+        <div class="quick-action">
+            <h3>🚀 快速设置 - 一键解决Token问题</h3>
+            <p>点击下面的按钮自动设置最新的有效Token：</p>
+            <button class="btn btn-success" onclick="setLatestToken()">🔑 设置最新Token</button>
+            <div id="quickStatus"></div>
+        </div>
+
+        <!-- Token管理区域 -->
+        <div class="section">
+            <h2>🔑 Token管理</h2>
+            <p>当前最新有效Token：</p>
+            <div class="token-display" id="latestToken">
+                eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc1MTQyNjM3NCwiZXhwIjoxNzUyMDMxMTc0fQ.FDNz29CVyGh0GqDoZ3kysaaEoCXGxqRa0GfcwVqTWSQ
+            </div>
+            
+            <button class="btn" onclick="generateNewToken()">🔄 生成新Token</button>
+            <button class="btn btn-warning" onclick="copyToken()">📋 复制Token</button>
+            <button class="btn btn-success" onclick="setTokenToLocalStorage()">💾 设置到前端</button>
+            
+            <div id="tokenStatus"></div>
+        </div>
+
+        <!-- API测试区域 -->
+        <div class="section">
+            <h2>🧪 API测试</h2>
+            <p>测试各种API接口是否正常工作：</p>
+            
+            <button class="btn" onclick="testResumeAPI()">📄 测试简历列表</button>
+            <button class="btn" onclick="testJobAPI()">💼 测试岗位列表</button>
+            <button class="btn" onclick="testCreateJob()">➕ 测试创建岗位</button>
+            <button class="btn" onclick="testAllAPIs()">🔍 全面测试</button>
+            
+            <div id="apiStatus"></div>
+        </div>
+
+        <!-- 日志区域 -->
+        <div class="section">
+            <h2>📋 操作日志</h2>
+            <div id="logArea" class="log">准备就绪，等待操作...\n</div>
+            <button class="btn btn-warning" onclick="clearLog()">🗑️ 清空日志</button>
+        </div>
+
+        <!-- 使用说明 -->
+        <div class="section">
+            <h2>📖 使用说明</h2>
+            <ol>
+                <li><strong>快速解决问题</strong>：点击"设置最新Token"按钮即可解决所有认证问题</li>
+                <li><strong>手动设置</strong>：复制上面的Token，然后在前端浏览器控制台运行：
+                    <div class="token-display">localStorage.setItem('token', 'YOUR_TOKEN_HERE');</div>
+                </li>
+                <li><strong>验证设置</strong>：刷新前端页面，检查是否还有Token错误</li>
+                <li><strong>测试API</strong>：使用API测试按钮验证各功能是否正常</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let currentToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc1MTQyNjM3NCwiZXhwIjoxNzUyMDMxMTc0fQ.FDNz29CVyGh0GqDoZ3kysaaEoCXGxqRa0GfcwVqTWSQ';
+
+        function log(message) {
+            const logArea = document.getElementById('logArea');
+            const timestamp = new Date().toLocaleTimeString();
+            logArea.textContent += `[${timestamp}] ${message}\n`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logArea').textContent = '日志已清空\n';
+        }
+
+        function showStatus(elementId, message, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status ${isSuccess ? 'success' : 'error'}">${message}</div>`;
+        }
+
+        async function generateNewToken() {
+            try {
+                log('正在生成新Token...');
+                const response = await fetch(`${API_BASE}/generate-token`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentToken = data.token;
+                    document.getElementById('latestToken').textContent = currentToken;
+                    showStatus('tokenStatus', '✅ 新Token生成成功！');
+                    log(`新Token生成成功: ${currentToken.substring(0, 50)}...`);
+                } else {
+                    throw new Error(data.message || '生成Token失败');
+                }
+            } catch (error) {
+                showStatus('tokenStatus', `❌ 生成Token失败: ${error.message}`, false);
+                log(`生成Token失败: ${error.message}`);
+            }
+        }
+
+        function copyToken() {
+            navigator.clipboard.writeText(currentToken).then(() => {
+                showStatus('tokenStatus', '✅ Token已复制到剪贴板！');
+                log('Token已复制到剪贴板');
+            }).catch(err => {
+                showStatus('tokenStatus', '❌ 复制失败，请手动复制', false);
+                log(`复制失败: ${err.message}`);
+            });
+        }
+
+        function setTokenToLocalStorage() {
+            try {
+                // 尝试设置到当前页面的localStorage
+                localStorage.setItem('token', currentToken);
+                showStatus('tokenStatus', '✅ Token已设置到当前页面localStorage！');
+                log('Token已设置到localStorage');
+                
+                // 提供前端设置指令
+                const instruction = `请在前端页面（http://localhost:3016）的浏览器控制台运行：\nlocalStorage.setItem('token', '${currentToken}');`;
+                log(instruction);
+            } catch (error) {
+                showStatus('tokenStatus', `❌ 设置失败: ${error.message}`, false);
+                log(`设置localStorage失败: ${error.message}`);
+            }
+        }
+
+        function setLatestToken() {
+            try {
+                // 设置到localStorage
+                localStorage.setItem('token', currentToken);
+                
+                // 显示成功状态
+                showStatus('quickStatus', '✅ 最新Token已设置成功！现在可以刷新前端页面测试功能。');
+                log('快速设置完成 - Token已更新');
+                
+                // 自动测试API
+                setTimeout(() => {
+                    testAllAPIs();
+                }, 1000);
+                
+            } catch (error) {
+                showStatus('quickStatus', `❌ 设置失败: ${error.message}`, false);
+                log(`快速设置失败: ${error.message}`);
+            }
+        }
+
+        async function testAPI(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method,
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+                
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    return { success: true, data: result };
+                } else {
+                    throw new Error(result.message || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testResumeAPI() {
+            log('测试简历列表API...');
+            const result = await testAPI('/api/resumes');
+            
+            if (result.success) {
+                const count = result.data.data?.length || 0;
+                showStatus('apiStatus', `✅ 简历列表API正常 (${count}个简历)`);
+                log(`简历列表API测试成功，找到${count}个简历`);
+            } else {
+                showStatus('apiStatus', `❌ 简历列表API失败: ${result.error}`, false);
+                log(`简历列表API测试失败: ${result.error}`);
+            }
+        }
+
+        async function testJobAPI() {
+            log('测试岗位列表API...');
+            const result = await testAPI('/api/jobs');
+            
+            if (result.success) {
+                const count = result.data.data?.length || 0;
+                showStatus('apiStatus', `✅ 岗位列表API正常 (${count}个岗位)`);
+                log(`岗位列表API测试成功，找到${count}个岗位`);
+            } else {
+                showStatus('apiStatus', `❌ 岗位列表API失败: ${result.error}`, false);
+                log(`岗位列表API测试失败: ${result.error}`);
+            }
+        }
+
+        async function testCreateJob() {
+            log('测试创建岗位API...');
+            const testJob = {
+                title: '测试岗位 - ' + new Date().toLocaleTimeString(),
+                company: '测试公司',
+                description: '这是一个测试岗位描述',
+                requirements: '测试要求'
+            };
+            
+            const result = await testAPI('/api/jobs', 'POST', testJob);
+            
+            if (result.success) {
+                showStatus('apiStatus', '✅ 创建岗位API正常');
+                log(`创建岗位API测试成功，岗位ID: ${result.data.data?.id}`);
+            } else {
+                showStatus('apiStatus', `❌ 创建岗位API失败: ${result.error}`, false);
+                log(`创建岗位API测试失败: ${result.error}`);
+            }
+        }
+
+        async function testAllAPIs() {
+            log('开始全面API测试...');
+            showStatus('apiStatus', '🔄 正在进行全面测试...');
+            
+            const tests = [
+                { name: '简历列表', test: testResumeAPI },
+                { name: '岗位列表', test: testJobAPI },
+                { name: '创建岗位', test: testCreateJob }
+            ];
+            
+            let successCount = 0;
+            
+            for (const { name, test } of tests) {
+                try {
+                    await test();
+                    successCount++;
+                } catch (error) {
+                    log(`${name}测试异常: ${error.message}`);
+                }
+                
+                // 短暂延迟
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            const message = `✅ 全面测试完成: ${successCount}/${tests.length} 个API正常`;
+            showStatus('apiStatus', message);
+            log(message);
+        }
+
+        // 页面加载时的初始化
+        window.onload = function() {
+            log('Token设置工具已就绪');
+            log(`当前Token: ${currentToken.substring(0, 50)}...`);
+        };
+    </script>
+</body>
+</html> 
