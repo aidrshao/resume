@@ -248,7 +248,9 @@ ${text}
       console.log('🧠 开始AI结构化识别，文本长度:', text.length);
       const response = await aiService.generateText(prompt, 'deepseek', {
         temperature: 0.3, // 降低随机性，提高准确性
-        max_tokens: 6000
+        max_tokens: 6000,
+        timeout: parseInt(process.env.RESUME_AI_TIMEOUT) || 180000, // 简历解析专用超时: 3分钟
+        maxRetries: parseInt(process.env.RESUME_MAX_RETRIES) || 3 // 简历解析专用重试次数
       });
       
       console.log('🤖 AI原始响应:', response.substring(0, 500) + '...');

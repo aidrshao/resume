@@ -41,8 +41,10 @@ class AIService {
     const defaultOptions = {
       temperature: 0.7,
       max_tokens: 4000,
-      timeout: 150000, // 基础超时2.5分钟
-      maxRetries: 2, // 最大重试次数
+      timeout: parseInt(process.env.AI_TIMEOUT) || 120000, // 生产环境优化: 2分钟
+      maxRetries: parseInt(process.env.AI_MAX_RETRIES) || 2, // 最大重试次数
+      requestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT) || 90000, // 单次请求超时
+      connectionTimeout: parseInt(process.env.AI_CONNECTION_TIMEOUT) || 30000, // 连接超时
       ...options
     };
 
@@ -50,7 +52,10 @@ class AIService {
       temperature: defaultOptions.temperature,
       max_tokens: defaultOptions.max_tokens,
       timeout: defaultOptions.timeout + 'ms',
-      maxRetries: defaultOptions.maxRetries
+      requestTimeout: defaultOptions.requestTimeout + 'ms',
+      connectionTimeout: defaultOptions.connectionTimeout + 'ms',
+      maxRetries: defaultOptions.maxRetries,
+      environment: process.env.NODE_ENV || 'development'
     });
 
     const errors = {};
