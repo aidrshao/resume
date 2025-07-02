@@ -47,6 +47,9 @@ const JobsPage = () => {
 
   // 加载岗位列表
   const loadJobs = async (page = 1, newFilters = filters) => {
+    console.log('📋 [LOAD_JOBS] 开始加载岗位列表');
+    console.log('📋 [LOAD_JOBS] 参数:', { page, newFilters });
+    
     try {
       setLoading(true);
       const params = {
@@ -55,33 +58,70 @@ const JobsPage = () => {
         ...newFilters
       };
 
+      console.log('🌐 [LOAD_JOBS] 调用getJobs API，参数:', params);
+      const apiStartTime = Date.now();
+      
       const response = await getJobs(params);
       
-      if (response.success) {
+      const apiEndTime = Date.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      
+      console.log('✅ [LOAD_JOBS] getJobs API调用完成，耗时:', apiDuration + 'ms');
+      console.log('📊 [LOAD_JOBS] API响应:', response);
+      console.log('🔍 [LOAD_JOBS] response.success:', response.success);
+      
+      if (response && response.success) {
+        console.log('📋 [LOAD_JOBS] 设置岗位数据，数量:', response.data?.jobs?.length || 0);
+        console.log('📋 [LOAD_JOBS] 分页信息:', response.data?.pagination);
+        
         setJobs(response.data.jobs);
         setCurrentPage(response.data.pagination.page);
         setTotalPages(response.data.pagination.totalPages);
+        
+        console.log('✅ [LOAD_JOBS] 岗位列表加载成功');
       } else {
-        setError(response.message || '获取岗位列表失败');
+        const errorMessage = response?.message || '获取岗位列表失败';
+        console.log('❌ [LOAD_JOBS] 岗位列表加载失败:', errorMessage);
+        setError(errorMessage);
       }
     } catch (err) {
-      console.error('加载岗位列表失败:', err);
+      console.error('💥 [LOAD_JOBS] 加载岗位列表异常:', err);
       setError('加载岗位列表失败');
     } finally {
       setLoading(false);
+      console.log('🏁 [LOAD_JOBS] 岗位列表加载流程结束');
     }
   };
 
   // 加载统计数据
   const loadStats = async () => {
+    console.log('📊 [LOAD_STATS] 开始加载统计数据');
+    
     try {
+      console.log('🌐 [LOAD_STATS] 调用getJobStats API');
+      const apiStartTime = Date.now();
+      
       const response = await getJobStats();
-      if (response.success) {
+      
+      const apiEndTime = Date.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      
+      console.log('✅ [LOAD_STATS] getJobStats API调用完成，耗时:', apiDuration + 'ms');
+      console.log('📊 [LOAD_STATS] API响应:', response);
+      console.log('🔍 [LOAD_STATS] response.success:', response.success);
+      
+      if (response && response.success) {
+        console.log('📊 [LOAD_STATS] 设置统计数据:', response.data);
         setStats(response.data);
+        console.log('✅ [LOAD_STATS] 统计数据加载成功');
+      } else {
+        console.log('❌ [LOAD_STATS] 统计数据加载失败:', response?.message);
       }
     } catch (err) {
-      console.error('加载统计数据失败:', err);
+      console.error('💥 [LOAD_STATS] 加载统计数据异常:', err);
     }
+    
+    console.log('🏁 [LOAD_STATS] 统计数据加载流程结束');
   };
 
   // 获取基础简历
@@ -500,9 +540,19 @@ const JobsPage = () => {
         <AddJobModal
           onClose={() => setShowAddModal(false)}
           onSuccess={() => {
+            console.log('🎉 [JOBS_PAGE] AddJobModal onSuccess回调被调用');
+            console.log('🔄 [JOBS_PAGE] 开始执行成功后的操作...');
+            
+            console.log('🚪 [JOBS_PAGE] 关闭添加岗位模态框');
             setShowAddModal(false);
+            
+            console.log('📋 [JOBS_PAGE] 重新加载岗位列表，当前页:', currentPage);
             loadJobs(currentPage);
+            
+            console.log('📊 [JOBS_PAGE] 重新加载统计信息');
             loadStats();
+            
+            console.log('✅ [JOBS_PAGE] onSuccess回调执行完成');
           }}
         />
       )}

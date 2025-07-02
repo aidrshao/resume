@@ -73,9 +73,18 @@ const AddJobModal = ({ onClose, onSuccess }) => {
   const handleTextSubmit = async (e) => {
     e.preventDefault();
     
+    console.log('🚀 [ADD_JOB_MODAL] 开始提交文本表单');
+    console.log('📋 [ADD_JOB_MODAL] 表单数据:', textFormData);
+    
     // 验证表单
     const validationErrors = validateTextForm();
+    console.log('🔍 [ADD_JOB_MODAL] 表单验证结果:', { 
+      isValid: validationErrors.length === 0, 
+      errors: validationErrors 
+    });
+    
     if (validationErrors.length > 0) {
+      console.log('❌ [ADD_JOB_MODAL] 表单验证失败:', validationErrors);
       setError(validationErrors.join('、'));
       return;
     }
@@ -84,18 +93,50 @@ const AddJobModal = ({ onClose, onSuccess }) => {
     setError('');
 
     try {
+      console.log('🌐 [ADD_JOB_MODAL] 开始调用createJob API...');
+      const apiStartTime = Date.now();
+      
       const response = await createJob(textFormData);
       
-      if (response.success) {
+      const apiEndTime = Date.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      
+      console.log('✅ [ADD_JOB_MODAL] createJob API调用完成，耗时:', apiDuration + 'ms');
+      console.log('📊 [ADD_JOB_MODAL] API响应:', response);
+      console.log('🔍 [ADD_JOB_MODAL] 响应类型:', typeof response);
+      console.log('🔍 [ADD_JOB_MODAL] response.success:', response.success);
+      console.log('🔍 [ADD_JOB_MODAL] response.message:', response.message);
+      console.log('🔍 [ADD_JOB_MODAL] response.data:', response.data);
+      
+      if (response && response.success) {
+        console.log('🎉 [ADD_JOB_MODAL] 岗位创建成功，调用onSuccess回调');
         onSuccess();
       } else {
-        setError(response.message || '创建岗位失败');
+        const errorMessage = response?.message || '创建岗位失败';
+        console.log('❌ [ADD_JOB_MODAL] 岗位创建失败:', errorMessage);
+        setError(errorMessage);
       }
     } catch (err) {
-      console.error('创建岗位失败:', err);
-      setError('创建岗位失败，请重试');
+      console.error('💥 [ADD_JOB_MODAL] createJob API调用异常:', err);
+      console.error('💥 [ADD_JOB_MODAL] 错误详情:', {
+        message: err.message,
+        response: err.response,
+        stack: err.stack
+      });
+      
+      // 尝试从错误响应中提取更详细的信息
+      let errorMessage = '创建岗位失败，请重试';
+      if (err.response && err.response.data && err.response.data.message) {
+        errorMessage = err.response.data.message;
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      console.log('❌ [ADD_JOB_MODAL] 最终错误信息:', errorMessage);
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      console.log('🏁 [ADD_JOB_MODAL] 表单提交流程结束');
     }
   };
 

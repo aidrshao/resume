@@ -119,7 +119,13 @@ export const register = (userData) => {
  */
 export const login = (credentials) => {
   console.log('🌐 API: 发送登录请求', credentials);
-  return api.post('/auth/login', credentials);
+  return api.post('/auth/login', credentials).then(response => {
+    console.log('✅ [LOGIN] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [LOGIN] API响应失败:', error);
+    throw error;
+  });
 };
 
 /**
@@ -131,7 +137,13 @@ export const login = (credentials) => {
  */
 export const sendVerificationCode = (data) => {
   console.log('🌐 API: 发送验证码请求', data);
-  return api.post('/auth/send-code', data);
+  return api.post('/auth/send-code', data).then(response => {
+    console.log('✅ [SEND_CODE] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [SEND_CODE] API响应失败:', error);
+    throw error;
+  });
 };
 
 /**
@@ -143,7 +155,13 @@ export const sendVerificationCode = (data) => {
  */
 export const loginWithCode = (credentials) => {
   console.log('🌐 API: 发送验证码登录请求', credentials);
-  return api.post('/auth/login-with-code', credentials);
+  return api.post('/auth/login-with-code', credentials).then(response => {
+    console.log('✅ [LOGIN_WITH_CODE] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [LOGIN_WITH_CODE] API响应失败:', error);
+    throw error;
+  });
 };
 
 /**
@@ -227,7 +245,13 @@ export const getJobById = (jobId) => {
  */
 export const createJob = (jobData) => {
   console.log('🌐 API: 创建新岗位', jobData);
-  return api.post('/jobs', jobData);
+  return api.post('/jobs', jobData).then(response => {
+    console.log('✅ [CREATE_JOB] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [CREATE_JOB] API响应失败:', error);
+    throw error;
+  });
 };
 
 /**
@@ -241,6 +265,12 @@ export const uploadJobFile = (formData) => {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
+  }).then(response => {
+    console.log('✅ [UPLOAD_JOB] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [UPLOAD_JOB] API响应失败:', error);
+    throw error;
   });
 };
 
@@ -252,7 +282,9 @@ export const uploadJobFile = (formData) => {
  */
 export const updateJob = (jobId, updateData) => {
   console.log('🌐 API: 更新岗位信息', jobId, updateData);
-  return api.put(`/jobs/${jobId}`, updateData);
+  return api.put(`/jobs/${jobId}`, updateData).then(response => {
+    return response.data;
+  });
 };
 
 /**
@@ -262,7 +294,9 @@ export const updateJob = (jobId, updateData) => {
  */
 export const deleteJob = (jobId) => {
   console.log('🌐 API: 删除岗位', jobId);
-  return api.delete(`/jobs/${jobId}`);
+  return api.delete(`/jobs/${jobId}`).then(response => {
+    return response.data;
+  });
 };
 
 /**
@@ -273,7 +307,9 @@ export const deleteJob = (jobId) => {
  */
 export const batchUpdateJobStatus = (jobIds, status) => {
   console.log('🌐 API: 批量更新岗位状态', jobIds, status);
-  return api.patch('/jobs/batch-status', { job_ids: jobIds, status });
+  return api.patch('/jobs/batch-status', { job_ids: jobIds, status }).then(response => {
+    return response.data;
+  });
 };
 
 /**
@@ -282,7 +318,9 @@ export const batchUpdateJobStatus = (jobIds, status) => {
  */
 export const getJobStats = () => {
   console.log('🌐 API: 获取岗位统计');
-  return api.get('/jobs/stats');
+  return api.get('/jobs/stats').then(response => {
+    return response.data;
+  });
 };
 
 // ===== 简历管理相关API =====
