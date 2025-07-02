@@ -188,30 +188,52 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
     setMessage('');
     setErrors({});
 
+    // 添加连接状态监控
+    const startTime = Date.now();
+    console.log(`🚀 [AUTH_MODAL] 开始${authMode === 'login' ? '登录' : '注册'}请求...`);
+    console.log(`📊 [AUTH_MODAL] 请求开始时间:`, new Date(startTime).toISOString());
+
     try {
       let response;
       
+      // 添加超时控制
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.warn('⏰ [AUTH_MODAL] 请求超时，中断请求...');
+        controller.abort();
+      }, 30000); // 30秒超时
+      
       if (authMode === 'login') {
         if (loginType === 'password') {
+          console.log('🔑 [AUTH_MODAL] 发送密码登录请求');
           response = await login({
             email: formData.email,
             password: formData.password
           });
         } else {
+          console.log('📱 [AUTH_MODAL] 发送验证码登录请求');
           response = await loginWithCode({
             email: formData.email,
             code: formData.code
           });
         }
       } else {
+        console.log('📝 [AUTH_MODAL] 发送注册请求');
         response = await register({
           email: formData.email,
           password: formData.password,
           code: formData.code
         });
       }
+      
+      clearTimeout(timeoutId);
+      const duration = Date.now() - startTime;
+      console.log(`✅ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}请求完成，耗时:`, duration + 'ms');
+      console.log(`📊 [AUTH_MODAL] API响应:`, response);
 
-      if (response.success) {
+      if (response && response.success) {
+        console.log(`🎉 [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}成功`);
+        
         // 注册成功不自动登录，只显示成功消息
         if (authMode === 'register') {
           setMessage('注册成功！请使用您的账户登录');
@@ -234,13 +256,40 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
           }, 1000);
         }
       } else {
-        setMessage(response.message || `${authMode === 'login' ? '登录' : '注册'}失败`);
+        console.warn(`⚠️ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}API返回失败:`, response);
+        setMessage(response?.message || `${authMode === 'login' ? '登录' : '注册'}失败`);
       }
     } catch (error) {
-      console.error(`❌ AuthModal: ${authMode === 'login' ? '登录' : '注册'}失败:`, error);
-      setMessage(error.message || `${authMode === 'login' ? '登录' : '注册'}失败，请重试`);
+      const duration = Date.now() - startTime;
+      console.error(`❌ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}失败:`, error);
+      console.error(`❌ [AUTH_MODAL] 错误详情:`, {
+        name: error.name,
+        message: error.message,
+        duration: duration + 'ms',
+        timestamp: error.timestamp || new Date().toISOString(),
+        userMessage: error.userMessage
+      });
+      
+      // 根据错误类型显示不同的用户友好消息
+      let userMessage = '';
+      if (error.name === 'AbortError') {
+        userMessage = '请求超时，请检查网络连接后重试';
+      } else if (error.userMessage) {
+        userMessage = error.userMessage;
+      } else if (error.message.includes('Network Error') || 
+                 error.message.includes('ERR_NETWORK') ||
+                 error.message.includes('Failed to fetch')) {
+        userMessage = '网络连接异常，请检查网络后重试';
+      } else if (error.message.includes('timeout')) {
+        userMessage = '请求超时，请稍后重试';
+      } else {
+        userMessage = error.message || `${authMode === 'login' ? '登录' : '注册'}失败，请重试`;
+      }
+      
+      setMessage(userMessage);
     } finally {
       setIsLoading(false);
+      console.log(`🏁 [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}流程结束`);
     }
   };
 

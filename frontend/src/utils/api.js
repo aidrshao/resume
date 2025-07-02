@@ -77,22 +77,57 @@ api.interceptors.response.use(
     
     console.error('❌ [API响应拦截器] 请求失败');
     console.error('❌ [API响应拦截器] 错误信息:', error.message);
+    console.error('❌ [API响应拦截器] 错误类型:', error.name);
     console.error('❌ [API响应拦截器] 网络请求耗时:', duration + 'ms');
     
+    // 详细的错误分析
     if (error.response) {
+      console.error('❌ [API响应拦截器] 服务器响应错误');
       console.error('❌ [API响应拦截器] 响应状态码:', error.response.status);
       console.error('❌ [API响应拦截器] 响应数据:', error.response.data);
+      console.error('❌ [API响应拦截器] 响应头:', error.response.headers);
       
       // 处理401未授权错误
       if (error.response.status === 401) {
         console.log('🔐 [API响应拦截器] 检测到401错误，清除token并跳转到登录页');
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         window.location.href = '/login';
       }
     } else if (error.request) {
-      console.error('❌ [API响应拦截器] 网络错误，没有收到响应');
-      console.error('❌ [API响应拦截器] 请求配置:', error.request);
+      console.error('❌ [API响应拦截器] 网络连接错误，没有收到响应');
+      console.error('❌ [API响应拦截器] 请求状态:', error.request.readyState);
+      console.error('❌ [API响应拦截器] 请求状态文本:', error.request.statusText);
+      console.error('❌ [API响应拦截器] 请求URL:', error.config?.url);
+      
+      // 检查是否是连接中断
+      if (error.message.includes('Network Error') || 
+          error.message.includes('ERR_NETWORK') ||
+          error.message.includes('ERR_INTERNET_DISCONNECTED')) {
+        console.error('🌐 [API响应拦截器] 网络连接中断');
+        error.userMessage = '网络连接中断，请检查网络后重试';
+      }
+      
+      // 检查是否是超时
+      if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.error('⏰ [API响应拦截器] 请求超时');
+        error.userMessage = '请求超时，请稍后重试';
+      }
+      
+      // 检查是否是连接拒绝
+      if (error.message.includes('ERR_CONNECTION_REFUSED')) {
+        console.error('🚫 [API响应拦截器] 连接被拒绝');
+        error.userMessage = '无法连接到服务器，请联系技术支持';
+      }
+    } else {
+      console.error('❌ [API响应拦截器] 其他错误');
+      console.error('❌ [API响应拦截器] 错误配置:', error.config);
+      console.error('❌ [API响应拦截器] 错误堆栈:', error.stack);
     }
+    
+    // 添加错误发生的时间戳
+    error.timestamp = new Date().toISOString();
+    error.duration = duration;
     
     return Promise.reject(error);
   }
