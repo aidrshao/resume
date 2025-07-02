@@ -110,6 +110,60 @@ class Resume {
   }
 
   /**
+   * 获取用户的简历列表（仅基本信息，用于列表页面）
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Array>} 简历列表（仅基本信息）
+   */
+  static async findListByUserId(userId) {
+    const startTime = Date.now();
+    try {
+      console.log(`🗄️ [RESUME_MODEL] 开始查询用户简历列表，用户ID: ${userId}`);
+      console.log(`🔍 [SQL_QUERY] 查询字段: id, user_id, template_id, title, generation_mode, target_company, target_position, status, created_at, updated_at, is_base, source`);
+      
+      const queryStartTime = Date.now();
+      const results = await knex('resumes')
+        .select([
+          'id',
+          'user_id', 
+          'template_id',
+          'title',
+          'generation_mode',
+          'target_company',
+          'target_position',
+          'status',
+          'created_at',
+          'updated_at',
+          'is_base',
+          'source'
+        ])
+        .where('user_id', userId)
+        .orderBy('updated_at', 'desc');
+      
+      const queryDuration = Date.now() - queryStartTime;
+      const totalDuration = Date.now() - startTime;
+      
+      console.log(`✅ [RESUME_MODEL] 查询完成，耗时: ${totalDuration}ms`);
+      console.log(`📊 [SQL_PERFORMANCE] SQL执行时间: ${queryDuration}ms`);
+      console.log(`📊 [QUERY_RESULT] 返回记录数: ${results.length}`);
+      
+      if (results.length > 0) {
+        console.log(`📋 [SAMPLE_DATA] 第一条记录: ${JSON.stringify({
+          id: results[0].id,
+          title: results[0].title,
+          status: results[0].status,
+          created_at: results[0].created_at
+        })}`);
+      }
+      
+      return results;
+    } catch (error) {
+      const totalDuration = Date.now() - startTime;
+      console.error(`❌ [RESUME_MODEL] 查询用户简历列表失败，耗时: ${totalDuration}ms`, error);
+      throw error;
+    }
+  }
+
+  /**
    * 查找用户的基础简历
    * @param {number} userId - 用户ID
    * @returns {Promise<Object|null>} 基础简历或null

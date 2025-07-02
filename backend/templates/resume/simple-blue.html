@@ -206,6 +206,240 @@
             color: #4b5563;
         }
         
+        /* 响应式设计 - 平板和小屏幕 */
+        @media (max-width: 768px) {
+            .resume-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .name {
+                font-size: 28px;
+            }
+            
+            .title {
+                font-size: 16px;
+            }
+            
+            .contact-info {
+                gap: 15px;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .contact-item {
+                justify-content: center;
+            }
+            
+            .section-title {
+                font-size: 18px;
+            }
+            
+            .skills-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .experience-item {
+                padding-left: 15px;
+            }
+            
+            .experience-item:before {
+                left: -5px;
+                width: 8px;
+                height: 8px;
+            }
+        }
+        
+        /* 响应式设计 - 手机屏幕 */
+        @media (max-width: 480px) {
+            .resume-container {
+                padding: 15px;
+                margin: 5px;
+            }
+            
+            .name {
+                font-size: 24px;
+            }
+            
+            .title {
+                font-size: 14px;
+            }
+            
+            .contact-info {
+                font-size: 12px;
+                gap: 10px;
+            }
+            
+            .section-title {
+                font-size: 16px;
+                padding-left: 10px;
+            }
+            
+            .section-title:before {
+                width: 3px;
+            }
+            
+            .summary {
+                font-size: 14px;
+            }
+            
+            .job-title {
+                font-size: 14px;
+            }
+            
+            .company {
+                font-size: 13px;
+            }
+            
+            .period {
+                font-size: 12px;
+            }
+            
+            .description {
+                font-size: 13px;
+            }
+            
+            .project-item,
+            .skill-category {
+                padding: 15px;
+            }
+        }
+        
+        /* 文本自动换行和溢出处理 */
+        .summary,
+        .description,
+        .project-description {
+            word-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+        }
+        
+        .name,
+        .job-title,
+        .company,
+        .project-name {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* 响应式设计 - 平板和小屏幕 */
+        @media (max-width: 768px) {
+            .resume-container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .name {
+                font-size: 28px;
+            }
+            
+            .title {
+                font-size: 16px;
+            }
+            
+            .contact-info {
+                gap: 15px;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .contact-item {
+                justify-content: center;
+            }
+            
+            .section-title {
+                font-size: 18px;
+            }
+            
+            .skills-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .experience-item {
+                padding-left: 15px;
+            }
+            
+            .experience-item:before {
+                left: -5px;
+                width: 8px;
+                height: 8px;
+            }
+        }
+        
+        /* 响应式设计 - 手机屏幕 */
+        @media (max-width: 480px) {
+            .resume-container {
+                padding: 15px;
+                margin: 5px;
+            }
+            
+            .name {
+                font-size: 24px;
+            }
+            
+            .title {
+                font-size: 14px;
+            }
+            
+            .contact-info {
+                font-size: 12px;
+                gap: 10px;
+            }
+            
+            .section-title {
+                font-size: 16px;
+                padding-left: 10px;
+            }
+            
+            .section-title::before {
+                width: 3px;
+            }
+            
+            .summary {
+                font-size: 14px;
+            }
+            
+            .job-title {
+                font-size: 14px;
+            }
+            
+            .company {
+                font-size: 13px;
+            }
+            
+            .period {
+                font-size: 12px;
+            }
+            
+            .description {
+                font-size: 13px;
+            }
+            
+            .project-item,
+            .skill-category {
+                padding: 15px;
+            }
+        }
+        
+        /* 文本自动换行和溢出处理 */
+        .summary,
+        .description,
+        .project-description {
+            word-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+        }
+        
+        .name,
+        .job-title,
+        .company,
+        .project-name {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
         @media print {
             .resume-container {
                 padding: 20px;

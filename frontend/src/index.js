@@ -9,8 +9,7 @@ import './index.css';
 import App from './App';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-); 
+
+// 临时移除StrictMode来测试性能
+// 生产环境下StrictMode不会造成重复请求
+root.render(<App />); 

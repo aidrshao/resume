@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{name}} - 简历</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Microsoft YaHei', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f2f3f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .resume {
+      max-width: 900px;
+      margin: 40px auto;
+      background: #fff;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      min-height: auto;
+    }
+    .header {
+      background: #1c2b3a;
+      color: #fff;
+      text-align: center;
+      padding: 30px 20px;
+      position: relative;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 2em;
+      letter-spacing: 2px;
+      word-wrap: break-word;
+    }
+    .header .title {
+      color: #d4af37;
+      text-transform: uppercase;
+      margin-top: 5px;
+      font-weight: 500;
+      word-wrap: break-word;
+    }
+    .header .contact {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      gap: 20px;
+      font-size: 0.95em;
+    }
+    .header .contact div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      word-wrap: break-word;
+    }
+    .main {
+      display: flex;
+      flex-wrap: wrap;
+      min-height: auto;
+    }
+    .sidebar {
+      width: 30%;
+      padding: 30px 20px;
+      box-sizing: border-box;
+      border-right: 1px solid #eee;
+      text-align: center;
+      min-height: auto;
+    }
+    .sidebar img {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 20px;
+      background: #f0f0f0;
+    }
+    .sidebar h2 {
+      font-size: 1em;
+      color: #1c2b3a;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+      margin: 20px 0 10px;
+      text-transform: uppercase;
+    }
+    .sidebar p {
+      font-size: 0.9em;
+      margin: 8px 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .content {
+      width: 70%;
+      padding: 30px;
+      box-sizing: border-box;
+      min-height: auto;
+    }
+    .content p.summary {
+      font-size: 0.95em;
+      line-height: 1.6;
+      margin-bottom: 30px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .section {
+      margin-bottom: 30px;
+      min-height: auto;
+    }
+    .section h2 {
+      font-size: 1.1em;
+      color: #1c2b3a;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+      margin-bottom: 15px;
+      text-transform: uppercase;
+    }
+    .item {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .item h3 {
+      margin: 0 0 4px 0;
+      font-weight: 600;
+      font-size: 1em;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .item .meta {
+      display: block;
+      color: #d4af37;
+      font-size: 0.9em;
+      margin: 4px 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .item p, .item ul {
+      font-size: 0.9em;
+      line-height: 1.5;
+      margin: 8px 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+    .item ul {
+      padding-left: 20px;
+    }
+    .item li {
+      margin-bottom: 4px;
+    }
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px 30px;
+    }
+    .skill span {
+      font-size: 0.9em;
+      display: block;
+      margin-bottom: 4px;
+      word-wrap: break-word;
+    }
+    .bar {
+      background: #eee;
+      height: 6px;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .bar .fill {
+      height: 100%;
+      background: #d4af37;
+      transition: width 0.3s ease;
+    }
+    .languages p {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9em;
+      margin: 8px 0;
+      align-items: center;
+    }
+    .languages .bar {
+      height: 4px;
+      background: #eee;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+      flex: 1;
+      margin-left: 10px;
+    }
+    .languages .fill {
+      height: 100%;
+      background: #d4af37;
+    }
+    
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .resume {
+        margin: 20px;
+        max-width: none;
+      }
+      .main {
+        flex-direction: column;
+      }
+      .sidebar, .content {
+        width: 100%;
+      }
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid #eee;
+        padding: 20px;
+      }
+      .header .contact {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .skills-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .header {
+        padding: 20px 15px;
+      }
+      .header h1 {
+        font-size: 1.5em;
+      }
+      .content, .sidebar {
+        padding: 20px 15px;
+      }
+    }
+    
+    /* 打印样式 */
+    @media print {
+      .resume {
+        box-shadow: none;
+        margin: 0;
+        max-width: none;
+      }
+      body {
+        background: white;
+      }
+    }
+    
+    /* 空状态处理 */
+    .empty-placeholder {
+      color: #999;
+      font-style: italic;
+      font-size: 0.9em;
+    }
+    
+    /* 文本截断 */
+    .text-ellipsis {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="resume">
+    <!-- Header -->
+    <div class="header">
+      <h1>{{name || '姓名'}}</h1>
+      <div class="title">{{targetPosition || '目标职位'}}</div>
+      <div class="contact">
+        {{#if phone}}<div><span>📞</span>{{phone}}</div>{{/if}}
+        {{#if email}}<div><span>✉️</span>{{email}}</div>{{/if}}
+        {{#if address}}<div><span>📍</span>{{address}}</div>{{/if}}
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        {{#if avatar}}
+        <img src="{{avatar}}" alt="头像">
+        {{else}}
+        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIxMjAiIGhlaWdodD0iMTIwIiBmaWxsPSIjRjBGMEYwIi8+CjxjaXJjbGUgY3g9IjYwIiBjeT0iNDUiIHI9IjIwIiBmaWxsPSIjQ0NDIi8+CjxwYXRoIGQ9Ik0zMCA5MEM0MCA4MCA4MCA4MCA5MCA5MFYxMjBIMzBWOTBaIiBmaWxsPSIjQ0NDIi8+Cjwvc3ZnPgo=" alt="默认头像">
+        {{/if}}
+        
+        {{#if educations}}
+        <h2>教育经历</h2>
+        {{#each educations}}
+        <p>
+          <strong>{{degree || '学位'}}</strong><br>
+          <span style="color:#d4af37;">{{school || '学校'}} {{#if graduationDate}}/ {{graduationDate}}{{/if}}</span>
+        </p>
+        {{#if description}}<p>{{description}}</p>{{/if}}
+        {{/each}}
+        {{/if}}
+        
+        {{#if languages}}
+        <h2>语言能力</h2>
+        <div class="languages">
+          {{#each languages}}
+          <p>
+            <span>{{name || '语言'}}</span>
+            <span>{{level || '水平'}}</span>
+          </p>
+          <div class="bar">
+            <div class="fill" style="width: {{proficiency || 70}}%;"></div>
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+        
+        {{#if certifications}}
+        <h2>证书资质</h2>
+        {{#each certifications}}
+        <p>
+          <strong>{{name}}</strong><br>
+          {{#if issuer}}<span style="color:#d4af37;">{{issuer}} {{#if date}}/ {{date}}{{/if}}</span>{{/if}}
+        </p>
+        {{/each}}
+        {{/if}}
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        {{#if summary}}
+        <p class="summary">{{summary}}</p>
+        {{/if}}
+
+        {{#if experiences}}
+        <div class="section">
+          <h2>工作经历</h2>
+          {{#each experiences}}
+          <div class="item">
+            <h3>{{position || '职位名称'}}</h3>
+            <span class="meta">
+              {{company || '公司名称'}}
+              {{#if startDate}} / {{startDate}}{{/if}}
+              {{#if endDate}} - {{endDate}}{{/if}}
+              {{#if location}} / {{location}}{{/if}}
+            </span>
+            {{#if description}}
+            <p>{{description}}</p>
+            {{/if}}
+            {{#if achievements}}
+            <ul>
+              {{#each achievements}}
+              <li>{{this}}</li>
+              {{/each}}
+            </ul>
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+
+        {{#if skills}}
+        <div class="section">
+          <h2>专业技能</h2>
+          <div class="skills-grid">
+            {{#each skills}}
+            <div class="skill">
+              <span>{{name || '技能名称'}}</span>
+              <div class="bar">
+                <div class="fill" style="width: {{level || 70}}%;"></div>
+              </div>
+            </div>
+            {{/each}}
+          </div>
+        </div>
+        {{/if}}
+        
+        {{#if projects}}
+        <div class="section">
+          <h2>项目经历</h2>
+          {{#each projects}}
+          <div class="item">
+            <h3>{{name || '项目名称'}}</h3>
+            <span class="meta">
+              {{#if role}}{{role}}{{/if}}
+              {{#if startDate}} / {{startDate}}{{/if}}
+              {{#if endDate}} - {{endDate}}{{/if}}
+            </span>
+            {{#if description}}
+            <p>{{description}}</p>
+            {{/if}}
+            {{#if technologies}}
+            <p><strong>技术栈：</strong>{{technologies}}</p>
+            {{/if}}
+          </div>
+          {{/each}}
+        </div>
+        {{/if}}
+      </div>
+    </div>
+  </div>
+</body>
+</html> 

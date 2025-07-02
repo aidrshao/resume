@@ -19,56 +19,82 @@ const api = axios.create({
   },
 });
 
-// 请求拦截器 - 添加认证token
+// 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
     console.log('🔐 [API请求拦截器] 开始处理请求');
     console.log('🔐 [API请求拦截器] 请求URL:', config.url);
     console.log('🔐 [API请求拦截器] 请求方法:', config.method);
-    console.log('🔐 [API请求拦截器] localStorage中的token:', token ? `${token.substring(0, 20)}...` : '无token');
+    console.log('🔐 [API请求拦截器] localStorage中的token:', localStorage.getItem('token') ? localStorage.getItem('token').substring(0, 20) + '...' : '无');
     
+    // 记录请求开始时间
+    config.metadata = { startTime: Date.now() };
+    
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
       console.log('✅ [API请求拦截器] 已添加Authorization头');
     } else {
-      console.log('❌ [API请求拦截器] 没有token，未添加Authorization头');
+      console.log('⚠️ [API请求拦截器] 没有找到token');
     }
     
     console.log('🔐 [API请求拦截器] 最终请求头:', JSON.stringify(config.headers, null, 2));
+    console.log('🌐 [API请求拦截器] 发送请求到:', config.baseURL + config.url);
+    
     return config;
   },
   (error) => {
-    console.error('❌ [API请求拦截器] 请求拦截器错误:', error);
+    console.error('❌ [API请求拦截器] 请求配置错误:', error);
     return Promise.reject(error);
   }
 );
 
-// 响应拦截器 - 统一错误处理
+// 响应拦截器
 api.interceptors.response.use(
   (response) => {
+    const endTime = Date.now();
+    const startTime = response.config.metadata?.startTime || endTime;
+    const duration = endTime - startTime;
+    
     console.log('✅ [API响应拦截器] 请求成功');
     console.log('✅ [API响应拦截器] 状态码:', response.status);
     console.log('✅ [API响应拦截器] 响应数据:', response.data);
-    return response.data;
-  },
-  (error) => {
-    console.error('❌ [API响应拦截器] 请求失败');
-    console.error('❌ [API响应拦截器] 错误状态码:', error.response?.status);
-    console.error('❌ [API响应拦截器] 错误响应数据:', error.response?.data);
-    console.error('❌ [API响应拦截器] 完整错误对象:', error);
+    console.log('📊 [API响应拦截器] 网络请求耗时:', duration + 'ms');
+    console.log('📊 [API响应拦截器] 响应大小:', JSON.stringify(response.data).length + ' bytes');
     
-    if (error.response?.status === 401) {
-      console.warn('⚠️ [API响应拦截器] 检测到401错误，清除token并跳转登录');
-      // token过期或无效，清除本地存储并跳转登录
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+    // 如果耗时超过200ms，记录警告
+    if (duration > 200) {
+      console.warn('⚠️ [API响应拦截器] 请求耗时较长:', duration + 'ms');
+      console.warn('⚠️ [API响应拦截器] 请求URL:', response.config.url);
     }
     
-    const errorMessage = error.response?.data?.message || '网络请求失败';
-    console.error('❌ [API响应拦截器] 最终错误消息:', errorMessage);
-    return Promise.reject(new Error(errorMessage));
+    return response;
+  },
+  (error) => {
+    const endTime = Date.now();
+    const startTime = error.config?.metadata?.startTime || endTime;
+    const duration = endTime - startTime;
+    
+    console.error('❌ [API响应拦截器] 请求失败');
+    console.error('❌ [API响应拦截器] 错误信息:', error.message);
+    console.error('❌ [API响应拦截器] 网络请求耗时:', duration + 'ms');
+    
+    if (error.response) {
+      console.error('❌ [API响应拦截器] 响应状态码:', error.response.status);
+      console.error('❌ [API响应拦截器] 响应数据:', error.response.data);
+      
+      // 处理401未授权错误
+      if (error.response.status === 401) {
+        console.log('🔐 [API响应拦截器] 检测到401错误，清除token并跳转到登录页');
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+    } else if (error.request) {
+      console.error('❌ [API响应拦截器] 网络错误，没有收到响应');
+      console.error('❌ [API响应拦截器] 请求配置:', error.request);
+    }
+    
+    return Promise.reject(error);
   }
 );
 
@@ -168,7 +194,10 @@ export const getUserProfile = () => {
  */
 export const getJobs = (params = {}) => {
   console.log('🌐 API: 获取岗位列表', params);
-  return api.get('/jobs', { params });
+  return api.get('/jobs', { params }).then(response => {
+    // 返回实际的数据内容，而不是完整的axios响应
+    return response.data;
+  });
 };
 
 /**
@@ -264,8 +293,55 @@ export const getJobStats = () => {
  * @returns {Promise} API响应
  */
 export const getResumes = (params = {}) => {
+  const startTime = Date.now();
+  const performanceId = `getResumes_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   console.log('🌐 API: 获取简历列表', params);
-  return api.get('/resumes', { params });
+  console.log('📊 [FRONTEND_PERFORMANCE] 开始时间:', new Date().toISOString());
+  console.log('📊 [FRONTEND_PERFORMANCE] 性能ID:', performanceId);
+  
+  // 记录axios请求开始时间
+  const axiosStartTime = Date.now();
+  console.log('🌐 [AXIOS_REQUEST] 开始发送axios请求:', axiosStartTime);
+  
+  return api.get('/resumes', { params }).then(response => {
+    const axiosEndTime = Date.now();
+    const axiosDuration = axiosEndTime - axiosStartTime;
+    console.log('🌐 [AXIOS_REQUEST] axios请求完成，耗时:', axiosDuration + 'ms');
+    
+    // 数据处理开始
+    const processStartTime = Date.now();
+    console.log('🔄 [DATA_PROCESSING] 开始处理响应数据:', processStartTime);
+    
+    const endTime = Date.now();
+    const totalDuration = endTime - startTime;
+    const processDuration = endTime - processStartTime;
+    
+    console.log('✅ [FRONTEND_PERFORMANCE] 简历列表请求完成');
+    console.log('📊 [FRONTEND_PERFORMANCE] 总耗时:', totalDuration + 'ms');
+    console.log('📊 [FRONTEND_PERFORMANCE] axios耗时:', axiosDuration + 'ms');
+    console.log('📊 [FRONTEND_PERFORMANCE] 数据处理耗时:', processDuration + 'ms');
+    console.log('📊 [FRONTEND_PERFORMANCE] 响应数据大小:', JSON.stringify(response).length + ' bytes');
+    console.log('📊 [FRONTEND_PERFORMANCE] 响应数据:', response);
+    console.log('📊 [FRONTEND_PERFORMANCE] 性能ID:', performanceId);
+    
+    // 性能警告
+    if (totalDuration > 200) {
+      console.warn('⚠️ [PERFORMANCE_WARNING] 请求总耗时超过200ms:', totalDuration + 'ms');
+      console.warn('⚠️ [PERFORMANCE_WARNING] axios耗时:', axiosDuration + 'ms');
+      console.warn('⚠️ [PERFORMANCE_WARNING] 数据处理耗时:', processDuration + 'ms');
+    }
+    
+    // 返回实际的数据内容，而不是完整的axios响应
+    return response.data;
+  }).catch(error => {
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    console.error('❌ [FRONTEND_PERFORMANCE] 简历列表请求失败，耗时:', duration + 'ms');
+    console.error('❌ [FRONTEND_PERFORMANCE] 性能ID:', performanceId);
+    console.error('❌ [FRONTEND_PERFORMANCE] 错误:', error);
+    throw error;
+  });
 };
 
 /**

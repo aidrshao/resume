@@ -99,6 +99,22 @@ class MembershipController {
       };
 
       if (membership) {
+        // 正确处理features字段 - 可能是字符串、数组或逗号分隔的字符串
+        let features = [];
+        if (membership.features) {
+          if (Array.isArray(membership.features)) {
+            features = membership.features;
+          } else if (typeof membership.features === 'string') {
+            // 首先尝试作为JSON解析
+            try {
+              features = JSON.parse(membership.features);
+            } catch (e) {
+              // 如果JSON解析失败，按逗号分隔处理
+              features = membership.features.split(',').map(f => f.trim()).filter(f => f.length > 0);
+            }
+          }
+        }
+
         membershipInfo = {
           hasMembership: true,
           isActive: membership.status === 'active',
@@ -108,7 +124,7 @@ class MembershipController {
           endDate: membership.end_date,
           quotaResetDate: membership.quota_reset_date,
           templateAccessLevel: membership.template_access_level || 'basic',
-          features: Array.isArray(membership.features) ? membership.features : []
+          features: features
         };
       }
 

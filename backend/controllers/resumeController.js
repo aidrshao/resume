@@ -52,17 +52,45 @@ class ResumeController {
    * GET /api/resumes
    */
   static async getUserResumes(req, res) {
+    const startTime = Date.now();
+    const requestId = req.requestId || 'unknown';
+    
     try {
       const userId = req.user.id;
-      const resumes = await Resume.findByUserId(userId);
+      console.log(`🔍 [GET_USER_RESUMES] [${requestId}] 开始获取用户简历列表，用户ID: ${userId}`);
+      console.log(`📊 [PERFORMANCE] [${requestId}] 开始时间: ${new Date().toISOString()}`);
       
-      res.json({
+      // 数据库查询开始时间
+      const dbStartTime = Date.now();
+      console.log(`🗄️ [DATABASE] [${requestId}] 开始数据库查询...`);
+      
+      // 使用优化的方法，只返回列表需要的基本信息
+      const resumes = await Resume.findListByUserId(userId);
+      
+      const dbEndTime = Date.now();
+      const dbDuration = dbEndTime - dbStartTime;
+      console.log(`🗄️ [DATABASE] [${requestId}] 数据库查询完成，耗时: ${dbDuration}ms`);
+      console.log(`📊 [DATABASE] [${requestId}] 查询结果数量: ${resumes.length}`);
+      
+      // 计算响应数据大小
+      const responseData = {
         success: true,
         data: resumes,
         message: '获取简历列表成功'
-      });
+      };
+      const responseSize = JSON.stringify(responseData).length;
+      console.log(`📦 [RESPONSE] [${requestId}] 响应数据大小: ${responseSize} bytes (${(responseSize/1024).toFixed(2)} KB)`);
+      
+      const totalDuration = Date.now() - startTime;
+      console.log(`✅ [GET_USER_RESUMES] [${requestId}] 成功获取简历列表，总耗时: ${totalDuration}ms`);
+      console.log(`📊 [PERFORMANCE] [${requestId}] 性能统计:`);
+      console.log(`   - 数据库查询: ${dbDuration}ms (${((dbDuration/totalDuration)*100).toFixed(1)}%)`);
+      console.log(`   - 其他处理: ${totalDuration - dbDuration}ms (${(((totalDuration - dbDuration)/totalDuration)*100).toFixed(1)}%)`);
+      
+      res.json(responseData);
     } catch (error) {
-      console.error('获取简历列表失败:', error);
+      const totalDuration = Date.now() - startTime;
+      console.error(`❌ [GET_USER_RESUMES] [${requestId}] 获取简历列表失败，耗时: ${totalDuration}ms`, error);
       res.status(500).json({
         success: false,
         message: '获取简历列表失败'

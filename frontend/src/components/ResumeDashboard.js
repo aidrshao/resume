@@ -24,65 +24,113 @@ const ResumeDashboard = () => {
    * 加载用户的简历列表
    */
   const loadResumes = useCallback(async () => {
+    const loadStartTime = Date.now();
+    console.log('🔄 [LOAD_RESUMES] 开始执行loadResumes函数');
+    console.log('🔄 [LOAD_RESUMES] 开始时间:', new Date().toISOString());
+    
     try {
       const token = localStorage.getItem('token');
       if (!token) {
+        console.log('❌ [LOAD_RESUMES] 没有token，跳转到登录页');
         navigate('/login');
         return;
       }
 
-      // 使用封装的API工具
+      console.log('🌐 [LOAD_RESUMES] 开始调用api.getResumes()');
+      const apiStartTime = Date.now();
+      
       const data = await api.getResumes();
       
-      if (data.success) {
-        setResumes(data.data);
+      const apiEndTime = Date.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      console.log('🌐 [LOAD_RESUMES] api.getResumes()完成，耗时:', apiDuration + 'ms');
+      console.log('🔍 [LOAD_RESUMES] 返回的数据:', data);
+      
+      if (data && data.success) {
+        console.log('✅ [LOAD_RESUMES] 数据处理开始，简历数量:', data.data ? data.data.length : 0);
+        const processStartTime = Date.now();
+        
+        setResumes(data.data || []);
         // 找出基础简历
-        const base = data.data.find(resume => resume.is_base || (!resume.target_company && !resume.target_position));
+        const base = data.data ? data.data.find(resume => resume.is_base || (!resume.target_company && !resume.target_position)) : null;
         setBaseResume(base);
+        
+        const processEndTime = Date.now();
+        const processDuration = processEndTime - processStartTime;
+        console.log('✅ [LOAD_RESUMES] 数据处理完成，耗时:', processDuration + 'ms');
+        console.log('✅ [LOAD_RESUMES] 基础简历:', base ? base.title : '未找到');
       } else {
-        setError(data.message || '加载简历列表失败');
+        console.error('❌ [LOAD_RESUMES] API返回失败:', data ? data.message : '无数据');
+        setError((data && data.message) || '加载简历列表失败');
       }
     } catch (error) {
-      console.error('加载简历列表失败:', error);
+      console.error('❌ [LOAD_RESUMES] 异常:', error);
       setError(error.message || '加载简历列表失败');
+    } finally {
+      const totalDuration = Date.now() - loadStartTime;
+      console.log('🏁 [LOAD_RESUMES] loadResumes函数执行完成，总耗时:', totalDuration + 'ms');
     }
   }, [navigate]);
 
   /**
-   * 加载用户的岗位列表
+   * 加载职位列表
    */
   const loadJobs = useCallback(async () => {
+    const loadStartTime = Date.now();
+    console.log('🔄 [LOAD_JOBS] 开始执行loadJobs函数');
+    console.log('🔄 [LOAD_JOBS] 开始时间:', new Date().toISOString());
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-
-      const response = await fetch('/api/jobs', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      if (data.success && data.data && Array.isArray(data.data.jobs)) {
-        setJobs(data.data.jobs);
+      console.log('🌐 [LOAD_JOBS] 开始调用api.getJobs()');
+      const apiStartTime = Date.now();
+      
+      const data = await api.getJobs();
+      
+      const apiEndTime = Date.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      console.log('🌐 [LOAD_JOBS] api.getJobs()完成，耗时:', apiDuration + 'ms');
+      console.log('🔍 [LOAD_JOBS] 返回的数据:', data);
+      
+      if (data && data.success) {
+        console.log('✅ [LOAD_JOBS] 数据处理开始，职位数量:', data.data ? data.data.length : 0);
+        const processStartTime = Date.now();
+        
+        setJobs(data.data || []);
+        
+        const processEndTime = Date.now();
+        const processDuration = processEndTime - processStartTime;
+        console.log('✅ [LOAD_JOBS] 数据处理完成，耗时:', processDuration + 'ms');
       } else {
-        console.warn('岗位数据格式异常:', data);
-        setJobs([]); // 确保设置为空数组
+        console.error('❌ [LOAD_JOBS] API返回失败:', data ? data.message : '无数据');
+        setError((data && data.message) || '加载职位列表失败');
       }
     } catch (error) {
-      console.error('加载岗位列表失败:', error);
-      setJobs([]); // 确保在错误时设置为空数组
+      console.error('❌ [LOAD_JOBS] 异常:', error);
+      setError(error.message || '加载职位列表失败');
+    } finally {
+      const totalDuration = Date.now() - loadStartTime;
+      console.log('🏁 [LOAD_JOBS] loadJobs函数执行完成，总耗时:', totalDuration + 'ms');
     }
   }, []);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([loadResumes(), loadJobs()]);
-      setLoading(false);
+      console.log('🔄 [RESUME_DASHBOARD] 开始加载数据...');
+      const loadStartTime = Date.now();
+      
+      try {
+        await Promise.all([loadResumes(), loadJobs()]);
+        const loadEndTime = Date.now();
+        console.log('✅ [RESUME_DASHBOARD] 数据加载完成，总耗时:', (loadEndTime - loadStartTime) + 'ms');
+      } catch (error) {
+        console.error('❌ [RESUME_DASHBOARD] 数据加载失败:', error);
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
-  }, [loadResumes, loadJobs]);
+  }, []); // 移除loadResumes和loadJobs依赖，避免无限循环
 
   /**
    * 删除简历
