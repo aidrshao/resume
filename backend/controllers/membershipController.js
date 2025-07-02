@@ -43,8 +43,47 @@ class MembershipController {
     try {
       const userId = req.user.userId;
 
-      // 获取当前有效会员信息
-      const membership = await UserMembership.getCurrentMembership(userId);
+      // 获取当前有效会员信息，如果没有则自动创建免费会员
+      let membership = await UserMembership.getCurrentMembership(userId);
+
+      // 如果用户没有会员记录，自动创建免费会员
+      if (!membership) {
+        console.log('🔧 [AUTO_CREATE_MEMBERSHIP] 用户没有会员记录，自动创建免费会员...');
+        
+        // 获取免费版套餐
+        const freeTier = await knex('membership_tiers').where('name', '免费版').first();
+        if (!freeTier) {
+          throw new Error('系统配置错误：免费版套餐不存在');
+        }
+
+        // 计算配额重置时间（下个月的第一天）
+        const quotaResetDate = new Date();
+        quotaResetDate.setMonth(quotaResetDate.getMonth() + 1);
+        quotaResetDate.setDate(1);
+        quotaResetDate.setHours(0, 0, 0, 0);
+
+        // 创建免费会员记录
+        await knex('user_memberships').insert({
+          user_id: userId,
+          membership_tier_id: freeTier.id,
+          status: 'active',
+          start_date: new Date(),
+          end_date: null, // 免费版永久有效
+          remaining_ai_quota: freeTier.ai_resume_quota,
+          quota_reset_date: quotaResetDate,
+          payment_status: 'paid',
+          paid_amount: 0,
+          payment_method: 'auto_free',
+          admin_notes: '系统自动创建的免费会员',
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        });
+
+        console.log('✅ [AUTO_CREATE_MEMBERSHIP] 免费会员创建成功，配额:', freeTier.ai_resume_quota);
+
+        // 重新获取会员信息（包含套餐信息）
+        membership = await UserMembership.getCurrentMembership(userId);
+      }
 
       // 计算会员状态
       let membershipInfo = {
@@ -69,7 +108,7 @@ class MembershipController {
           endDate: membership.end_date,
           quotaResetDate: membership.quota_reset_date,
           templateAccessLevel: membership.template_access_level || 'basic',
-          features: membership.features ? JSON.parse(membership.features) : []
+          features: Array.isArray(membership.features) ? membership.features : []
         };
       }
 
@@ -368,15 +407,45 @@ class MembershipController {
   static async validateAIQuota(userId) {
     try {
       // 获取用户当前会员信息
-      const membership = await UserMembership.getCurrentMembership(userId);
+      let membership = await UserMembership.getCurrentMembership(userId);
 
+      // 如果用户没有会员记录，自动创建免费会员
       if (!membership) {
-        return {
-          hasQuota: false,
-          hasMembership: false,
-          remainingQuota: 0,
-          message: '您还不是会员，请先购买会员套餐'
-        };
+        console.log('🔧 [AUTO_CREATE_MEMBERSHIP] 用户没有会员记录，自动创建免费会员...');
+        
+        // 获取免费版套餐
+        const freeTier = await knex('membership_tiers').where('name', '免费版').first();
+        if (!freeTier) {
+          throw new Error('系统配置错误：免费版套餐不存在');
+        }
+
+        // 计算配额重置时间（下个月的第一天）
+        const quotaResetDate = new Date();
+        quotaResetDate.setMonth(quotaResetDate.getMonth() + 1);
+        quotaResetDate.setDate(1);
+        quotaResetDate.setHours(0, 0, 0, 0);
+
+        // 创建免费会员记录
+        const [newMembership] = await knex('user_memberships').insert({
+          user_id: userId,
+          membership_tier_id: freeTier.id,
+          status: 'active',
+          start_date: new Date(),
+          end_date: null, // 免费版永久有效
+          remaining_ai_quota: freeTier.ai_resume_quota,
+          quota_reset_date: quotaResetDate,
+          payment_status: 'paid',
+          paid_amount: 0,
+          payment_method: 'auto_free',
+          admin_notes: '系统自动创建的免费会员',
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        }).returning('*');
+
+        console.log('✅ [AUTO_CREATE_MEMBERSHIP] 免费会员创建成功，配额:', freeTier.ai_resume_quota);
+
+        // 重新获取会员信息（包含套餐信息）
+        membership = await UserMembership.getCurrentMembership(userId);
       }
 
       if (membership.status !== 'active') {
@@ -401,6 +470,7 @@ class MembershipController {
           });
         
         membership.remaining_ai_quota = membership.ai_resume_quota;
+        console.log('🔄 [QUOTA_RESET] 配额已重置为:', membership.ai_resume_quota);
       }
 
       if (membership.remaining_ai_quota <= 0) {

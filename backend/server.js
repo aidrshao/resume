@@ -129,6 +129,18 @@ app.post('/generate-token', (req, res) => {
   }
 });
 
+// 健康检查路由（在所有其他路由之前）
+app.get('/api/health', (req, res) => {
+  res.json({
+    success: true,
+    message: '服务运行正常',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
 // 路由配置
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前

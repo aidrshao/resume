@@ -128,6 +128,31 @@ exports.seed = async function(knex) {
       sort_order: 5,
       created_at: new Date(),
       updated_at: new Date()
+    },
+    {
+      id: 6,
+      name: '专业侧边栏',
+      description: '专业的侧边栏布局，左侧展示个人信息，右侧展示核心内容',
+      template_config: {
+        layout: 'sidebar',
+        colors: {
+          primary: '#2c3e50',
+          secondary: '#f9c922',
+          text: '#333333',
+          sidebar: '#2c3e50',
+          accent: '#f9c922'
+        },
+        fonts: {
+          heading: 'PingFang SC',
+          body: 'PingFang SC'
+        },
+        sections: ['header', 'summary', 'experience', 'education', 'skills', 'projects', 'languages', 'references']
+      },
+      is_premium: false,
+      is_active: true,
+      sort_order: 6,
+      created_at: new Date(),
+      updated_at: new Date()
     }
   ]);
 }; 

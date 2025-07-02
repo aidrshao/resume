@@ -3,12 +3,13 @@
  * 处理简历模板选择、预览和PDF生成
  */
 
+const { Resume } = require('../models/Resume');
 const ResumeTemplate = require('../models/ResumeTemplate');
 const ResumeRender = require('../models/ResumeRender');
-const { Resume } = require('../models/Resume');
 const path = require('path');
-const fs = require('fs-extra');
+const fs = require('fs').promises;
 const PDFService = require('../services/pdfService');
+const Handlebars = require('handlebars');
 
 class ResumeRenderController {
   /**
@@ -115,7 +116,7 @@ class ResumeRenderController {
       const formattedData = ResumeRenderController.formatResumeData(resume);
       
       // 生成HTML预览
-      const htmlContent = ResumeRenderController.generateHtmlFromConfig(formattedData, template);
+      const htmlContent = await ResumeRenderController.generateHtmlFromConfig(formattedData, template);
       
       console.log(`✅ [简历预览] 预览生成成功`);
       
@@ -197,7 +198,7 @@ class ResumeRenderController {
       
       try {
         // 生成HTML内容
-        const htmlContent = ResumeRenderController.generateHtmlFromConfig(formattedData, template);
+        const htmlContent = await ResumeRenderController.generateHtmlFromConfig(formattedData, template);
         
         let result = {
           id: renderRecord.id,
@@ -521,13 +522,35 @@ class ResumeRenderController {
    * 根据模板配置生成HTML内容
    * @param {Object} data - 格式化后的简历数据
    * @param {Object} template - 模板对象
-   * @returns {String} HTML内容
+   * @returns {Promise<String>} HTML内容
    */
-  static generateHtmlFromConfig(data, template) {
+  static async generateHtmlFromConfig(data, template) {
     const config = template.template_config;
     
-    // 基础HTML结构
-    let html = `
+    // 检查是否有对应的HTML模板文件
+    const templateFileName = ResumeRenderController.getTemplateFileName(template.name);
+    const templatePath = path.join(__dirname, '../templates/resume', templateFileName);
+    
+    try {
+      // 尝试读取HTML模板文件
+      const templateContent = await fs.readFile(templatePath, 'utf-8');
+      
+      console.log(`✅ [模板渲染] 使用HTML模板文件: ${templateFileName}`);
+      
+      // 使用Handlebars编译模板
+      const compiledTemplate = Handlebars.compile(templateContent);
+      
+      // 渲染模板
+      const result = compiledTemplate(data);
+      
+      return result;
+      
+    } catch (error) {
+      // 如果模板文件不存在，回退到动态生成
+      console.log(`📝 [模板渲染] 使用动态生成，模板: ${template.name}`);
+      
+      // 基础HTML结构
+      let html = `
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -544,8 +567,25 @@ class ResumeRenderController {
     </div>
 </body>
 </html>`;
+      
+      return html;
+    }
+  }
+
+  /**
+   * 根据模板名称获取对应的HTML文件名
+   */
+  static getTemplateFileName(templateName) {
+    const nameMap = {
+      '经典商务': 'simple-blue.html',
+      '现代创意': 'creative-green.html',
+      '技术极简': 'business-dark.html',
+      '学术研究': 'simple-blue.html',
+      '销售营销': 'creative-green.html',
+      '专业侧边栏': 'professional-sidebar.html'
+    };
     
-    return html;
+    return nameMap[templateName] || 'simple-blue.html';
   }
 
   /**
@@ -869,7 +909,7 @@ class ResumeRenderController {
       });
       
       // 渲染HTML
-      const renderedHTML = ResumeRenderController.generateHtmlFromConfig(
+      const renderedHTML = await ResumeRenderController.generateHtmlFromConfig(
         formattedData, 
         template
       );
@@ -955,7 +995,6 @@ class ResumeRenderController {
       const filePath = path.join(__dirname, '..', 'uploads', 'pdfs', filename);
       
       // 检查文件是否存在
-      const fs = require('fs').promises;
       try {
         await fs.access(filePath);
       } catch (error) {
