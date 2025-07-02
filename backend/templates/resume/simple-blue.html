@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{name}} - 简历</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+        }
+        
+        .resume-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            background: #fff;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .name {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 10px;
+        }
+        
+        .title {
+            font-size: 18px;
+            color: #64748b;
+            margin-bottom: 20px;
+        }
+        
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .section {
+            margin-bottom: 35px;
+        }
+        
+        .section-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e40af;
+            border-left: 4px solid #2563eb;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .summary {
+            font-size: 15px;
+            line-height: 1.8;
+            color: #4b5563;
+            text-align: justify;
+        }
+        
+        .experience-item {
+            margin-bottom: 25px;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .experience-item:before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            top: 5px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2563eb;
+        }
+        
+        .experience-header {
+            margin-bottom: 10px;
+        }
+        
+        .job-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .company {
+            font-size: 15px;
+            color: #2563eb;
+            font-weight: 500;
+        }
+        
+        .period {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        
+        .description {
+            font-size: 14px;
+            line-height: 1.7;
+            color: #4b5563;
+            margin-top: 10px;
+        }
+        
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .skill-category {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .skill-category-title {
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .skill-list {
+            font-size: 13px;
+            color: #4b5563;
+            line-height: 1.5;
+        }
+        
+        .education-item {
+            margin-bottom: 20px;
+        }
+        
+        .degree {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        
+        .school {
+            font-size: 15px;
+            color: #2563eb;
+            margin-top: 5px;
+        }
+        
+        .graduation {
+            font-size: 13px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+        
+        .projects-grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .project-item {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .project-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-bottom: 8px;
+        }
+        
+        .project-tech {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+        
+        .project-description {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #4b5563;
+        }
+        
+        @media print {
+            .resume-container {
+                padding: 20px;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="resume-container">
+        <!-- 个人信息头部 -->
+        <div class="header">
+            <h1 class="name">{{name}}</h1>
+            <div class="title">{{title}}</div>
+            <div class="contact-info">
+                {{#phone}}
+                <div class="contact-item">
+                    <span>📱</span>
+                    <span>{{phone}}</span>
+                </div>
+                {{/phone}}
+                {{#email}}
+                <div class="contact-item">
+                    <span>📧</span>
+                    <span>{{email}}</span>
+                </div>
+                {{/email}}
+                {{#location}}
+                <div class="contact-item">
+                    <span>📍</span>
+                    <span>{{location}}</span>
+                </div>
+                {{/location}}
+            </div>
+        </div>
+
+        <!-- 个人简介 -->
+        {{#summary}}
+        <div class="section">
+            <h2 class="section-title">个人简介</h2>
+            <div class="summary">{{summary}}</div>
+        </div>
+        {{/summary}}
+
+        <!-- 工作经历 -->
+        {{#experience}}
+        <div class="section">
+            <h2 class="section-title">工作经历</h2>
+            {{#items}}
+            <div class="experience-item">
+                <div class="experience-header">
+                    <div class="job-title">{{position}}</div>
+                    <div class="company">{{company}}</div>
+                    <div class="period">{{startDate}} - {{endDate}}</div>
+                </div>
+                <div class="description">{{description}}</div>
+            </div>
+            {{/items}}
+        </div>
+        {{/experience}}
+
+        <!-- 专业技能 -->
+        {{#skills}}
+        <div class="section">
+            <h2 class="section-title">专业技能</h2>
+            <div class="skills-grid">
+                {{#categories}}
+                <div class="skill-category">
+                    <div class="skill-category-title">{{name}}</div>
+                    <div class="skill-list">{{skills}}</div>
+                </div>
+                {{/categories}}
+            </div>
+        </div>
+        {{/skills}}
+
+        <!-- 项目经历 -->
+        {{#projects}}
+        <div class="section">
+            <h2 class="section-title">项目经历</h2>
+            <div class="projects-grid">
+                {{#items}}
+                <div class="project-item">
+                    <div class="project-name">{{name}}</div>
+                    <div class="project-tech">技术栈：{{technologies}}</div>
+                    <div class="project-description">{{description}}</div>
+                </div>
+                {{/items}}
+            </div>
+        </div>
+        {{/projects}}
+
+        <!-- 教育背景 -->
+        {{#education}}
+        <div class="section">
+            <h2 class="section-title">教育背景</h2>
+            {{#items}}
+            <div class="education-item">
+                <div class="degree">{{degree}} - {{major}}</div>
+                <div class="school">{{school}}</div>
+                <div class="graduation">{{graduationDate}}</div>
+            </div>
+            {{/items}}
+        </div>
+        {{/education}}
+    </div>
+</body>
+</html> 

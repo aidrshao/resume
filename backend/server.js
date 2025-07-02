@@ -11,6 +11,7 @@ const resumeRoutes = require('./routes/resumeRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const membershipRoutes = require('./routes/membershipRoutes');
+const resumeRenderRoutes = require('./routes/resumeRenderRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -62,6 +63,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// 静态文件服务
+app.use(express.static(__dirname));
+
 // 健康检查端点（必须在所有路由之前，避免被认证中间件拦截）
 app.get('/health', (req, res) => {
   console.log('💓 [HEALTH] 健康检查请求');
@@ -82,10 +86,54 @@ app.get('/health', (req, res) => {
   res.json(healthResponse);
 });
 
+// Token生成端点（调试用）
+app.post('/generate-token', (req, res) => {
+  const jwt = require('jsonwebtoken');
+  
+  console.log('🔐 [TOKEN_GEN] Token生成请求');
+  console.log('🔐 [TOKEN_GEN] 请求ID:', req.requestId);
+  console.log('🔐 [TOKEN_GEN] 请求数据:', req.body);
+  
+  try {
+    const { userId = 2, email = 'user@example.com' } = req.body;
+    
+    const token = jwt.sign(
+      { userId, email },
+      process.env.JWT_SECRET || 'resume_app_jwt_secret_2024_very_secure_key_change_in_production',
+      { expiresIn: '7d' }
+    );
+    
+    console.log('🔐 [TOKEN_GEN] Token生成成功');
+    console.log('🔐 [TOKEN_GEN] 用户ID:', userId);
+    console.log('🔐 [TOKEN_GEN] 邮箱:', email);
+    console.log('🔐 [TOKEN_GEN] Token长度:', token.length);
+    
+    res.json({
+      success: true,
+      token: token,
+      message: 'Token生成成功',
+      expires_in: '7天',
+      user: { userId, email },
+      request_id: req.requestId,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('🔐 [TOKEN_GEN] Token生成失败:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Token生成失败',
+      error: error.message,
+      request_id: req.requestId,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 路由配置
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/memberships', membershipRoutes);  // 会员路由
+app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
 app.use('/api/jobs', jobRoutes);
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
 

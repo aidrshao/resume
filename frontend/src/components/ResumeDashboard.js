@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as api from '../utils/api';
+import ResumeTemplateSelector from './ResumeTemplateSelector';
 
 const ResumeDashboard = () => {
   const navigate = useNavigate();
@@ -16,6 +17,8 @@ const ResumeDashboard = () => {
   const [showJobSelectModal, setShowJobSelectModal] = useState(false);
   const [baseResume, setBaseResume] = useState(null);
   const [generatingJobSpecific, setGeneratingJobSpecific] = useState({});
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
+  const [selectedResumeForTemplate, setSelectedResumeForTemplate] = useState(null);
 
   /**
    * 加载用户的简历列表
@@ -194,6 +197,40 @@ const ResumeDashboard = () => {
     resume.target_company || resume.target_position
   );
 
+  /**
+   * 打开模板选择器
+   */
+  const handleOpenTemplateSelector = (resume) => {
+    setSelectedResumeForTemplate(resume);
+    setShowTemplateSelector(true);
+  };
+
+  /**
+   * 关闭模板选择器
+   */
+  const handleCloseTemplateSelector = () => {
+    setShowTemplateSelector(false);
+    setSelectedResumeForTemplate(null);
+  };
+
+  /**
+   * 模板选择完成回调
+   */
+  const handleTemplateSelected = (template, format, data) => {
+    console.log('模板选择完成:', { template, format, data });
+    
+    // 显示成功消息
+    alert(`${format === 'pdf' ? 'PDF生成' : '模板应用'}成功！`);
+    
+    // 关闭选择器
+    handleCloseTemplateSelector();
+    
+    // 如果需要，可以刷新简历列表
+    if (format === 'html') {
+      loadResumes();
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -323,6 +360,12 @@ const ResumeDashboard = () => {
                     >
                       编辑
                     </Link>
+                    <button
+                      onClick={() => handleOpenTemplateSelector(baseResume)}
+                      className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                    >
+                      选择模板
+                    </button>
                   </div>
                   <button
                     onClick={() => deleteResume(baseResume.id)}
@@ -416,6 +459,12 @@ const ResumeDashboard = () => {
                         >
                           编辑
                         </Link>
+                        <button
+                          onClick={() => handleOpenTemplateSelector(resume)}
+                          className="text-purple-600 hover:text-purple-900 text-sm font-medium"
+                        >
+                          选择模板
+                        </button>
                       </div>
                       <button
                         onClick={() => deleteResume(resume.id)}
@@ -501,6 +550,15 @@ const ResumeDashboard = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 模板选择器 */}
+      {showTemplateSelector && selectedResumeForTemplate && (
+        <ResumeTemplateSelector
+          resumeId={selectedResumeForTemplate.id}
+          onTemplateSelect={handleTemplateSelected}
+          onClose={handleCloseTemplateSelector}
+        />
       )}
     </div>
   );

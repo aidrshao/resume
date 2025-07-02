@@ -23,6 +23,8 @@ import AdminMembershipTiers from './components/AdminMembershipTiers';
 import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
 import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
+// 测试页面
+import TemplateTestPage from './components/TemplateTestPage';
 
 /**
  * 主应用组件
@@ -43,6 +45,9 @@ function App() {
           
           {/* 独立的注册页面（保留，用于直接访问） */}
           <Route path="/register" element={<RegisterPage />} />
+          
+          {/* 模板测试页面 - 用于开发测试 */}
+          <Route path="/template-test" element={<TemplateTestPage />} />
           
           {/* 管理员路由 */}
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 快速Token设置</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .title {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            color: #1e293b;
+        }
+        
+        .subtitle {
+            color: #64748b;
+            margin-bottom: 30px;
+        }
+        
+        .status {
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        
+        .status.error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .status.info {
+            background: #dbeafe;
+            color: #1d4ed8;
+            border: 1px solid #bfdbfe;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 10px;
+            min-width: 180px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn.secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
+        
+        .token-display {
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 0.9rem;
+            word-break: break-all;
+            color: #475569;
+        }
+        
+        .steps {
+            text-align: left;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .steps h3 {
+            margin-top: 0;
+            color: #1e293b;
+        }
+        
+        .steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .steps li {
+            margin: 8px 0;
+            color: #475569;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">🔐 快速Token设置</h1>
+        <p class="subtitle">一键生成并设置认证Token，解决前端访问问题</p>
+        
+        <div id="status" class="status info">
+            点击下方按钮开始设置Token
+        </div>
+        
+        <div>
+            <button id="autoSetupBtn" class="btn" onclick="autoSetupToken()">
+                <span id="btnText">🚀 一键自动设置</span>
+            </button>
+        </div>
+        
+        <div id="tokenDisplay" class="token-display" style="display: none;">
+            <strong>生成的Token:</strong><br>
+            <span id="tokenValue"></span>
+        </div>
+        
+        <div class="steps">
+            <h3>📋 使用说明：</h3>
+            <ol>
+                <li>点击"一键自动设置"按钮</li>
+                <li>系统会自动生成有效的Token</li>
+                <li>Token会自动保存到浏览器localStorage</li>
+                <li>设置完成后可以正常使用前端功能</li>
+            </ol>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <button class="btn secondary" onclick="window.open('http://localhost:3016', '_blank')">
+                🌐 打开前端应用
+            </button>
+            <button class="btn secondary" onclick="window.open('/debug-frontend-complete.html', '_blank')">
+                🔧 打开调试工具
+            </button>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 0.9rem; color: #64748b;">
+            <p>💡 提示：Token有效期为7天，过期后需要重新设置</p>
+        </div>
+    </div>
+
+    <script>
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${type}`;
+            statusEl.innerHTML = message;
+        }
+        
+        function updateButton(text, disabled = false) {
+            const btnEl = document.getElementById('autoSetupBtn');
+            const textEl = document.getElementById('btnText');
+            textEl.innerHTML = text;
+            btnEl.disabled = disabled;
+        }
+        
+        async function autoSetupToken() {
+            try {
+                updateButton('<span class="loading"></span>正在生成Token...', true);
+                updateStatus('🔄 正在生成新的认证Token...', 'info');
+                
+                // 生成新Token
+                const response = await fetch('/generate-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: 2,
+                        email: 'user@example.com'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message || 'Token生成失败');
+                }
+                
+                // 保存到localStorage
+                localStorage.setItem('token', data.token);
+                
+                // 显示Token
+                document.getElementById('tokenValue').textContent = data.token;
+                document.getElementById('tokenDisplay').style.display = 'block';
+                
+                // 验证Token是否正确设置
+                const savedToken = localStorage.getItem('token');
+                if (savedToken === data.token) {
+                    updateStatus('✅ Token设置成功！现在可以正常使用前端功能了', 'success');
+                    updateButton('✅ 设置完成', false);
+                    
+                    // 3秒后恢复按钮状态
+                    setTimeout(() => {
+                        updateButton('🔄 重新设置Token', false);
+                    }, 3000);
+                } else {
+                    throw new Error('Token保存验证失败');
+                }
+                
+            } catch (error) {
+                console.error('Token设置失败:', error);
+                updateStatus(`❌ Token设置失败: ${error.message}`, 'error');
+                updateButton('❌ 设置失败，点击重试', false);
+            }
+        }
+        
+        // 页面加载时检查当前Token状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentToken = localStorage.getItem('token');
+            if (currentToken) {
+                try {
+                    const payload = JSON.parse(atob(currentToken.split('.')[1]));
+                    const exp = new Date(payload.exp * 1000);
+                    const now = new Date();
+                    
+                    if (exp > now) {
+                        updateStatus('✅ 检测到有效Token，当前已可正常使用', 'success');
+                        updateButton('🔄 重新生成Token', false);
+                        document.getElementById('tokenValue').textContent = currentToken;
+                        document.getElementById('tokenDisplay').style.display = 'block';
+                    } else {
+                        updateStatus('⚠️ 检测到过期Token，需要重新设置', 'error');
+                    }
+                } catch (error) {
+                    updateStatus('⚠️ 检测到无效Token，需要重新设置', 'error');
+                }
+            }
+        });
+        
+        // 添加键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                autoSetupToken();
+            }
+        });
+    </script>
+</body>
+</html>

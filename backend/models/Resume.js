@@ -57,6 +57,38 @@ class Resume {
   }
 
   /**
+   * 根据ID和用户ID获取简历（验证用户权限）
+   * @param {number} id - 简历ID
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object|null>} 简历对象
+   */
+  static async findByIdAndUser(id, userId) {
+    const resume = await knex('resumes')
+      .leftJoin('resume_templates', 'resumes.template_id', 'resume_templates.id')
+      .select(
+        'resumes.*',
+        'resume_templates.name as template_name',
+        'resume_templates.template_config'
+      )
+      .where('resumes.id', id)
+      .where('resumes.user_id', userId)
+      .first();
+    
+    if (resume && resume.resume_data) {
+      // 如果resume_data是字符串，解析为JSON
+      if (typeof resume.resume_data === 'string') {
+        try {
+          resume.resume_data = JSON.parse(resume.resume_data);
+        } catch (e) {
+          console.warn('解析简历数据失败:', e);
+        }
+      }
+    }
+    
+    return resume;
+  }
+
+  /**
    * 获取用户的所有简历
    * @param {number} userId - 用户ID
    * @returns {Promise<Array>} 简历列表

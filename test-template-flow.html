@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简历模板功能测试</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-8">
+        <h1 class="text-3xl font-bold text-center mb-8">简历模板功能测试</h1>
+        
+        <!-- 功能测试区域 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- 获取模板列表 -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">📋 获取模板列表</h2>
+                <button id="getTemplates" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    获取模板
+                </button>
+                <div id="templatesResult" class="mt-4 text-sm"></div>
+            </div>
+
+            <!-- 预览简历 -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">🔍 预览简历</h2>
+                <div class="space-y-2">
+                    <input id="resumeId" placeholder="简历ID" class="w-full border rounded px-3 py-2">
+                    <input id="templateId" placeholder="模板ID" class="w-full border rounded px-3 py-2">
+                    <button id="previewResume" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                        预览简历
+                    </button>
+                </div>
+                <div id="previewResult" class="mt-4 text-sm max-h-32 overflow-auto"></div>
+            </div>
+
+            <!-- 生成PDF -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">📄 生成PDF</h2>
+                <div class="space-y-2">
+                    <input id="pdfResumeId" placeholder="简历ID" class="w-full border rounded px-3 py-2">
+                    <input id="pdfTemplateId" placeholder="模板ID" class="w-full border rounded px-3 py-2">
+                    <button id="generatePDF" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                        生成PDF
+                    </button>
+                </div>
+                <div id="pdfResult" class="mt-4 text-sm"></div>
+            </div>
+
+            <!-- 检查浏览器 -->
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">🌐 检查PDF服务</h2>
+                <button id="checkBrowser" class="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600">
+                    检查浏览器
+                </button>
+                <div id="browserResult" class="mt-4 text-sm"></div>
+            </div>
+        </div>
+
+        <!-- 日志显示区域 -->
+        <div class="mt-8 bg-gray-800 text-green-400 p-4 rounded-lg">
+            <h3 class="text-lg font-semibold mb-2">🖥️ 操作日志</h3>
+            <div id="logs" class="text-sm font-mono max-h-64 overflow-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        // 配置
+        const API_BASE = 'http://localhost:8000';
+        const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjksImVtYWlsIjoiYWRtaW5AZXhhbXBsZS5jb20iLCJpc0FkbWluIjp0cnVlLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3NTEzODMxNjAsImV4cCI6MTc1MTk4Nzk2MH0.FueXJ9nVhpJLQxZVulL7sXlLUX0xctxfawMB6SsbRs';
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const logs = document.getElementById('logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-400' : type === 'success' ? 'text-green-400' : 'text-blue-400';
+            logs.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // API请求函数
+        async function apiRequest(url, options = {}) {
+            try {
+                log(`发送请求: ${options.method || 'GET'} ${url}`);
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${TOKEN}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                log(`响应状态: ${response.status}`, response.ok ? 'success' : 'error');
+                
+                return { response, data };
+            } catch (error) {
+                log(`请求失败: ${error.message}`, 'error');
+                return { error };
+            }
+        }
+
+        // 获取模板列表
+        document.getElementById('getTemplates').addEventListener('click', async () => {
+            const { data, error } = await apiRequest(`${API_BASE}/api/resume-render/templates`);
+            
+            if (error) {
+                document.getElementById('templatesResult').innerHTML = `<div class="text-red-600">错误: ${error}</div>`;
+                return;
+            }
+
+            if (data.success) {
+                const templates = data.data;
+                log(`获取到 ${templates.length} 个模板`, 'success');
+                
+                let html = `<div class="text-green-600">成功获取 ${templates.length} 个模板:</div>`;
+                templates.forEach(template => {
+                    html += `<div class="mt-1 p-2 bg-gray-50 rounded text-xs">
+                        <div><strong>ID:</strong> ${template.id}</div>
+                        <div><strong>名称:</strong> ${template.name}</div>
+                        <div><strong>布局:</strong> ${template.template_config?.layout || '未知'}</div>
+                    </div>`;
+                });
+                
+                document.getElementById('templatesResult').innerHTML = html;
+            } else {
+                document.getElementById('templatesResult').innerHTML = `<div class="text-red-600">失败: ${data.message}</div>`;
+            }
+        });
+
+        // 预览简历
+        document.getElementById('previewResume').addEventListener('click', async () => {
+            const resumeId = document.getElementById('resumeId').value;
+            const templateId = document.getElementById('templateId').value;
+            
+            if (!resumeId || !templateId) {
+                alert('请填写简历ID和模板ID');
+                return;
+            }
+
+            const { data, error } = await apiRequest(`${API_BASE}/api/resume-render/preview`, {
+                method: 'POST',
+                body: JSON.stringify({ resumeId: parseInt(resumeId), templateId: parseInt(templateId) })
+            });
+            
+            if (error) {
+                document.getElementById('previewResult').innerHTML = `<div class="text-red-600">错误: ${error}</div>`;
+                return;
+            }
+
+            if (data.success) {
+                log('简历预览生成成功', 'success');
+                document.getElementById('previewResult').innerHTML = `
+                    <div class="text-green-600">预览生成成功!</div>
+                    <div class="mt-2 text-xs">模板: ${data.data.template.name}</div>
+                    <div class="text-xs">简历: ${data.data.resume.title}</div>
+                `;
+            } else {
+                document.getElementById('previewResult').innerHTML = `<div class="text-red-600">失败: ${data.message}</div>`;
+            }
+        });
+
+        // 生成PDF
+        document.getElementById('generatePDF').addEventListener('click', async () => {
+            const resumeId = document.getElementById('pdfResumeId').value;
+            const templateId = document.getElementById('pdfTemplateId').value;
+            
+            if (!resumeId || !templateId) {
+                alert('请填写简历ID和模板ID');
+                return;
+            }
+
+            log('开始生成PDF...');
+            
+            const { data, error } = await apiRequest(`${API_BASE}/api/resume-render/pdf`, {
+                method: 'POST',
+                body: JSON.stringify({ 
+                    resumeId: parseInt(resumeId), 
+                    templateId: parseInt(templateId),
+                    options: {
+                        format: 'A4',
+                        margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' }
+                    }
+                })
+            });
+            
+            if (error) {
+                document.getElementById('pdfResult').innerHTML = `<div class="text-red-600">错误: ${error}</div>`;
+                return;
+            }
+
+            if (data.success) {
+                log('PDF生成成功!', 'success');
+                document.getElementById('pdfResult').innerHTML = `
+                    <div class="text-green-600">PDF生成成功!</div>
+                    <div class="mt-2 text-xs">文件名: ${data.data.filename}</div>
+                    <div class="text-xs">大小: ${(data.data.fileSize / 1024).toFixed(1)} KB</div>
+                    <a href="${API_BASE}${data.data.downloadUrl}" target="_blank" class="inline-block mt-2 px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">
+                        下载PDF
+                    </a>
+                `;
+            } else {
+                document.getElementById('pdfResult').innerHTML = `<div class="text-red-600">失败: ${data.message}</div>`;
+            }
+        });
+
+        // 检查浏览器
+        document.getElementById('checkBrowser').addEventListener('click', async () => {
+            log('检查PDF服务状态...');
+            
+            const { data, error } = await apiRequest(`${API_BASE}/health`);
+            
+            if (error) {
+                document.getElementById('browserResult').innerHTML = `<div class="text-red-600">连接失败</div>`;
+                return;
+            }
+
+            document.getElementById('browserResult').innerHTML = `
+                <div class="text-green-600">服务器运行正常</div>
+                <div class="mt-2 text-xs">端口: ${data.server_port}</div>
+                <div class="text-xs">环境: ${data.node_env}</div>
+            `;
+            
+            log('服务器状态检查完成', 'success');
+        });
+
+        // 页面加载时自动获取模板
+        window.addEventListener('load', () => {
+            log('页面加载完成，准备测试功能');
+            document.getElementById('getTemplates').click();
+        });
+    </script>
+</body>
+</html> 

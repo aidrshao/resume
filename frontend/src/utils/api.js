@@ -23,12 +23,23 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    console.log('🔐 [API请求拦截器] 开始处理请求');
+    console.log('🔐 [API请求拦截器] 请求URL:', config.url);
+    console.log('🔐 [API请求拦截器] 请求方法:', config.method);
+    console.log('🔐 [API请求拦截器] localStorage中的token:', token ? `${token.substring(0, 20)}...` : '无token');
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('✅ [API请求拦截器] 已添加Authorization头');
+    } else {
+      console.log('❌ [API请求拦截器] 没有token，未添加Authorization头');
     }
+    
+    console.log('🔐 [API请求拦截器] 最终请求头:', JSON.stringify(config.headers, null, 2));
     return config;
   },
   (error) => {
+    console.error('❌ [API请求拦截器] 请求拦截器错误:', error);
     return Promise.reject(error);
   }
 );
@@ -36,10 +47,19 @@ api.interceptors.request.use(
 // 响应拦截器 - 统一错误处理
 api.interceptors.response.use(
   (response) => {
+    console.log('✅ [API响应拦截器] 请求成功');
+    console.log('✅ [API响应拦截器] 状态码:', response.status);
+    console.log('✅ [API响应拦截器] 响应数据:', response.data);
     return response.data;
   },
   (error) => {
+    console.error('❌ [API响应拦截器] 请求失败');
+    console.error('❌ [API响应拦截器] 错误状态码:', error.response?.status);
+    console.error('❌ [API响应拦截器] 错误响应数据:', error.response?.data);
+    console.error('❌ [API响应拦截器] 完整错误对象:', error);
+    
     if (error.response?.status === 401) {
+      console.warn('⚠️ [API响应拦截器] 检测到401错误，清除token并跳转登录');
       // token过期或无效，清除本地存储并跳转登录
       localStorage.removeItem('token');
       localStorage.removeItem('user');
@@ -47,6 +67,7 @@ api.interceptors.response.use(
     }
     
     const errorMessage = error.response?.data?.message || '网络请求失败';
+    console.error('❌ [API响应拦截器] 最终错误消息:', errorMessage);
     return Promise.reject(new Error(errorMessage));
   }
 );
@@ -302,4 +323,51 @@ export const generateJobSpecificResume = (data) => {
   return api.post('/resumes/generate-for-job', data);
 };
 
-export default api; 
+// ===== 简历模板渲染相关API =====
+
+/**
+ * 获取所有简历模板
+ * @returns {Promise} API响应
+ */
+export const getResumeTemplates = () => {
+  console.log('🎨 [模板API] 开始获取简历模板列表');
+  return api.get('/resume-render/templates');
+};
+
+/**
+ * 生成简历预览HTML
+ * @param {Object} data - 预览参数
+ * @param {number} data.resumeId - 简历ID
+ * @param {number} data.templateId - 模板ID
+ * @returns {Promise} API响应
+ */
+export const generateResumePreview = (data) => {
+  console.log('🎨 [模板API] 开始生成简历预览', data);
+  return api.post('/resume-render/preview', data);
+};
+
+/**
+ * 生成简历PDF
+ * @param {Object} data - PDF生成参数
+ * @param {number} data.resumeId - 简历ID
+ * @param {number} data.templateId - 模板ID
+ * @returns {Promise} API响应
+ */
+export const generateResumePDF = (data) => {
+  console.log('🎨 [模板API] 开始生成简历PDF', data);
+  return api.post('/resume-render/pdf', data);
+};
+
+/**
+ * 下载简历PDF
+ * @param {string} filename - PDF文件名
+ * @returns {Promise} API响应
+ */
+export const downloadResumePDF = (filename) => {
+  console.log('🎨 [模板API] 开始下载简历PDF', filename);
+  return api.get(`/resume-render/download/${filename}`, {
+    responseType: 'blob'
+  });
+};
+
+export default api;

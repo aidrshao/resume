@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 完整前端调试工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .section {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .section h2 {
+            color: #1e293b;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
+        .status.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .status.error {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+        
+        .status.warning {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+            min-width: 120px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 70, 229, 0.3);
+        }
+        
+        .btn:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn.secondary {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+        }
+        
+        .btn.success {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        }
+        
+        .btn.danger {
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .input-group input, .input-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .input-group input:focus, .input-group textarea:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        
+        .log-container {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+        
+        .log-entry.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: #93c5fd;
+        }
+        
+        .log-entry.success {
+            background: rgba(34, 197, 94, 0.1);
+            color: #86efac;
+        }
+        
+        .log-entry.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #fca5a5;
+        }
+        
+        .log-entry.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fcd34d;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .card {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            border-color: #4f46e5;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .progress {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔧 完整前端调试工具</h1>
+            <p>Token管理 | API测试 | 模板预览 | 实时日志</p>
+        </div>
+        
+        <div class="content">
+            <!-- Token管理区域 -->
+            <div class="section">
+                <h2>🔐 Token管理 <span id="tokenStatus" class="status warning">未设置</span></h2>
+                
+                <div class="input-group">
+                    <label for="currentToken">当前Token：</label>
+                    <input type="text" id="currentToken" placeholder="将显示当前localStorage中的token..." readonly>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <button class="btn success" onclick="generateNewToken()">🔄 生成新Token</button>
+                    <button class="btn" onclick="setTokenToStorage()">💾 设置到浏览器</button>
+                    <button class="btn secondary" onclick="checkTokenStatus()">🔍 检查Token状态</button>
+                    <button class="btn danger" onclick="clearToken()">🗑️ 清除Token</button>
+                </div>
+                
+                <div id="tokenInfo" style="display: none;">
+                    <h4>Token信息：</h4>
+                    <div id="tokenDetails"></div>
+                </div>
+            </div>
+            
+            <!-- API测试区域 -->
+            <div class="section">
+                <h2>🧪 API测试中心 <span id="apiStatus" class="status warning">未测试</span></h2>
+                
+                <div class="grid">
+                    <div class="card">
+                        <h4>📄 模板API</h4>
+                        <button class="btn" onclick="testTemplatesAPI()">测试模板列表</button>
+                        <button class="btn" onclick="testPreviewAPI()">测试预览生成</button>
+                        <div id="templatesResult" class="log-container" style="max-height: 200px; display: none;"></div>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>📋 简历API</h4>
+                        <button class="btn" onclick="testResumesAPI()">测试简历列表</button>
+                        <button class="btn" onclick="testResumeDetail()">测试简历详情</button>
+                        <div id="resumesResult" class="log-container" style="max-height: 200px; display: none;"></div>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>💼 岗位API</h4>
+                        <button class="btn" onclick="testJobsAPI()">测试岗位列表</button>
+                        <button class="btn" onclick="testJobCreate()">测试创建岗位</button>
+                        <div id="jobsResult" class="log-container" style="max-height: 200px; display: none;"></div>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>📊 PDF API</h4>
+                        <button class="btn" onclick="testPDFGeneration()">测试PDF生成</button>
+                        <button class="btn" onclick="testPDFDownload()">测试PDF下载</button>
+                        <div id="pdfResult" class="log-container" style="max-height: 200px; display: none;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 快速操作区域 -->
+            <div class="section">
+                <h2>⚡ 快速操作</h2>
+                
+                <div style="margin-bottom: 20px;">
+                    <button class="btn success" onclick="setupCompleteEnvironment()">🚀 一键设置完整环境</button>
+                    <button class="btn" onclick="openFrontendApp()">🌐 打开前端应用</button>
+                    <button class="btn secondary" onclick="runFullTest()">🔬 运行完整测试</button>
+                </div>
+                
+                <div class="progress" id="setupProgress" style="display: none;">
+                    <div class="progress-bar" id="setupProgressBar"></div>
+                </div>
+                <div id="setupStatus" style="margin-top: 10px;"></div>
+            </div>
+            
+            <!-- 实时日志区域 -->
+            <div class="section">
+                <h2>📋 实时日志 <button class="btn secondary" onclick="clearLogs()" style="float: right; margin-top: -5px;">清除日志</button></h2>
+                <div id="logContainer" class="log-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const API_BASE_URL = 'http://localhost:8000/api';
+        const FRONTEND_URL = 'http://localhost:3016';
+        let currentToken = null;
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🚀 调试工具已加载', 'info');
+            checkTokenStatus();
+            updateTokenDisplay();
+        });
+        
+        // 日志函数
+        function log(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+            logEntry.innerHTML = `[${timestamp}] ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        // 清除日志
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+            log('📝 日志已清除', 'info');
+        }
+        
+        // 生成新Token
+        async function generateNewToken() {
+            try {
+                log('🔄 正在生成新Token...', 'info');
+                
+                const response = await fetch('/generate-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: 2,
+                        email: 'user@example.com'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    currentToken = data.token;
+                    document.getElementById('currentToken').value = currentToken;
+                    log('✅ 新Token生成成功', 'success');
+                    updateTokenStatus('success', '已生成');
+                } else {
+                    throw new Error('Token生成失败');
+                }
+            } catch (error) {
+                log(`❌ Token生成失败: ${error.message}`, 'error');
+                updateTokenStatus('error', '生成失败');
+            }
+        }
+        
+        // 设置Token到localStorage
+        function setTokenToStorage() {
+            const token = document.getElementById('currentToken').value || currentToken;
+            if (!token) {
+                log('❌ 没有可用的Token', 'error');
+                return;
+            }
+            
+            localStorage.setItem('token', token);
+            log('✅ Token已设置到localStorage', 'success');
+            updateTokenStatus('success', '已设置');
+            checkTokenStatus();
+        }
+        
+        // 检查Token状态
+        function checkTokenStatus() {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const exp = new Date(payload.exp * 1000);
+                    const now = new Date();
+                    
+                    if (exp > now) {
+                        updateTokenStatus('success', '有效');
+                        showTokenInfo(payload, exp);
+                        log('✅ Token有效', 'success');
+                    } else {
+                        updateTokenStatus('error', '已过期');
+                        log('❌ Token已过期', 'error');
+                    }
+                } catch (error) {
+                    updateTokenStatus('error', '无效');
+                    log('❌ Token格式无效', 'error');
+                }
+            } else {
+                updateTokenStatus('warning', '未设置');
+                log('⚠️ 未找到Token', 'warning');
+            }
+            updateTokenDisplay();
+        }
+        
+        // 更新Token显示
+        function updateTokenDisplay() {
+            const token = localStorage.getItem('token');
+            const tokenInput = document.getElementById('currentToken');
+            if (token) {
+                tokenInput.value = `${token.substring(0, 50)}...`;
+            } else {
+                tokenInput.value = '';
+                tokenInput.placeholder = '未设置Token';
+            }
+        }
+        
+        // 显示Token信息
+        function showTokenInfo(payload, exp) {
+            const tokenInfo = document.getElementById('tokenInfo');
+            const tokenDetails = document.getElementById('tokenDetails');
+            
+            tokenDetails.innerHTML = `
+                <p><strong>用户ID:</strong> ${payload.userId}</p>
+                <p><strong>邮箱:</strong> ${payload.email}</p>
+                <p><strong>过期时间:</strong> ${exp.toLocaleString()}</p>
+                <p><strong>剩余时间:</strong> ${Math.round((exp - new Date()) / (1000 * 60 * 60))} 小时</p>
+            `;
+            tokenInfo.style.display = 'block';
+        }
+        
+        // 更新Token状态
+        function updateTokenStatus(type, text) {
+            const status = document.getElementById('tokenStatus');
+            status.className = `status ${type}`;
+            status.textContent = text;
+        }
+        
+        // 清除Token
+        function clearToken() {
+            localStorage.removeItem('token');
+            document.getElementById('currentToken').value = '';
+            document.getElementById('tokenInfo').style.display = 'none';
+            updateTokenStatus('warning', '未设置');
+            log('🗑️ Token已清除', 'info');
+        }
+        
+        // API请求辅助函数
+        async function makeAPIRequest(url, options = {}) {
+            const token = localStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            return fetch(url, {
+                ...options,
+                headers
+            });
+        }
+        
+        // 测试模板API
+        async function testTemplatesAPI() {
+            try {
+                log('🧪 测试模板API...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/resume-render/templates`);
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('templatesResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                if (data.success) {
+                    log(`✅ 模板API测试成功，获取到 ${data.data.length} 个模板`, 'success');
+                } else {
+                    log(`❌ 模板API测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 模板API测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 测试预览API
+        async function testPreviewAPI() {
+            try {
+                log('🧪 测试预览API...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/resume-render/preview`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        resumeId: 2,
+                        templateId: 1
+                    })
+                });
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('templatesResult');
+                resultDiv.style.display = 'block';
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `<div style="color: #86efac;">✅ 预览生成成功</div><div style="max-height: 150px; overflow-y: auto;">${data.data.html.substring(0, 500)}...</div>`;
+                    log('✅ 预览API测试成功', 'success');
+                } else {
+                    resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    log(`❌ 预览API测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 预览API测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 测试简历API
+        async function testResumesAPI() {
+            try {
+                log('🧪 测试简历API...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/resumes`);
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('resumesResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                if (data.success) {
+                    log(`✅ 简历API测试成功，获取到 ${data.data.length} 份简历`, 'success');
+                } else {
+                    log(`❌ 简历API测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 简历API测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 测试简历详情
+        async function testResumeDetail() {
+            try {
+                log('🧪 测试简历详情API...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/resumes/2`);
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('resumesResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                if (data.success) {
+                    log('✅ 简历详情API测试成功', 'success');
+                } else {
+                    log(`❌ 简历详情API测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 简历详情API测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 测试岗位API
+        async function testJobsAPI() {
+            try {
+                log('🧪 测试岗位API...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/jobs`);
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('jobsResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                if (data.success) {
+                    log(`✅ 岗位API测试成功，获取到 ${data.data.length} 个岗位`, 'success');
+                } else {
+                    log(`❌ 岗位API测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ 岗位API测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 测试PDF生成
+        async function testPDFGeneration() {
+            try {
+                log('🧪 测试PDF生成...', 'info');
+                const response = await makeAPIRequest(`${API_BASE_URL}/resume-render/pdf`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        resumeId: 2,
+                        templateId: 1
+                    })
+                });
+                const data = await response.json();
+                
+                const resultDiv = document.getElementById('pdfResult');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                
+                if (data.success) {
+                    log('✅ PDF生成测试成功', 'success');
+                } else {
+                    log(`❌ PDF生成测试失败: ${data.message}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ PDF生成测试异常: ${error.message}`, 'error');
+            }
+        }
+        
+        // 一键设置完整环境
+        async function setupCompleteEnvironment() {
+            const progressContainer = document.getElementById('setupProgress');
+            const progressBar = document.getElementById('setupProgressBar');
+            const statusDiv = document.getElementById('setupStatus');
+            
+            progressContainer.style.display = 'block';
+            
+            const steps = [
+                { name: '生成Token', func: generateNewToken },
+                { name: '设置Token', func: setTokenToStorage },
+                { name: '测试模板API', func: testTemplatesAPI },
+                { name: '测试简历API', func: testResumesAPI },
+                { name: '测试岗位API', func: testJobsAPI }
+            ];
+            
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                statusDiv.innerHTML = `<span class="loading"></span>正在执行: ${step.name}...`;
+                log(`⚡ 执行步骤: ${step.name}`, 'info');
+                
+                try {
+                    await step.func();
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒
+                } catch (error) {
+                    log(`❌ 步骤 ${step.name} 失败: ${error.message}`, 'error');
+                }
+                
+                const progress = ((i + 1) / steps.length) * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+            
+            statusDiv.innerHTML = '✅ 完整环境设置完成！';
+            log('🎉 完整环境设置完成', 'success');
+            
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+                statusDiv.innerHTML = '';
+            }, 3000);
+        }
+        
+        // 打开前端应用
+        function openFrontendApp() {
+            window.open(FRONTEND_URL, '_blank');
+            log('🌐 已打开前端应用', 'info');
+        }
+        
+        // 运行完整测试
+        async function runFullTest() {
+            log('🔬 开始运行完整测试...', 'info');
+            
+            const tests = [
+                testTemplatesAPI,
+                testPreviewAPI,
+                testResumesAPI,
+                testResumeDetail,
+                testJobsAPI,
+                testPDFGeneration
+            ];
+            
+            for (const test of tests) {
+                await test();
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            log('🎯 完整测试完成', 'success');
+        }
+        
+        // 添加Token生成端点
+        if (window.location.pathname.includes('debug-frontend-complete.html')) {
+            // 这个页面需要后端支持Token生成端点
+        }
+    </script>
+</body>
+</html> 
