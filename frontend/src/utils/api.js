@@ -434,7 +434,13 @@ export const deleteResume = (resumeId) => {
  */
 export const generateJobSpecificResume = (data) => {
   console.log('🌐 API: 生成岗位专属简历', data);
-  return api.post('/resumes/generate-for-job', data);
+  return api.post('/resumes/generate-for-job', data).then(response => {
+    console.log('✅ [GENERATE_RESUME] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [GENERATE_RESUME] API响应失败:', error);
+    throw error;
+  });
 };
 
 // ===== 简历模板渲染相关API =====

@@ -181,7 +181,31 @@ const JobsPage = () => {
       }
     } catch (err) {
       console.error('生成简历失败:', err);
-      setError('生成简历失败');
+      
+      // 检查是否是409冲突错误（已存在专属简历）
+      if (err.response && err.response.status === 409) {
+        const errorData = err.response.data;
+        const errorMessage = errorData?.message || '已存在针对该岗位的专属简历';
+        const existingResumeId = errorData?.data?.existingResumeId;
+        
+        // 如果有现有简历ID，提供更友好的错误处理
+        if (existingResumeId) {
+          const confirmMessage = `${errorMessage}\n\n您可以选择：\n1. 点击"确定"查看现有简历\n2. 点击"取消"返回岗位列表`;
+          
+          if (window.confirm(confirmMessage)) {
+            // 用户选择查看现有简历，跳转到简历管理页面
+            window.location.href = '/resumes';
+          }
+        } else {
+          setError(errorMessage);
+        }
+      } else if (err.response && err.response.data?.message) {
+        // 其他API错误，显示具体错误信息
+        setError(err.response.data.message);
+      } else {
+        // 网络错误或其他未知错误
+        setError('生成简历失败，请稍后重试');
+      }
     } finally {
       setIsGenerating(false);
     }
