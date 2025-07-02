@@ -391,6 +391,160 @@ function validateJobUpdate(data) {
   };
 }
 
+/**
+ * 模板数据验证规则
+ */
+const templateCreateSchema = Joi.object({
+  name: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      'string.empty': '模板名称不能为空',
+      'string.min': '模板名称不能为空',
+      'string.max': '模板名称最多100个字符',
+      'any.required': '模板名称为必填项'
+    }),
+  html_content: Joi.string()
+    .required()
+    .messages({
+      'any.required': 'HTML内容为必填项'
+    }),
+  css_content: Joi.string()
+    .required()
+    .messages({
+      'any.required': 'CSS内容为必填项'
+    }),
+  thumbnail_url: Joi.string()
+    .uri()
+    .allow('')
+    .max(500)
+    .messages({
+      'string.uri': '缩略图URL格式不正确',
+      'string.max': '缩略图URL最多500个字符'
+    }),
+  is_premium: Joi.boolean()
+    .default(false)
+    .messages({
+      'boolean.base': '付费标识必须为布尔值'
+    }),
+  status: Joi.string()
+    .valid('draft', 'published', 'archived')
+    .default('draft')
+    .messages({
+      'any.only': '状态值必须为 draft、published 或 archived'
+    }),
+  category: Joi.string()
+    .trim()
+    .max(50)
+    .default('general')
+    .messages({
+      'string.max': '分类最多50个字符'
+    }),
+  description: Joi.string()
+    .allow('')
+    .max(1000)
+    .messages({
+      'string.max': '描述最多1000个字符'
+    }),
+  sort_order: Joi.number()
+    .integer()
+    .min(0)
+    .default(0)
+    .messages({
+      'number.base': '排序值必须为数字',
+      'number.integer': '排序值必须为整数',
+      'number.min': '排序值不能小于0'
+    })
+});
+
+/**
+ * 模板更新数据验证规则（字段为可选）
+ */
+const templateUpdateSchema = Joi.object({
+  name: Joi.string()
+    .trim()
+    .min(1)
+    .max(100)
+    .messages({
+      'string.empty': '模板名称不能为空',
+      'string.min': '模板名称不能为空',
+      'string.max': '模板名称最多100个字符'
+    }),
+  html_content: Joi.string()
+    .messages({
+      'string.base': 'HTML内容必须为字符串'
+    }),
+  css_content: Joi.string()
+    .messages({
+      'string.base': 'CSS内容必须为字符串'
+    }),
+  thumbnail_url: Joi.string()
+    .uri()
+    .allow('')
+    .max(500)
+    .messages({
+      'string.uri': '缩略图URL格式不正确',
+      'string.max': '缩略图URL最多500个字符'
+    }),
+  is_premium: Joi.boolean()
+    .messages({
+      'boolean.base': '付费标识必须为布尔值'
+    }),
+  status: Joi.string()
+    .valid('draft', 'published', 'archived')
+    .messages({
+      'any.only': '状态值必须为 draft、published 或 archived'
+    }),
+  category: Joi.string()
+    .trim()
+    .max(50)
+    .messages({
+      'string.max': '分类最多50个字符'
+    }),
+  description: Joi.string()
+    .allow('')
+    .max(1000)
+    .messages({
+      'string.max': '描述最多1000个字符'
+    }),
+  sort_order: Joi.number()
+    .integer()
+    .min(0)
+    .messages({
+      'number.base': '排序值必须为数字',
+      'number.integer': '排序值必须为整数',
+      'number.min': '排序值不能小于0'
+    })
+});
+
+/**
+ * 验证模板数据
+ * @param {Object} data - 要验证的数据
+ * @param {boolean} isCreate - 是否为创建操作（true为创建，false为更新）
+ * @returns {Object} 验证结果
+ */
+function validateTemplateData(data, isCreate = true) {
+  const schema = isCreate ? templateCreateSchema : templateUpdateSchema;
+  const { error, value } = schema.validate(data, { abortEarly: false });
+  
+  if (error) {
+    return {
+      isValid: false,
+      errors: error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message
+      }))
+    };
+  }
+  
+  return {
+    isValid: true,
+    data: value
+  };
+}
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -401,5 +555,8 @@ module.exports = {
   jobCreateSchema,
   jobUpdateSchema,
   validateJobData,
-  validateJobUpdate
+  validateJobUpdate,
+  templateCreateSchema,
+  templateUpdateSchema,
+  validateTemplateData
 }; 

@@ -12,6 +12,7 @@ const jobRoutes = require('./routes/jobRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const membershipRoutes = require('./routes/membershipRoutes');
 const resumeRenderRoutes = require('./routes/resumeRenderRoutes');
+const templateRoutes = require('./routes/templateRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -146,6 +147,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/memberships', membershipRoutes);  // 会员路由
 app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
+app.use('/api/templates', templateRoutes);  // 模板管理路由
 app.use('/api/jobs', jobRoutes);
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
 
