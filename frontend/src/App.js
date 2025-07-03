@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import logger from './utils/logger';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -32,7 +33,11 @@ import TemplateTestPage from './components/TemplateTestPage';
  */
 function App() {
   // 添加调试日志
-  console.log('🚀 [APP] 应用启动，配置路由...');
+  logger.info('应用启动，配置路由', {
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    url: window.location.href
+  });
   
   return (
     <Router>

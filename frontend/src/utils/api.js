@@ -4,6 +4,7 @@
  */
 
 import axios from 'axios';
+import logger from './logger';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
@@ -22,29 +23,24 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   (config) => {
-    console.log('🔐 [API请求拦截器] 开始处理请求');
-    console.log('🔐 [API请求拦截器] 请求URL:', config.url);
-    console.log('🔐 [API请求拦截器] 请求方法:', config.method);
-    console.log('🔐 [API请求拦截器] localStorage中的token:', localStorage.getItem('token') ? localStorage.getItem('token').substring(0, 20) + '...' : '无');
-    
     // 记录请求开始时间
     config.metadata = { startTime: Date.now() };
     
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('✅ [API请求拦截器] 已添加Authorization头');
-    } else {
-      console.log('⚠️ [API请求拦截器] 没有找到token');
     }
     
-    console.log('🔐 [API请求拦截器] 最终请求头:', JSON.stringify(config.headers, null, 2));
-    console.log('🌐 [API请求拦截器] 发送请求到:', config.baseURL + config.url);
+    // 使用logger记录关键信息
+    logger.apiCall(config.method, config.url, 'REQUEST', 0, {
+      hasToken: !!token,
+      url: config.baseURL + config.url
+    });
     
     return config;
   },
   (error) => {
-    console.error('❌ [API请求拦截器] 请求配置错误:', error);
+    logger.error('API请求配置错误', error);
     return Promise.reject(error);
   }
 );
@@ -56,16 +52,19 @@ api.interceptors.response.use(
     const startTime = response.config.metadata?.startTime || endTime;
     const duration = endTime - startTime;
     
-    console.log('✅ [API响应拦截器] 请求成功');
-    console.log('✅ [API响应拦截器] 状态码:', response.status);
-    console.log('✅ [API响应拦截器] 响应数据:', response.data);
-    console.log('📊 [API响应拦截器] 网络请求耗时:', duration + 'ms');
-    console.log('📊 [API响应拦截器] 响应大小:', JSON.stringify(response.data).length + ' bytes');
+    // 使用logger记录响应信息
+    logger.apiCall(response.config.method, response.config.url, response.status, duration, {
+      success: true,
+      dataSize: JSON.stringify(response.data).length + ' bytes',
+      responseData: response.data
+    });
     
     // 如果耗时超过200ms，记录警告
     if (duration > 200) {
-      console.warn('⚠️ [API响应拦截器] 请求耗时较长:', duration + 'ms');
-      console.warn('⚠️ [API响应拦截器] 请求URL:', response.config.url);
+      logger.warn('API请求耗时较长', {
+        duration: duration + 'ms',
+        url: response.config.url
+      });
     }
     
     return response;
@@ -75,54 +74,61 @@ api.interceptors.response.use(
     const startTime = error.config?.metadata?.startTime || endTime;
     const duration = endTime - startTime;
     
-    console.error('❌ [API响应拦截器] 请求失败');
-    console.error('❌ [API响应拦截器] 错误信息:', error.message);
-    console.error('❌ [API响应拦截器] 错误类型:', error.name);
-    console.error('❌ [API响应拦截器] 网络请求耗时:', duration + 'ms');
+    // 使用logger记录错误信息
+    logger.error('API请求失败', {
+      message: error.message,
+      name: error.name,
+      duration: duration + 'ms',
+      url: error.config?.url,
+      method: error.config?.method
+    });
     
     // 详细的错误分析
     if (error.response) {
-      console.error('❌ [API响应拦截器] 服务器响应错误');
-      console.error('❌ [API响应拦截器] 响应状态码:', error.response.status);
-      console.error('❌ [API响应拦截器] 响应数据:', error.response.data);
-      console.error('❌ [API响应拦截器] 响应头:', error.response.headers);
+      logger.error('服务器响应错误', {
+        status: error.response.status,
+        data: error.response.data,
+        url: error.config?.url
+      });
       
       // 处理401未授权错误
       if (error.response.status === 401) {
-        console.log('🔐 [API响应拦截器] 检测到401错误，清除token并跳转到登录页');
+        logger.auth('检测到401错误，清除认证信息', { url: error.config?.url });
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
       }
     } else if (error.request) {
-      console.error('❌ [API响应拦截器] 网络连接错误，没有收到响应');
-      console.error('❌ [API响应拦截器] 请求状态:', error.request.readyState);
-      console.error('❌ [API响应拦截器] 请求状态文本:', error.request.statusText);
-      console.error('❌ [API响应拦截器] 请求URL:', error.config?.url);
+      logger.error('网络连接错误', {
+        readyState: error.request.readyState,
+        statusText: error.request.statusText,
+        url: error.config?.url
+      });
       
       // 检查是否是连接中断
       if (error.message.includes('Network Error') || 
           error.message.includes('ERR_NETWORK') ||
           error.message.includes('ERR_INTERNET_DISCONNECTED')) {
-        console.error('🌐 [API响应拦截器] 网络连接中断');
+        logger.error('网络连接中断', { message: error.message });
         error.userMessage = '网络连接中断，请检查网络后重试';
       }
       
       // 检查是否是超时
       if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        console.error('⏰ [API响应拦截器] 请求超时');
+        logger.error('请求超时', { code: error.code, message: error.message });
         error.userMessage = '请求超时，请稍后重试';
       }
       
       // 检查是否是连接拒绝
       if (error.message.includes('ERR_CONNECTION_REFUSED')) {
-        console.error('🚫 [API响应拦截器] 连接被拒绝');
+        logger.error('连接被拒绝', { message: error.message });
         error.userMessage = '无法连接到服务器，请联系技术支持';
       }
     } else {
-      console.error('❌ [API响应拦截器] 其他错误');
-      console.error('❌ [API响应拦截器] 错误配置:', error.config);
-      console.error('❌ [API响应拦截器] 错误堆栈:', error.stack);
+      logger.error('其他API错误', {
+        config: error.config,
+        stack: error.stack
+      });
     }
     
     // 添加错误发生的时间戳
@@ -153,12 +159,12 @@ export const register = (userData) => {
  * @returns {Promise} API响应
  */
 export const login = (credentials) => {
-  console.log('🌐 API: 发送登录请求', credentials);
+  logger.auth('发送登录请求', { email: credentials.email });
   return api.post('/auth/login', credentials).then(response => {
-    console.log('✅ [LOGIN] API响应成功:', response.data);
+    logger.auth('登录API响应成功', { email: credentials.email, success: response.data.success });
     return response.data;
   }).catch(error => {
-    console.error('❌ [LOGIN] API响应失败:', error);
+    logger.authError('登录API响应失败', error);
     throw error;
   });
 };

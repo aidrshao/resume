@@ -12,6 +12,7 @@ import {
   validateSendCodeForm, 
   validateRegisterCodeForm
 } from '../utils/validation';
+import logger from '../utils/logger';
 
 const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
   // 当前认证模式：'login' | 'register'
@@ -89,7 +90,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
    */
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    console.log(`⌨️ AuthModal: 输入框变化 ${name}:`, value);
+    logger.debug(`输入框变化 ${name}`, { field: name, value: value.substring(0, 20) + (value.length > 20 ? '...' : '') });
     
     setFormData(prev => ({
       ...prev,
@@ -114,7 +115,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
    * 切换登录方式
    */
   const handleLoginTypeSwitch = (type) => {
-    console.log('AuthModal: 切换登录方式', type);
+    logger.userAction('切换登录方式', { from: loginType, to: type });
     setLoginType(type);
     setFormData(prev => ({
       ...prev,
@@ -139,7 +140,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
     setErrors(prev => ({ ...prev, email: '' }));
 
     try {
-      console.log('📧 AuthModal: 开始发送验证码', { 
+      logger.auth('开始发送验证码', { 
         email: formData.email, 
         type: authMode === 'login' ? 'login' : 'register' 
       });
@@ -156,7 +157,7 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
         setMessage(response.message || '验证码发送失败');
       }
     } catch (error) {
-      console.error('❌ AuthModal: 发送验证码失败:', error);
+      logger.authError('发送验证码失败', error);
       setMessage(error.message || '验证码发送失败，请稍后重试');
     } finally {
       setCodeSending(false);
@@ -190,8 +191,12 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
 
     // 添加连接状态监控
     const startTime = Date.now();
-    console.log(`🚀 [AUTH_MODAL] 开始${authMode === 'login' ? '登录' : '注册'}请求...`);
-    console.log(`📊 [AUTH_MODAL] 请求开始时间:`, new Date(startTime).toISOString());
+    logger.auth(`开始${authMode === 'login' ? '登录' : '注册'}请求`, {
+      authMode,
+      loginType: authMode === 'login' ? loginType : null,
+      email: formData.email,
+      startTime: new Date(startTime).toISOString()
+    });
 
     try {
       let response;
@@ -199,26 +204,26 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
       // 添加超时控制
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.warn('⏰ [AUTH_MODAL] 请求超时，中断请求...');
+        logger.warn('请求超时，中断请求', { timeout: '30秒' });
         controller.abort();
       }, 30000); // 30秒超时
       
       if (authMode === 'login') {
         if (loginType === 'password') {
-          console.log('🔑 [AUTH_MODAL] 发送密码登录请求');
+          logger.auth('发送密码登录请求', { email: formData.email });
           response = await login({
             email: formData.email,
             password: formData.password
           });
         } else {
-          console.log('📱 [AUTH_MODAL] 发送验证码登录请求');
+          logger.auth('发送验证码登录请求', { email: formData.email });
           response = await loginWithCode({
             email: formData.email,
             code: formData.code
           });
         }
       } else {
-        console.log('📝 [AUTH_MODAL] 发送注册请求');
+        logger.auth('发送注册请求', { email: formData.email });
         response = await register({
           email: formData.email,
           password: formData.password,
@@ -228,11 +233,17 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
       
       clearTimeout(timeoutId);
       const duration = Date.now() - startTime;
-      console.log(`✅ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}请求完成，耗时:`, duration + 'ms');
-      console.log(`📊 [AUTH_MODAL] API响应:`, response);
+      logger.auth(`${authMode === 'login' ? '登录' : '注册'}请求完成`, {
+        duration: duration + 'ms',
+        response: response
+      });
 
       if (response && response.success) {
-        console.log(`🎉 [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}成功`);
+        logger.auth(`${authMode === 'login' ? '登录' : '注册'}成功`, {
+          authMode,
+          email: formData.email,
+          message: response.message
+        });
         
         // 注册成功不自动登录，只显示成功消息
         if (authMode === 'register') {
@@ -256,18 +267,24 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
           }, 1000);
         }
       } else {
-        console.warn(`⚠️ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}API返回失败:`, response);
+        logger.warn(`${authMode === 'login' ? '登录' : '注册'}API返回失败`, {
+          response,
+          email: formData.email
+        });
         setMessage(response?.message || `${authMode === 'login' ? '登录' : '注册'}失败`);
       }
     } catch (error) {
       const duration = Date.now() - startTime;
-      console.error(`❌ [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}失败:`, error);
-      console.error(`❌ [AUTH_MODAL] 错误详情:`, {
+      logger.authError(`${authMode === 'login' ? '登录' : '注册'}失败`, error);
+      logger.error('认证错误详情', {
         name: error.name,
         message: error.message,
         duration: duration + 'ms',
         timestamp: error.timestamp || new Date().toISOString(),
-        userMessage: error.userMessage
+        userMessage: error.userMessage,
+        email: formData.email,
+        authMode,
+        loginType: authMode === 'login' ? loginType : null
       });
       
       // 根据错误类型显示不同的用户友好消息
@@ -289,7 +306,11 @@ const AuthModal = ({ isOpen, onClose, mode, onSuccess, onSwitchMode }) => {
       setMessage(userMessage);
     } finally {
       setIsLoading(false);
-      console.log(`🏁 [AUTH_MODAL] ${authMode === 'login' ? '登录' : '注册'}流程结束`);
+      logger.auth(`${authMode === 'login' ? '登录' : '注册'}流程结束`, {
+        authMode,
+        email: formData.email,
+        totalDuration: Date.now() - startTime + 'ms'
+      });
     }
   };
 

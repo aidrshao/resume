@@ -13,6 +13,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const membershipRoutes = require('./routes/membershipRoutes');
 const resumeRenderRoutes = require('./routes/resumeRenderRoutes');
 const templateRoutes = require('./routes/templateRoutes');
+const logRoutes = require('./routes/logRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -143,6 +144,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // 路由配置
+app.use('/api/logs', logRoutes);  // 日志路由（无需认证）
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/memberships', membershipRoutes);  // 会员路由
