@@ -19,6 +19,9 @@ const ResumeDashboard = () => {
   const [generatingJobSpecific, setGeneratingJobSpecific] = useState({});
   const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const [selectedResumeForTemplate, setSelectedResumeForTemplate] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   /**
    * 加载用户的简历列表
@@ -279,6 +282,38 @@ const ResumeDashboard = () => {
     }
   };
 
+  /**
+   * 获取简历建议
+   */
+  const getResumeSuggestions = async (resumeId) => {
+    try {
+      setLoadingSuggestions(true);
+      
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/resumes/${resumeId}/suggestions`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setSuggestions(data.data);
+        setShowSuggestionsModal(true);
+      } else {
+        setError(data.message || '获取简历建议失败');
+      }
+    } catch (err) {
+      console.error('获取简历建议失败:', err);
+      setError('获取简历建议失败，请稍后重试');
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -414,6 +449,12 @@ const ResumeDashboard = () => {
                     >
                       选择模板
                     </button>
+                    <button
+                      onClick={() => getResumeSuggestions(baseResume.id)}
+                      className="text-green-600 hover:text-green-900 text-sm font-medium"
+                    >
+                      获取建议
+                    </button>
                   </div>
                   <button
                     onClick={() => deleteResume(baseResume.id)}
@@ -513,6 +554,14 @@ const ResumeDashboard = () => {
                         >
                           选择模板
                         </button>
+                        {resume.status === 'completed' && (
+                          <button
+                            onClick={() => getResumeSuggestions(resume.id)}
+                            className="text-green-600 hover:text-green-900 text-sm font-medium"
+                          >
+                            获取建议
+                          </button>
+                        )}
                       </div>
                       <button
                         onClick={() => deleteResume(resume.id)}
@@ -593,6 +642,97 @@ const ResumeDashboard = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 简历建议模态框 */}
+      {showSuggestionsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-medium text-gray-900">📝 简历优化建议</h3>
+                <button
+                  onClick={() => setShowSuggestionsModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {loadingSuggestions ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                  <p className="mt-4 text-gray-600">AI正在分析您的简历...</p>
+                </div>
+              ) : suggestions.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-4">✨</div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-2">恭喜！</h4>
+                  <p className="text-gray-500">您的简历已经很棒了，暂无特别建议</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {suggestions.map((suggestion, index) => (
+                    <div
+                      key={index}
+                      className={`p-4 rounded-lg border-l-4 ${
+                        suggestion.priority === 'high' 
+                          ? 'bg-red-50 border-red-400' 
+                          : suggestion.priority === 'medium'
+                          ? 'bg-yellow-50 border-yellow-400'
+                          : 'bg-blue-50 border-blue-400'
+                      }`}
+                    >
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          {suggestion.priority === 'high' && <span className="text-red-500">🔴</span>}
+                          {suggestion.priority === 'medium' && <span className="text-yellow-500">🟡</span>}
+                          {suggestion.priority === 'low' && <span className="text-blue-500">🔵</span>}
+                        </div>
+                        <div className="ml-3 flex-1">
+                          <div className="flex items-center mb-2">
+                            <h4 className="text-sm font-medium text-gray-900">
+                              {suggestion.title}
+                            </h4>
+                            <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              suggestion.priority === 'high' 
+                                ? 'bg-red-100 text-red-800' 
+                                : suggestion.priority === 'medium'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {suggestion.priority === 'high' ? '重要' : suggestion.priority === 'medium' ? '一般' : '建议'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 mb-2">
+                            {suggestion.description}
+                          </p>
+                          {suggestion.section && (
+                            <div className="mt-2 text-xs text-gray-500">
+                              📍 相关部分：{suggestion.section}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center">
+                      <span className="text-green-500 text-xl">💡</span>
+                      <div className="ml-3">
+                        <h4 className="text-sm font-medium text-green-800">小贴士</h4>
+                        <p className="text-sm text-green-700">
+                          根据以上建议优化简历后，您可以重新获取建议来查看改进效果
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

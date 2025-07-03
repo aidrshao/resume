@@ -15,7 +15,8 @@ import {
   ChevronUpIcon,
   PlayIcon,
   CheckIcon,
-  XMarkIcon
+  XMarkIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
 const AdminAIPromptManagement = () => {
@@ -66,6 +67,8 @@ const AdminAIPromptManagement = () => {
     variables: {}
   });
   const [testResult, setTestResult] = useState('');
+  const [showFallbackModal, setShowFallbackModal] = useState(false);
+  const [selectedFallbackKey, setSelectedFallbackKey] = useState('');
   
   // 批量操作状态
   const [selectedIds, setSelectedIds] = useState([]);
@@ -234,7 +237,18 @@ const AdminAIPromptManagement = () => {
 
   // 删除提示词
   const deletePrompt = async (id) => {
-    if (!window.confirm('确定要删除这个提示词吗？')) {
+    const prompt = prompts.find(p => p.id === id);
+    
+    // 系统关键提示词保护
+    const systemKeys = ['resume_optimization', 'resume_suggestions', 'user_info_collector', 'resume_parsing'];
+    if (systemKeys.includes(prompt?.key)) {
+      setError('❌ 无法删除系统关键提示词！\n\n这个提示词是系统正常运行必需的，删除后会影响核心功能。\n建议使用"禁用"功能暂停使用。');
+      return;
+    }
+    
+    const confirmMessage = `⚠️ 危险操作确认\n\n您即将删除提示词：${prompt?.name || '未知'}\n标识：${prompt?.key || '未知'}\n\n删除后：\n• 该提示词将永久丢失\n• 相关功能可能受到影响\n• 系统会使用内置回退模板\n\n确定要继续吗？`;
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
@@ -243,7 +257,7 @@ const AdminAIPromptManagement = () => {
       await apiRequest(`/ai-prompts/${id}`, {
         method: 'DELETE'
       });
-      setSuccess('删除提示词成功');
+      setSuccess('✅ 删除提示词成功。系统已启用回退模式确保功能正常。');
       await loadPrompts();
     } catch (err) {
       setError(err.message);
@@ -256,16 +270,109 @@ const AdminAIPromptManagement = () => {
   const testRender = async () => {
     try {
       setLoading(true);
+      const requestData = {
+        prompt_template: testData.template,  // 字段名匹配后端
+        variables: testData.variables
+      };
+      
+      console.log('🧪 [TEST_RENDER] 发送数据:', requestData);
+      
       const response = await apiRequest('/ai-prompts/test-render', {
         method: 'POST',
-        body: JSON.stringify(testData)
+        body: JSON.stringify(requestData)
       });
-      setTestResult(response.data.rendered);
+      
+      console.log('✅ [TEST_RENDER] 响应数据:', response);
+      setTestResult(response.data.rendered_prompt); // 修正字段名
     } catch (err) {
+      console.error('❌ [TEST_RENDER] 错误:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // 获取回退模板内容 - 现在支持智能回退机制
+  const getFallbackTemplate = (key) => {
+    return {
+      name: `智能回退机制 - ${key}`,
+      strategies: [
+        {
+          priority: 1,
+          type: 'history_version',
+          name: '历史版本回退',
+          description: '使用该提示词最近的禁用版本',
+          template: '📂 自动查找最近的历史版本...',
+          model_type: '继承原配置',
+          model_config: '继承原配置',
+          status: '动态获取'
+        },
+        {
+          priority: 2, 
+          type: 'system_builtin',
+          name: '系统内置模板',
+          description: '使用代码中预设的紧急模板',
+          template: getSystemBuiltinTemplate(key),
+          model_type: getSystemBuiltinConfig(key).model_type,
+          model_config: getSystemBuiltinConfig(key).model_config,
+          status: '固定内容'
+        }
+      ]
+    };
+  };
+  
+  // 获取系统内置模板
+  const getSystemBuiltinTemplate = (key) => {
+    const templates = {
+      resume_optimization: `你是一位专业的简历优化专家。请根据以下信息优化简历：
+
+目标公司: \${targetCompany}
+目标岗位: \${targetPosition}  
+岗位描述: \${jobDescription}
+用户要求: \${userRequirements}
+
+当前简历:
+\${resumeData}
+
+请提供优化后的简历，保持JSON格式。`,
+      resume_suggestions: `请分析以下简历并提供改进建议：
+
+\${resumeData}
+
+请返回JSON格式的建议列表。`,
+      user_info_collector: `你是专业的简历助手，请分析对话并收集用户信息：
+
+已收集信息: \${collectedInfo}
+对话历史: \${conversationHistory}  
+用户消息: \${userMessage}
+
+请返回JSON格式的收集结果。`,
+      resume_parsing: `请解析以下简历文本，提取结构化信息：
+
+\${resumeText}
+
+请返回包含个人信息、工作经历、教育背景、技能等的JSON格式数据。`
+    };
+    
+    return templates[key] || '未找到对应模板';
+  };
+  
+  // 获取系统内置配置
+  const getSystemBuiltinConfig = (key) => {
+    const configs = {
+      resume_optimization: { model_type: 'GPT-4o', model_config: { temperature: 0.3, max_tokens: 6000, timeout: 150000 } },
+      resume_suggestions: { model_type: 'DeepSeek', model_config: { temperature: 0.7, max_tokens: 4000, timeout: 120000 } },
+      user_info_collector: { model_type: 'DeepSeek', model_config: { temperature: 0.6, max_tokens: 3000, timeout: 90000 } },
+      resume_parsing: { model_type: 'DeepSeek', model_config: { temperature: 0.3, max_tokens: 6000, timeout: 180000 } }
+    };
+    
+    return configs[key] || { model_type: 'Unknown', model_config: {} };
+  };
+
+  // 显示回退模板
+  const showFallbackTemplate = (key) => {
+    setSelectedFallbackKey(key);
+    setShowFallbackModal(true);
   };
 
   // 批量操作
@@ -538,11 +645,18 @@ const AdminAIPromptManagement = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    prompt.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {prompt.is_active ? '已启用' : '已禁用'}
-                  </span>
+                  <div className="flex flex-col space-y-1">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      prompt.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {prompt.is_active ? '已启用' : '已禁用'}
+                    </span>
+                    {!prompt.is_active && (
+                      <span className="text-xs text-blue-600">
+                        → 使用回退模板
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(prompt.updated_at).toLocaleDateString()}
@@ -562,6 +676,13 @@ const AdminAIPromptManagement = () => {
                       title="测试"
                     >
                       <PlayIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => showFallbackTemplate(prompt.key)}
+                      className="text-orange-600 hover:text-orange-900"
+                      title="查看回退模板"
+                    >
+                      <ShieldCheckIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => openModal('edit', prompt)}
@@ -631,14 +752,27 @@ const AdminAIPromptManagement = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">标识 *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    标识 * 
+                    <span className="text-xs text-gray-500 ml-1">(仅限系统预定义)</span>
+                  </label>
+                  <select
                     value={formData.key}
                     onChange={(e) => handleFormChange('key', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="输入唯一标识，如：resume_optimization"
-                  />
+                    disabled={modalType === 'edit'}
+                  >
+                    <option value="">请选择提示词类型</option>
+                    <option value="resume_optimization">resume_optimization (简历优化)</option>
+                    <option value="resume_suggestions">resume_suggestions (简历建议)</option>
+                    <option value="user_info_collector">user_info_collector (信息收集)</option>
+                    <option value="resume_parsing">resume_parsing (简历解析)</option>
+                  </select>
+                  {modalType === 'edit' && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      编辑时不可修改标识
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -921,6 +1055,181 @@ const AdminAIPromptManagement = () => {
 
       {/* 模态框 */}
       {renderModal()}
+      
+      {/* 智能回退机制模态框 */}
+      {showFallbackModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-gray-900">
+                🔄 智能回退机制 - {selectedFallbackKey}
+              </h3>
+              <button
+                onClick={() => setShowFallbackModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex">
+                <CogIcon className="h-5 w-5 text-blue-400 mr-3 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-medium text-blue-800">
+                    🧠 智能回退机制说明
+                  </h4>
+                  <p className="text-sm text-blue-700 mt-2">
+                    当提示词被禁用时，系统会<strong>按优先级依次尝试</strong>以下回退策略，确保服务不中断：
+                  </p>
+                  <ul className="text-sm text-blue-700 mt-2 ml-4 space-y-1">
+                    <li>• <strong>优先级1</strong>：自动查找该提示词最近的历史版本（保持配置连续性）</li>
+                    <li>• <strong>优先级2</strong>：使用系统内置紧急模板（保底安全方案）</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {(() => {
+              const fallbackInfo = getFallbackTemplate(selectedFallbackKey);
+              if (!fallbackInfo) {
+                return (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">该标识没有对应的回退策略</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-6">
+                  {fallbackInfo.strategies.map((strategy, index) => (
+                    <div key={strategy.type} className={`border-2 rounded-lg p-5 ${
+                      strategy.priority === 1 
+                        ? 'border-green-300 bg-green-50' 
+                        : 'border-orange-300 bg-orange-50'
+                    }`}>
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center space-x-3">
+                          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                            strategy.priority === 1 
+                              ? 'bg-green-100 text-green-800 border-2 border-green-300' 
+                              : 'bg-orange-100 text-orange-800 border-2 border-orange-300'
+                          }`}>
+                            #{strategy.priority}
+                          </span>
+                          <div>
+                            <h4 className={`text-lg font-semibold ${
+                              strategy.priority === 1 ? 'text-green-800' : 'text-orange-800'
+                            }`}>
+                              {strategy.name}
+                            </h4>
+                            <p className={`text-sm ${
+                              strategy.priority === 1 ? 'text-green-700' : 'text-orange-700'
+                            }`}>
+                              {strategy.description}
+                            </p>
+                          </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          strategy.status === '动态获取' 
+                            ? 'bg-blue-100 text-blue-800 border border-blue-300' 
+                            : 'bg-gray-100 text-gray-800 border border-gray-300'
+                        }`}>
+                          {strategy.status}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">推荐模型</label>
+                          <div className="p-3 bg-white rounded-md border border-gray-200">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              strategy.model_type === 'GPT-4o' ? 'bg-green-100 text-green-800' : 'bg-purple-100 text-purple-800'
+                            }`}>
+                              {strategy.model_type}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">模型配置</label>
+                          <div className="p-3 bg-white rounded-md border border-gray-200 h-20 overflow-y-auto">
+                            <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                              {typeof strategy.model_config === 'string' 
+                                ? strategy.model_config 
+                                : JSON.stringify(strategy.model_config, null, 2)}
+                            </pre>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">提示词模板</label>
+                        <div className="p-4 bg-white rounded-md border border-gray-200 h-48 overflow-y-auto">
+                          <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                            {strategy.template}
+                          </pre>
+                        </div>
+                      </div>
+                      
+                      {strategy.priority === 1 && (
+                        <div className="mt-4 p-3 bg-green-100 border border-green-200 rounded-md">
+                          <div className="flex items-start">
+                            <span className="text-green-600 mr-2">💡</span>
+                            <div>
+                              <p className="text-sm font-medium text-green-800">智能特性</p>
+                              <p className="text-xs text-green-700 mt-1">
+                                此策略会动态查找数据库中最近被禁用的版本，<strong>保持与用户配置的连续性</strong>，
+                                避免因禁用功能而导致的体验断层。
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {strategy.priority === 2 && (
+                        <div className="mt-4 p-3 bg-orange-100 border border-orange-200 rounded-md">
+                          <div className="flex items-start">
+                            <span className="text-orange-600 mr-2">🛡️</span>
+                            <div>
+                              <p className="text-sm font-medium text-orange-800">保底安全方案</p>
+                              <p className="text-xs text-orange-700 mt-1">
+                                此模板<strong>固化在代码中</strong>，即使数据库完全异常也能确保系统正常运行，
+                                是最后的安全保障机制。
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-800 mb-2">
+                      🎯 回退机制触发条件
+                    </h4>
+                    <ul className="text-sm text-gray-700 space-y-1">
+                      <li>• 对应标识的提示词被管理员设置为"禁用"状态</li>
+                      <li>• 对应标识的提示词被意外删除</li>
+                      <li>• 数据库连接异常或查询失败</li>
+                      <li>• 提示词内容损坏或格式错误</li>
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
+            
+            <div className="flex justify-end pt-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowFallbackModal(false)}
+                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

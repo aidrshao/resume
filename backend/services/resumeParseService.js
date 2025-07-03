@@ -114,7 +114,31 @@ class ResumeParseService {
    * @returns {Promise<Object>} 结构化数据
    */
   static async structureResumeText(text) {
-    const prompt = `
+    const AIPrompt = require('../models/AIPrompt');
+    
+    let prompt;
+    let modelType = 'deepseek';
+    let modelConfig = {};
+    
+    try {
+      // 从提示词管理系统获取简历解析提示词
+      const promptData = await AIPrompt.getRenderedPrompt('resume_parsing', {
+        resumeText: text
+      });
+
+      console.log(`✅ [RESUME_PARSING] 使用提示词: ${promptData.name}`);
+      console.log(`📊 [RESUME_PARSING] 模型: ${promptData.model_type}`);
+
+      prompt = promptData.renderedTemplate;
+      modelType = promptData.model_type;
+      modelConfig = promptData.model_config || {};
+
+    } catch (promptError) {
+      console.error('❌ [RESUME_PARSING] 获取提示词失败:', promptError.message);
+      console.warn('🔄 [RESUME_PARSING] 回退到默认简历解析提示词');
+      
+      // 回退到硬编码提示词
+      prompt = `
 你是一个专业的简历解析专家，请仔细分析以下简历文本，提取所有可能的结构化信息。
 
 简历文本内容：
@@ -243,10 +267,11 @@ ${text}
 
 现在开始解析：
 `;
+    }
 
     try {
       console.log('🧠 开始AI结构化识别，文本长度:', text.length);
-      const response = await aiService.generateText(prompt, 'deepseek', {
+      const response = await aiService.generateText(prompt, modelType, {
         temperature: 0.3, // 降低随机性，提高准确性
         max_tokens: 6000,
         timeout: parseInt(process.env.RESUME_AI_TIMEOUT) || 180000, // 简历解析专用超时: 3分钟

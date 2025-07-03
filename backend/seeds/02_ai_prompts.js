@@ -272,6 +272,154 @@ exports.seed = async function(knex) {
         }
       }),
       is_active: true
+    },
+    {
+      id: 4,
+      name: '简历解析专家',
+      key: 'resume_parsing',
+      category: 'parsing',
+      model_type: 'deepseek',
+      description: '从简历文本中提取结构化信息，识别个人信息、工作经历、教育背景等',
+      prompt_template: `你是一个专业的简历解析专家，请仔细分析以下简历文本，提取所有可能的结构化信息。
+
+简历文本内容：
+\${resumeText}
+
+请按照以下步骤仔细解析：
+
+第一步：识别个人基本信息
+- 姓名：通常在简历开头，可能是最大的文字或单独一行
+- 联系方式：手机号码（11位数字，可能有分隔符）
+- 邮箱：包含@符号的邮箱地址
+- 地址：城市、省份信息
+- 个人简介：通常有"个人简介"、"自我评价"、"简介"等标题
+
+第二步：识别教育背景
+- 寻找学校名称、专业、学位、时间等信息
+- 注意"教育经历"、"教育背景"、"学习经历"等关键词
+
+第三步：识别工作经历
+- 寻找公司名称、职位、工作时间、工作描述
+- 注意"工作经历"、"工作经验"、"职业经历"等关键词
+- 每个工作经历都要单独提取
+
+第四步：识别项目经验
+- 寻找项目名称、项目描述、使用技术等
+- 注意"项目经验"、"项目经历"、"主要项目"等关键词
+
+第五步：识别技能信息
+- 编程语言、技术栈、工具等
+- 注意"技能"、"专业技能"、"技术栈"等关键词
+
+请严格按照以下JSON格式返回结果：
+
+{
+  "personalInfo": {
+    "name": "从简历中提取的完整姓名",
+    "phone": "手机号码（保持原格式）",
+    "email": "邮箱地址", 
+    "location": "居住地址或城市",
+    "summary": "个人简介或自我评价的完整内容",
+    "objective": "求职意向或职业目标"
+  },
+  "educations": [
+    {
+      "school": "学校完整名称",
+      "degree": "学位类型（学士/硕士/博士/专科等）",
+      "major": "专业名称",
+      "startDate": "入学时间（YYYY-MM格式）",
+      "endDate": "毕业时间（YYYY-MM格式）",
+      "gpa": "GPA成绩（如果有）",
+      "honors": ["学术荣誉或奖项"],
+      "courses": ["主要课程"],
+      "description": "其他教育相关描述"
+    }
+  ],
+  "workExperiences": [
+    {
+      "company": "公司完整名称",
+      "position": "职位名称",
+      "department": "部门名称",
+      "location": "工作地点",
+      "startDate": "入职时间（YYYY-MM格式）",
+      "endDate": "离职时间（YYYY-MM格式，在职写'至今'）",
+      "description": "工作职责和内容的详细描述",
+      "achievements": ["具体工作成就", "量化的工作成果"],
+      "technologies": ["使用的技术、工具、软件"],
+      "teamSize": "团队规模（如果提到）",
+      "reportTo": "汇报对象（如果提到）"
+    }
+  ],
+  "projects": [
+    {
+      "name": "项目名称",
+      "role": "在项目中的角色",
+      "company": "项目所属公司",
+      "startDate": "项目开始时间", 
+      "endDate": "项目结束时间",
+      "description": "项目详细描述和背景",
+      "responsibilities": ["具体职责"],
+      "achievements": ["项目成果和影响"],
+      "technologies": ["使用的技术栈"],
+      "teamSize": "项目团队规模",
+      "budget": "项目预算（如果提到）"
+    }
+  ],
+  "skills": {
+    "technical": ["编程语言", "开发框架", "数据库", "开发工具"],
+    "professional": ["专业技能", "行业知识"],
+    "soft": ["软技能", "沟通能力", "领导力"],
+    "certifications": ["获得的证书", "资格认证"]
+  },
+  "languages": [
+    {
+      "language": "语言名称（中文/英文/日文等）",
+      "level": "熟练程度（母语/精通/熟练/一般）",
+      "certification": "语言证书（如CET-6、托福、雅思分数）"
+    }
+  ],
+  "awards": [
+    {
+      "name": "奖项名称",
+      "issuer": "颁发机构",
+      "date": "获奖时间",
+      "description": "奖项说明"
+    }
+  ],
+  "publications": [
+    {
+      "title": "论文或著作标题",
+      "journal": "发表期刊或出版社",
+      "date": "发表时间",
+      "authors": ["作者列表"]
+    }
+  ],
+  "interests": ["个人兴趣爱好"]
+}
+
+重要提取规则：
+1. 个人信息是最重要的，请务必仔细提取姓名、电话、邮箱
+2. 每个工作经历、教育经历、项目都要单独成条目
+3. 保留所有时间信息，统一格式为YYYY-MM
+4. 技能要详细分类，不要遗漏
+5. 保留所有量化数据和具体成就
+6. 如果某个字段确实没有信息，设为null或空数组
+7. 只返回JSON格式，不要包含任何其他文字
+
+现在开始解析：`,
+      model_config: JSON.stringify({
+        temperature: 0.3,
+        max_tokens: 6000,
+        timeout: 180000
+      }),
+      variables: JSON.stringify({
+        resumeText: {
+          type: 'text',
+          description: '需要解析的简历文本内容',
+          required: true
+        }
+      }),
+      is_active: true
     }
   ]);
 
