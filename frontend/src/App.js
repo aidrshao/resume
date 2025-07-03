@@ -23,10 +23,50 @@ import AdminUserManagement from './components/AdminUserManagement';
 import AdminMembershipTiers from './components/AdminMembershipTiers';
 import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
 import AdminAIPromptManagement from './components/AdminAIPromptManagement';
+import AdminGlobalQuotaManagement from './components/AdminGlobalQuotaManagement';
+import TemplateManagement from './components/TemplateManagement';
+import ResumeBuilder from './components/ResumeBuilder';
 import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
-// 测试页面
-import TemplateTestPage from './components/TemplateTestPage';
+
+/**
+ * 错误边界组件
+ */
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('❌ [ERROR_BOUNDARY] 捕获到错误:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h2 className="text-xl font-bold text-red-600 mb-2">应用出现错误</h2>
+            <p className="text-gray-600 mb-4">请刷新页面重试</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+            >
+              刷新页面
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 /**
  * 主应用组件
@@ -40,9 +80,10 @@ function App() {
   });
   
   return (
-    <Router>
-      <div className="App">
-        <Routes>
+    <ErrorBoundary>
+      <Router>
+        <div className="App">
+          <Routes>
           {/* 首页 - Landing页面 */}
           <Route path="/" element={<LandingPage />} />
           
@@ -53,7 +94,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           
           {/* 模板测试页面 - 用于开发测试 */}
-          <Route path="/template-test" element={<TemplateTestPage />} />
+          
           
           {/* 管理员路由 */}
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
@@ -98,6 +139,22 @@ function App() {
               </AdminProtectedRoute>
             } 
           />
+          <Route 
+            path="/admin/global-quota-configs" 
+            element={
+              <AdminProtectedRoute>
+                <AdminGlobalQuotaManagement />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/templates" 
+            element={
+              <AdminProtectedRoute>
+                <TemplateManagement />
+              </AdminProtectedRoute>
+            } 
+          />
           
           {/* 用户中心 - 需要认证 */}
           <Route 
@@ -125,6 +182,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <ResumeDashboard />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 简历生成器页面 - 需要认证 */}
+          <Route 
+            path="/resumes/new" 
+            element={
+              <ProtectedRoute>
+                <ResumeBuilder />
               </ProtectedRoute>
             } 
           />
@@ -194,6 +261,7 @@ function App() {
         </Routes>
       </div>
     </Router>
+    </ErrorBoundary>
   );
 }
 

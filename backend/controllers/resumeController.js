@@ -108,30 +108,99 @@ class ResumeController {
       const { id } = req.params;
       const userId = req.user.id;
       
-      const resume = await Resume.findById(id);
+      console.log(`🔍 [GET_RESUME_BY_ID] 开始获取简历，ID: ${id}, 用户ID: ${userId}`);
+      
+      const resume = await Resume.findByIdAndUser(id, userId);
       
       if (!resume) {
+        console.log(`❌ [GET_RESUME_BY_ID] 简历不存在或无权访问，ID: ${id}, 用户ID: ${userId}`);
         return res.status(404).json({
           success: false,
-          message: '简历不存在'
+          message: '简历不存在或无权访问'
         });
       }
       
-      // 检查权限
-      if (resume.user_id !== userId) {
-        return res.status(403).json({
-          success: false,
-          message: '无权访问此简历'
-        });
+      console.log(`📋 [GET_RESUME_BY_ID] 原始数据库数据:`, {
+        id: resume.id,
+        title: resume.title,
+        user_id: resume.user_id,
+        content_exists: !!resume.content,
+        content_type: typeof resume.content,
+        resume_data_exists: !!resume.resume_data,
+        resume_data_type: typeof resume.resume_data
+      });
+      
+      // 详细输出内容预览 - 修复对象类型处理
+      if (resume.resume_data) {
+        if (typeof resume.resume_data === 'string') {
+          console.log(`📄 [GET_RESUME_BY_ID] resume_data前200字符:`, resume.resume_data.substring(0, 200));
+          // 尝试解析JSON
+          try {
+            const parsedData = JSON.parse(resume.resume_data);
+            console.log(`📊 [GET_RESUME_BY_ID] 解析后的JSON数据结构:`, {
+              personalInfo: !!parsedData.personalInfo,
+              workExperiences: Array.isArray(parsedData.workExperiences) ? parsedData.workExperiences.length : 'not array',
+              educations: Array.isArray(parsedData.educations) ? parsedData.educations.length : 'not array',
+              skills: Array.isArray(parsedData.skills) ? parsedData.skills.length : 'not array',
+              projects: Array.isArray(parsedData.projects) ? parsedData.projects.length : 'not array'
+            });
+            if (parsedData.personalInfo) {
+              console.log(`👤 [GET_RESUME_BY_ID] 个人信息:`, {
+                name: parsedData.personalInfo.name,
+                email: parsedData.personalInfo.email,
+                phone: parsedData.personalInfo.phone
+              });
+            }
+          } catch (e) {
+            console.log(`❌ [GET_RESUME_BY_ID] resume_data不是有效的JSON:`, e.message);
+          }
+        } else if (typeof resume.resume_data === 'object') {
+          console.log(`📄 [GET_RESUME_BY_ID] resume_data对象预览:`, JSON.stringify(resume.resume_data, null, 2).substring(0, 300));
+          console.log(`📊 [GET_RESUME_BY_ID] resume_data数据结构:`, {
+            personalInfo: !!resume.resume_data.personalInfo,
+            workExperiences: Array.isArray(resume.resume_data.workExperiences) ? resume.resume_data.workExperiences.length : 'not array',
+            educations: Array.isArray(resume.resume_data.educations) ? resume.resume_data.educations.length : 'not array',
+            skills: Array.isArray(resume.resume_data.skills) ? resume.resume_data.skills.length : 'not array',
+            projects: Array.isArray(resume.resume_data.projects) ? resume.resume_data.projects.length : 'not array'
+          });
+          if (resume.resume_data.personalInfo) {
+            console.log(`👤 [GET_RESUME_BY_ID] 个人信息:`, {
+              name: resume.resume_data.personalInfo.name,
+              email: resume.resume_data.personalInfo.email,
+              phone: resume.resume_data.personalInfo.phone
+            });
+          }
+        }
       }
+      
+      if (resume.content) {
+        if (typeof resume.content === 'string') {
+          console.log(`📄 [GET_RESUME_BY_ID] content前200字符:`, resume.content.substring(0, 200));
+        } else {
+          console.log(`📄 [GET_RESUME_BY_ID] content对象预览:`, JSON.stringify(resume.content, null, 2).substring(0, 300));
+        }
+      }
+      
+      // 将resume_data映射为content字段，确保前端兼容性
+      const resumeWithContent = {
+        ...resume,
+        content: resume.resume_data || resume.content || ''
+      };
+      
+      console.log(`✅ [GET_RESUME_BY_ID] 最终返回数据:`, {
+        id: resumeWithContent.id,
+        title: resumeWithContent.title,
+        final_content_exists: !!resumeWithContent.content,
+        final_content_type: typeof resumeWithContent.content
+      });
       
       res.json({
         success: true,
-        data: resume,
+        data: resumeWithContent,
         message: '获取简历详情成功'
       });
     } catch (error) {
-      console.error('获取简历详情失败:', error);
+      console.error('❌ [GET_RESUME_BY_ID] 获取简历详情失败:', error);
       res.status(500).json({
         success: false,
         message: '获取简历详情失败'

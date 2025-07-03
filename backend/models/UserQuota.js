@@ -335,23 +335,22 @@ class UserQuota {
    */
   static async createDefaultQuotas(userId, quotaConfigs = null) {
     try {
-      const defaultConfigs = quotaConfigs || [
-        {
-          quota_type: 'monthly_ai_resume',
-          quota_limit: 5,
-          reset_cycle: 'monthly'
-        },
-        {
-          quota_type: 'monthly_ai_chat',
-          quota_limit: 50,
-          reset_cycle: 'monthly'
-        },
-        {
-          quota_type: 'monthly_job_search',
-          quota_limit: 100,
-          reset_cycle: 'monthly'
-        }
-      ];
+      // 如果没有提供配额配置，从全局配额配置表中获取新用户配额
+      let defaultConfigs = quotaConfigs;
+      
+      if (!defaultConfigs) {
+        const GlobalQuotaConfig = require('./GlobalQuotaConfig');
+        const globalConfigs = await GlobalQuotaConfig.getNewUserQuotaConfigs();
+        
+        // 转换为UserQuota格式
+        defaultConfigs = globalConfigs.map(config => ({
+          quota_type: config.quota_type,
+          quota_limit: config.default_quota,
+          reset_cycle: config.reset_cycle
+        }));
+        
+        console.log('✅ [CREATE_DEFAULT_QUOTAS] 从全局配置获取新用户配额:', defaultConfigs.length, '项');
+      }
 
       const quotas = [];
 

@@ -3,10 +3,11 @@
  * 显示基础简历和岗位专属简历，提供创建、编辑、删除功能
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import * as api from '../utils/api';
-import ResumeTemplateSelector from './ResumeTemplateSelector';
+import html2pdf from 'html2pdf.js';
+import Handlebars from 'handlebars';
 
 const ResumeDashboard = () => {
   const navigate = useNavigate();
@@ -17,11 +18,24 @@ const ResumeDashboard = () => {
   const [showJobSelectModal, setShowJobSelectModal] = useState(false);
   const [baseResume, setBaseResume] = useState(null);
   const [generatingJobSpecific, setGeneratingJobSpecific] = useState({});
-  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
-  const [selectedResumeForTemplate, setSelectedResumeForTemplate] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestionsModal, setShowSuggestionsModal] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  
+  // 新的模板系统状态
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [selectedResumeForTemplate, setSelectedResumeForTemplate] = useState(null);
+  const [templates, setTemplates] = useState([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [templateDetailLoading, setTemplateDetailLoading] = useState(false);
+  const [renderedHtml, setRenderedHtml] = useState('');
+  const [renderError, setRenderError] = useState('');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  
+  // DOM引用
+  const currentStyleRef = useRef(null);
+  const previewRef = useRef(null);
 
   /**
    * 加载用户的简历列表
@@ -249,38 +263,423 @@ const ResumeDashboard = () => {
   );
 
   /**
+   * 获取模板列表
+   */
+  const fetchTemplates = async () => {
+    try {
+      console.log('🔄 [模板加载] 开始获取模板列表');
+      setTemplatesLoading(true);
+      setRenderError('');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/templates', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      console.log('📊 [模板加载] API返回:', data);
+
+      if (data.success) {
+        const templateList = data.data || [];
+        setTemplates(templateList);
+        console.log('✅ [模板加载] 成功加载', templateList.length, '个模板');
+        
+        // 自动选择第一个模板并渲染
+        if (templateList.length > 0 && selectedResumeForTemplate) {
+          console.log('🎯 [自动选择] 选择第一个模板:', templateList[0].name);
+          await handleTemplateSelect(templateList[0]);
+        }
+      } else {
+        console.error('❌ [模板加载] 失败:', data.message);
+        setRenderError(data.message || '获取模板列表失败');
+      }
+    } catch (error) {
+      console.error('❌ [模板加载] 异常:', error);
+      setRenderError('网络错误，请稍后重试');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  };
+
+  /**
+   * 选择模板并获取详情
+   */
+  const handleTemplateSelect = async (template) => {
+    try {
+      console.log('🎨 [模板选择] 选择模板:', template.name);
+      setSelectedTemplate(template);
+      setTemplateDetailLoading(true);
+      setRenderError('');
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/templates/${template.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      console.log('📄 [模板详情] API返回:', data);
+
+      if (data.success) {
+        console.log('✅ [模板详情] 获取成功，开始渲染');
+        await renderResumeWithTemplate(template, data.data);
+      } else {
+        console.error('❌ [模板详情] 获取失败:', data.message);
+        setRenderError(data.message || '获取模板详情失败');
+      }
+    } catch (error) {
+      console.error('❌ [模板选择] 异常:', error);
+      setRenderError('模板加载失败，请稍后重试');
+    } finally {
+      setTemplateDetailLoading(false);
+    }
+  };
+
+  /**
+   * 使用模板渲染简历 - 新版本支持统一变量规范
+   */
+  const renderResumeWithTemplate = async (template, templateData) => {
+    try {
+      console.log('🖥️ [简历渲染] 开始渲染，模板:', template.name);
+      
+      // 清除旧的样式
+      if (currentStyleRef.current) {
+        document.head.removeChild(currentStyleRef.current);
+        currentStyleRef.current = null;
+      }
+
+      // 注入新的CSS样式
+      if (templateData.css_content) {
+        const styleElement = document.createElement('style');
+        styleElement.textContent = templateData.css_content;
+        document.head.appendChild(styleElement);
+        currentStyleRef.current = styleElement;
+        console.log('✅ [CSS注入] 样式注入成功');
+      }
+
+      // 获取简历数据
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/resumes/${selectedResumeForTemplate.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const resumeData = await response.json();
+      
+      if (!resumeData.success) {
+        throw new Error(resumeData.message || '获取简历数据失败');
+      }
+
+      console.log('📊 [简历数据] 获取成功，开始解析...');
+
+      // 解析简历内容
+      let parsedContent = {};
+      try {
+        // 尝试解析JSON格式的内容
+        if (resumeData.data.content && typeof resumeData.data.content === 'string') {
+          parsedContent = JSON.parse(resumeData.data.content);
+        } else if (typeof resumeData.data.content === 'object') {
+          parsedContent = resumeData.data.content;
+        } else {
+          parsedContent = {};
+        }
+      } catch (error) {
+        console.error('❌ [简历解析] JSON解析失败:', error);
+        parsedContent = { summary: resumeData.data.content || '' };
+      }
+
+      // 创建符合新规范的完整数据结构
+      const standardResumeData = {
+        // 个人信息 - 按新规范格式
+        personalInfo: {
+          name: parsedContent.personalInfo?.name || resumeData.data.title || '姓名',
+          email: parsedContent.personalInfo?.email || 'user@example.com',
+          phone: parsedContent.personalInfo?.phone || '138-0000-0000',
+          location: parsedContent.personalInfo?.location || '北京市',
+          summary: parsedContent.personalInfo?.summary || parsedContent.summary || '优秀的专业人士'
+        },
+        
+        // 工作经历 - 确保是数组格式
+        workExperiences: Array.isArray(parsedContent.workExperiences) ? parsedContent.workExperiences : [
+          {
+            position: '待完善职位',
+            company: '待完善公司',
+            duration: '待完善时间',
+            description: '请在简历编辑中完善工作经历信息。'
+          }
+        ],
+        
+        // 教育背景 - 确保是数组格式
+        educations: Array.isArray(parsedContent.educations) ? parsedContent.educations : [
+          {
+            degree: '待完善学历',
+            school: '待完善学校',
+            duration: '待完善时间',
+            major: '待完善专业'
+          }
+        ],
+        
+        // 技能 - 确保是数组格式
+        skills: Array.isArray(parsedContent.skills) ? parsedContent.skills : 
+               (parsedContent.skills ? [parsedContent.skills] : ['待完善技能']),
+        
+        // 项目经历 - 确保是数组格式
+        projects: Array.isArray(parsedContent.projects) ? parsedContent.projects : [
+          {
+            name: '待完善项目',
+            duration: '待完善时间',
+            description: '请在简历编辑中完善项目经历信息。',
+            technologies: '技术栈'
+          }
+        ],
+        
+        // 语言能力 - 确保是数组格式
+        languages: Array.isArray(parsedContent.languages) ? parsedContent.languages : [
+          { name: '中文', level: '母语' },
+          { name: '英语', level: '待完善' }
+        ]
+      };
+
+      // 添加便捷访问属性
+      standardResumeData.workExperiences.first = standardResumeData.workExperiences[0] || {};
+      standardResumeData.educations.first = standardResumeData.educations[0] || {};
+      standardResumeData.skills.list = standardResumeData.skills.join(', ');
+
+      console.log('✅ [数据规范化] 数据结构标准化完成:', {
+        personalInfo: !!standardResumeData.personalInfo.name,
+        workExperiences: standardResumeData.workExperiences.length,
+        educations: standardResumeData.educations.length,
+        skills: standardResumeData.skills.length,
+        projects: standardResumeData.projects.length
+      });
+
+      // 使用Handlebars编译模板
+      let compiledTemplate;
+      try {
+        // 注册Handlebars helpers
+        Handlebars.registerHelper('eq', function(a, b) {
+          return a === b;
+        });
+        
+        Handlebars.registerHelper('or', function(a, b) {
+          return a || b;
+        });
+
+        // 编译模板
+        const template = Handlebars.compile(templateData.html_content);
+        let htmlContent = template(standardResumeData);
+        
+        console.log('✅ [Handlebars] 模板编译和渲染成功');
+
+        // ========== 向后兼容性处理 ==========
+        // 为了支持旧模板，同时进行简单变量替换
+        console.log('🔄 [向后兼容] 开始处理旧格式变量...');
+        
+        // 简单格式兼容性替换
+        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.personalInfo.name);
+        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.personalInfo.email);
+        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.personalInfo.phone);
+        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.personalInfo.location);
+        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.personalInfo.summary);
+        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperiences.first.position || '职位');
+
+        // 移除任何未处理的Handlebars语法
+        htmlContent = htmlContent.replace(/\{\{#[^}]+\}\}/g, function(match) {
+          console.warn('⚠️ [未处理变量]:', match);
+          return match; // 保留原始变量，便于调试
+        });
+
+        console.log('✅ [向后兼容] 处理完成');
+
+        // 最终调试：检查是否还有未替换的变量
+        const remainingVars = htmlContent.match(/\{\{[^}]+\}\}/g) || [];
+        if (remainingVars.length > 0) {
+          console.log('⚠️ [变量检查] 发现未替换的变量:', remainingVars);
+        }
+        
+        console.log('🔍 [变量替换] 个人信息验证:');
+        console.log('姓名:', standardResumeData.personalInfo.name);
+        console.log('邮箱:', standardResumeData.personalInfo.email);
+        console.log('电话:', standardResumeData.personalInfo.phone);
+        console.log('地址:', standardResumeData.personalInfo.location);
+
+        setRenderedHtml(htmlContent);
+        console.log('✅ [简历渲染] 渲染完成');
+
+      } catch (handlebarsError) {
+        console.error('❌ [Handlebars] 模板编译失败:', handlebarsError);
+        console.log('🔄 [降级处理] 使用简单变量替换...');
+        
+        // Handlebars失败时，降级到简单替换模式
+        let htmlContent = templateData.html_content;
+        
+        // 使用标准数据进行简单替换
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.name\}\}/g, standardResumeData.personalInfo.name);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.email\}\}/g, standardResumeData.personalInfo.email);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.phone\}\}/g, standardResumeData.personalInfo.phone);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.location\}\}/g, standardResumeData.personalInfo.location);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.summary\}\}/g, standardResumeData.personalInfo.summary);
+        
+        // 旧格式兼容
+        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.personalInfo.name);
+        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.personalInfo.email);
+        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.personalInfo.phone);
+        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.personalInfo.location);
+        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.personalInfo.summary);
+        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperiences.first.position || '职位');
+
+        // 简单的列表替换
+        const workExpHtml = standardResumeData.workExperiences.map(exp => 
+          `<div class="work-item">
+            <h4>${exp.position || '职位'}</h4>
+            <div class="work-meta">${exp.company || '公司'} | ${exp.duration || '工作时间'}</div>
+            <p>${exp.description || '工作描述'}</p>
+          </div>`
+        ).join('');
+        htmlContent = htmlContent.replace(/\{\{workExperiences\}\}/g, workExpHtml);
+
+        const educationHtml = standardResumeData.educations.map(edu => 
+          `<div class="education-item">
+            <h4>${edu.degree || '学位'}</h4>
+            <div class="education-meta">${edu.school || '学校'} | ${edu.duration || '就读时间'}</div>
+            <p>${edu.major || '专业'}</p>
+          </div>`
+        ).join('');
+        htmlContent = htmlContent.replace(/\{\{educations\}\}/g, educationHtml);
+
+        const skillsHtml = standardResumeData.skills.map(skill => 
+          `<span class="skill-tag">${skill}</span>`
+        ).join('');
+        htmlContent = htmlContent.replace(/\{\{skills\}\}/g, skillsHtml);
+
+        // 移除未处理的Handlebars语法
+        htmlContent = htmlContent.replace(/\{\{#[^}]+\}\}/g, '');
+        htmlContent = htmlContent.replace(/\{\{\/[^}]+\}\}/g, '');
+        htmlContent = htmlContent.replace(/\{\{[^}]+\}\}/g, '');
+
+        setRenderedHtml(htmlContent);
+        console.log('✅ [降级处理] 简单替换完成');
+      }
+
+    } catch (error) {
+      console.error('❌ [简历渲染] 渲染失败:', error);
+      setRenderError('模板渲染失败：' + error.message);
+    }
+  };
+
+  /**
+   * 生成并下载PDF
+   */
+  const handleDownloadPDF = async () => {
+    try {
+      console.log('📄 [PDF下载] 开始生成PDF');
+      setPdfGenerating(true);
+      setRenderError('');
+
+      // 检查预览内容是否存在
+      if (!previewRef.current || !renderedHtml) {
+        throw new Error('预览内容未准备好，请先选择模板');
+      }
+
+      // 生成文件名：使用简历标题或者从渲染内容中提取姓名
+      const resumeName = selectedResumeForTemplate?.title || '简历';
+      const cleanName = resumeName.replace(/[<>:"/\\|?*]/g, '_'); // 清理文件名中的非法字符
+      const fileName = `${cleanName}.pdf`;
+
+      // 配置html2pdf选项
+      const options = {
+        margin: [10, 10, 10, 10],
+        filename: fileName,
+        image: { 
+          type: 'jpeg', 
+          quality: 0.98 
+        },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          letterRendering: true,
+          allowTaint: false 
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4',
+          orientation: 'portrait' 
+        }
+      };
+
+      console.log('📄 [PDF下载] 配置选项:', options);
+
+      // 获取预览容器
+      const element = previewRef.current;
+      const originalTransform = element.style.transform;
+      const originalWidth = element.style.width;
+      
+      // 临时移除缩放效果
+      element.style.transform = 'none';
+      element.style.width = 'auto';
+
+      // 生成PDF
+      await html2pdf()
+        .set(options)
+        .from(element)
+        .save();
+
+      // 恢复原始样式
+      element.style.transform = originalTransform;
+      element.style.width = originalWidth;
+
+      console.log('✅ [PDF下载] PDF生成成功:', fileName);
+
+    } catch (error) {
+      console.error('❌ [PDF下载] 生成失败:', error);
+      setRenderError('PDF生成失败：' + error.message);
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
+
+  /**
    * 打开模板选择器
    */
   const handleOpenTemplateSelector = (resume) => {
     setSelectedResumeForTemplate(resume);
-    setShowTemplateSelector(true);
+    setShowTemplateModal(true);
+    fetchTemplates(); // 加载模板列表
   };
 
   /**
    * 关闭模板选择器
    */
   const handleCloseTemplateSelector = () => {
-    setShowTemplateSelector(false);
+    setShowTemplateModal(false);
     setSelectedResumeForTemplate(null);
-  };
-
-  /**
-   * 模板选择完成回调
-   */
-  const handleTemplateSelected = (template, format, data) => {
-    console.log('模板选择完成:', { template, format, data });
+    setSelectedTemplate(null);
+    setRenderedHtml('');
+    setRenderError('');
     
-    // 显示成功消息
-    alert(`${format === 'pdf' ? 'PDF生成' : '模板应用'}成功！`);
-    
-    // 关闭选择器
-    handleCloseTemplateSelector();
-    
-    // 如果需要，可以刷新简历列表
-    if (format === 'html') {
-      loadResumes();
+    // 清除CSS样式
+    if (currentStyleRef.current) {
+      document.head.removeChild(currentStyleRef.current);
+      currentStyleRef.current = null;
     }
   };
+
+  // 组件卸载时清理样式
+  useEffect(() => {
+    return () => {
+      if (currentStyleRef.current) {
+        document.head.removeChild(currentStyleRef.current);
+      }
+    };
+  }, []);
 
   /**
    * 获取简历建议
@@ -343,16 +742,16 @@ const ResumeDashboard = () => {
                 岗位管理
               </Link>
               <Link
-                to="/create-resume"
+                to="/resumes/new"
                 className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors"
               >
-                创建新简历
+                📝 创建新简历
               </Link>
               <Link
                 to="/ai-chat"
                 className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
               >
-                AI问答创建
+                🤖 AI问答创建
               </Link>
             </div>
           </div>
@@ -388,16 +787,16 @@ const ResumeDashboard = () => {
               <p className="text-gray-500 mb-6">基础简历是生成岗位专属简历的基础，请先创建一份基础简历</p>
               <div className="flex justify-center space-x-4">
                 <Link
-                  to="/create-resume"
+                  to="/resumes/new"
                   className="bg-indigo-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
                 >
-                  创建基础简历
+                  📝 创建基础简历
                 </Link>
                 <Link
                   to="/ai-chat"
                   className="bg-green-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-green-700"
                 >
-                  AI创建简历
+                  🤖 AI创建简历
                 </Link>
               </div>
             </div>
@@ -740,13 +1139,151 @@ const ResumeDashboard = () => {
         </div>
       )}
 
-      {/* 模板选择器 */}
-      {showTemplateSelector && selectedResumeForTemplate && (
-        <ResumeTemplateSelector
-          resumeId={selectedResumeForTemplate.id}
-          onTemplateSelect={handleTemplateSelected}
-          onClose={handleCloseTemplateSelector}
-        />
+      {/* 新的模板选择器 */}
+      {showTemplateModal && selectedResumeForTemplate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-7xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">选择简历模板</h3>
+                  <p className="text-sm text-gray-500">为简历 "{selectedResumeForTemplate.title}" 选择合适的模板</p>
+                </div>
+                <button
+                  onClick={handleCloseTemplateSelector}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 左侧：模板选择 */}
+                <div>
+                  <h4 className="text-md font-medium text-gray-900 mb-4">📚 可用模板</h4>
+                  
+                  {templatesLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-gray-600">加载模板中...</span>
+                    </div>
+                  ) : templates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>暂无可用模板</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto">
+                      {templates.map((template) => (
+                        <div
+                          key={template.id}
+                          onClick={() => handleTemplateSelect(template)}
+                          className={`relative cursor-pointer border-2 rounded-lg p-4 transition-all ${
+                            selectedTemplate?.id === template.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-sm font-medium text-gray-900 mb-1">
+                                {template.name}
+                              </h3>
+                              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                <span>{template.category}</span>
+                                {template.is_premium && (
+                                  <span className="inline-block px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full">
+                                    付费
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* 选中标识 */}
+                            {selectedTemplate?.id === template.id && (
+                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                            )}
+                            
+                            {/* 加载指示器 */}
+                            {templateDetailLoading && selectedTemplate?.id === template.id && (
+                              <div className="absolute inset-0 bg-white bg-opacity-80 rounded-lg flex items-center justify-center">
+                                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 右侧：预览和操作 */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-medium text-gray-900">👀 实时预览</h4>
+                    {selectedTemplate && renderedHtml && (
+                      <button
+                        onClick={handleDownloadPDF}
+                        disabled={pdfGenerating}
+                        className={`px-4 py-2 rounded-md transition-colors ${
+                          pdfGenerating
+                            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {pdfGenerating ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            生成中...
+                          </>
+                        ) : (
+                          '📄 下载PDF'
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    {templateDetailLoading ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span className="ml-2 text-gray-600">加载模板中...</span>
+                      </div>
+                    ) : renderError ? (
+                      <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                          <div className="text-red-500 text-lg mb-2">⚠️</div>
+                          <p className="text-red-600 text-sm">{renderError}</p>
+                        </div>
+                      </div>
+                    ) : renderedHtml ? (
+                      <div 
+                        ref={previewRef}
+                        className="p-6 bg-white min-h-[400px] scale-50 origin-top-left transform w-[200%] overflow-auto"
+                        dangerouslySetInnerHTML={{ __html: renderedHtml }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center py-12 text-gray-500">
+                        <div className="text-center">
+                          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <p className="mt-2">选择模板开始预览</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

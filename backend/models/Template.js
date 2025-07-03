@@ -23,7 +23,7 @@ class Template {
         const { category, isPremium } = options;
         
         let query = knex(this.tableName)
-            .select('id', 'name', 'thumbnail_url', 'is_premium', 'category', 'description', 'sort_order')
+            .select('id', 'name', 'html_content', 'css_content', 'thumbnail_url', 'is_premium', 'category', 'description', 'sort_order')
             .where('status', 'published')
             .orderBy('sort_order', 'asc')
             .orderBy('created_at', 'desc');
@@ -50,7 +50,7 @@ class Template {
         const { status, category, isPremium, page = 1, limit = 10 } = options;
         
         let query = knex(this.tableName)
-            .select('id', 'name', 'thumbnail_url', 'is_premium', 'status', 'category', 'description', 'sort_order', 'created_at', 'updated_at');
+            .select('id', 'name', 'html_content', 'css_content', 'thumbnail_url', 'is_premium', 'status', 'category', 'description', 'sort_order', 'created_at', 'updated_at');
 
         // 添加状态筛选
         if (status) {
@@ -139,7 +139,7 @@ class Template {
             throw new Error('模板名称、HTML内容和CSS内容为必填字段');
         }
 
-        const [templateId] = await knex(this.tableName)
+        const [result] = await knex(this.tableName)
             .insert({
                 name,
                 html_content,
@@ -155,6 +155,7 @@ class Template {
             })
             .returning('id');
 
+        const templateId = result.id || result;
         return await this.getTemplateById(templateId);
     }
 

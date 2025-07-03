@@ -159,6 +159,11 @@ const updateTemplate = async (req, res) => {
         const { id } = req.params;
         const templateData = req.body;
 
+        console.log('🔍 [模板更新] 请求数据:', {
+            id,
+            templateData: JSON.stringify(templateData, null, 2)
+        });
+
         if (!id || isNaN(parseInt(id))) {
             return res.status(400).json({
                 success: false,
@@ -168,6 +173,12 @@ const updateTemplate = async (req, res) => {
 
         // 验证请求数据（更新时某些字段可选）
         const validation = validateTemplateData(templateData, false);
+        
+        console.log('🔍 [模板更新] 验证结果:', {
+            isValid: validation.isValid,
+            errors: validation.errors
+        });
+        
         if (!validation.isValid) {
             return res.status(400).json({
                 success: false,

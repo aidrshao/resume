@@ -18,23 +18,13 @@ const templateController = require('../controllers/templateController');
 // GET /api/templates
 router.get('/', templateController.getPublishedTemplates);
 
-// 获取单个模板详情
-// GET /api/templates/:id
-router.get('/:id', templateController.getTemplateById);
-
 // 获取模板分类列表
 // GET /api/templates/categories
 router.get('/categories', templateController.getTemplateCategories);
 
 /**
- * 需要用户认证的路由
- */
-
-// 用户也可以查看模板详情（可能需要检查会员权限）
-// 这里暂时保持开放，后续可根据需要添加权限控制
-
-/**
  * 管理员专用路由 - 需要管理员权限
+ * 注意：具体路径必须在参数化路径之前定义
  */
 
 // 获取所有模板（管理员用）
@@ -44,6 +34,14 @@ router.get('/admin', adminAuth, templateController.getAllTemplatesForAdmin);
 // 获取模板统计信息
 // GET /api/templates/statistics
 router.get('/statistics', adminAuth, templateController.getTemplateStatistics);
+
+/**
+ * 参数化路由 - 必须放在具体路径之后
+ */
+
+// 获取单个模板详情
+// GET /api/templates/:id
+router.get('/:id', templateController.getTemplateById);
 
 // 创建新模板
 // POST /api/templates

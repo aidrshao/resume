@@ -947,13 +947,18 @@ class AdminController {
           .first();
 
         if (freeTier) {
+          // 从全局配额配置获取新用户AI简历配额
+          const GlobalQuotaConfig = require('../models/GlobalQuotaConfig');
+          const aiResumeConfig = await GlobalQuotaConfig.getByKey('new_user_ai_resume_quota');
+          const aiResumeQuota = aiResumeConfig ? aiResumeConfig.default_quota : freeTier.ai_resume_quota;
+          
           const membershipResult = await knex('user_memberships').insert({
             user_id: parseInt(userId),
             membership_tier_id: freeTier.id,
             status: 'active',
             start_date: new Date(),
             end_date: null, // 永久有效
-            remaining_ai_quota: freeTier.ai_resume_quota,
+            remaining_ai_quota: aiResumeQuota,
             quota_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
             payment_status: 'paid',
             paid_amount: 0,

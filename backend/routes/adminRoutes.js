@@ -8,6 +8,7 @@ const router = express.Router();
 const AdminController = require('../controllers/adminController');
 const { adminAuth, superAdminAuth } = require('../middleware/adminAuth');
 const AdminAIPromptController = require('../controllers/adminAIPromptController');
+const AdminGlobalQuotaController = require('../controllers/adminGlobalQuotaController');
 
 // ==================== 认证相关路由 ====================
 
@@ -191,6 +192,33 @@ router.post('/assign-quota', adminAuth, AdminController.assignQuota);
  * GET /api/admin/statistics
  */
 router.get('/statistics', adminAuth, AdminController.getStatistics);
+
+// ==================== 全局配额配置管理 ====================
+
+/**
+ * 获取全局配额配置列表
+ * GET /api/admin/global-quota-configs
+ * 查询参数: category, isActive, page, limit
+ */
+router.get('/global-quota-configs', adminAuth, AdminGlobalQuotaController.getGlobalQuotaConfigs);
+
+/**
+ * 更新全局配额配置
+ * PUT /api/admin/global-quota-configs/:id
+ */
+router.put('/global-quota-configs/:id', adminAuth, AdminGlobalQuotaController.updateGlobalQuotaConfig);
+
+/**
+ * 批量更新全局配额配置
+ * POST /api/admin/global-quota-configs/batch-update
+ */
+router.post('/global-quota-configs/batch-update', adminAuth, AdminGlobalQuotaController.batchUpdateGlobalQuotaConfigs);
+
+/**
+ * 获取全局配额配置统计信息
+ * GET /api/admin/global-quota-configs/statistics
+ */
+router.get('/global-quota-configs/statistics', adminAuth, AdminGlobalQuotaController.getGlobalQuotaConfigStatistics);
 
 // ==================== AI提示词管理 ====================
 
