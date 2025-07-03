@@ -66,7 +66,6 @@ async function initTestUsers() {
       const insertData = {
         email: userData.email,
         password_hash: passwordHash,
-        name: userData.name,
         email_verified: userData.email_verified,
         created_at: knex.fn.now(),
         updated_at: knex.fn.now()
@@ -161,7 +160,7 @@ async function listAllUsers() {
   
   try {
     const users = await knex('users')
-      .select('id', 'email', 'name', 'email_verified', 'created_at')
+      .select('id', 'email', 'email_verified', 'created_at')
       .orderBy('id', 'asc');
     
     console.log(`📊 [LIST_USERS] 总用户数: ${users.length}`);
@@ -172,7 +171,7 @@ async function listAllUsers() {
         const isAdmin = user.email === 'admin@example.com';
         const isTest = testUsers.some(t => t.email === user.email);
         const userType = isAdmin ? '👑 管理员' : isTest ? '🧪 测试用户' : '👤 普通用户';
-        console.log(`  ${index + 1}. ID: ${user.id}, 邮箱: ${user.email}, 姓名: ${user.name || 'N/A'}, 验证: ${user.email_verified ? '✅' : '❌'}, ${userType}`);
+        console.log(`  ${index + 1}. ID: ${user.id}, 邮箱: ${user.email}, 验证: ${user.email_verified ? '✅' : '❌'}, ${userType}`);
       });
     } else {
       console.log('⚠️ [LIST_USERS] 数据库中没有用户');
