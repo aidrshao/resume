@@ -36,7 +36,6 @@ router.post('/resumes/save-base', ResumeController.saveBaseResume);
 
 // 简历生成路由
 router.post('/resumes/:id/generate', ResumeController.generateResume);
-router.post('/resumes/:id/generate-advanced', ResumeController.generateAdvancedResume);
 router.post('/resumes/generate-for-job', ResumeController.generateJobSpecificResume);
 
 // 简历上传和解析

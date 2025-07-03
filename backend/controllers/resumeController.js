@@ -10,6 +10,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const knex = require('../config/database');
+const MembershipController = require('./membershipController');
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -300,90 +301,6 @@ class ResumeController {
   }
 
   /**
-   * 高级模式生成简历（AI优化）
-   * POST /api/resumes/:id/generate-advanced
-   */
-  static async generateAdvancedResume(req, res) {
-    try {
-      const { id } = req.params;
-      const userId = req.user.id;
-      
-      // 校验AI配额
-      const MembershipController = require('./membershipController');
-      try {
-        await MembershipController.consumeAIQuota(userId, 'resume_optimization', parseInt(id));
-        console.log('✅ [AI配额] 配额校验通过并已消耗');
-      } catch (quotaError) {
-        console.log('❌ [AI配额] 配额校验失败:', quotaError.message);
-        return res.status(403).json({
-          success: false,
-          message: quotaError.message,
-          error_code: 'QUOTA_EXCEEDED'
-        });
-      }
-      
-      const resume = await Resume.findById(id);
-      if (!resume || resume.user_id !== userId) {
-        return res.status(404).json({
-          success: false,
-          message: '简历不存在或无权访问'
-        });
-      }
-      
-      if (!resume.target_company || !resume.target_position) {
-        return res.status(400).json({
-          success: false,
-          message: '高级模式需要提供目标公司和岗位信息'
-        });
-      }
-      
-      // 更新状态为生成中
-      await Resume.updateStatus(id, 'generating', '开始AI优化简历');
-      
-      // 异步执行AI优化
-      setImmediate(async () => {
-        try {
-          console.log('🚀 开始AI优化简历');
-          
-          // 使用AI优化简历内容
-          const optimizedData = await aiService.optimizeResumeForJob(
-            resume.resume_data,
-            resume.target_company,
-            resume.target_position,
-            resume.job_description
-          );
-          
-          console.log('✅ AI优化完成');
-          
-          // 更新简历数据
-          await Resume.update(id, {
-            resume_data: optimizedData,
-            ai_optimizations: optimizedData.optimizations || [],
-            status: 'completed'
-          });
-          
-          await Resume.updateStatus(id, 'completed', 'AI优化简历生成完成');
-          
-        } catch (error) {
-          console.error('❌ AI优化失败:', error);
-          await Resume.updateStatus(id, 'failed', `AI优化失败: ${error.message}`);
-        }
-      });
-      
-      res.json({
-        success: true,
-        message: 'AI优化简历生成任务已启动'
-      });
-    } catch (error) {
-      console.error('高级生成简历失败:', error);
-      res.status(500).json({
-        success: false,
-        message: '高级生成简历失败'
-      });
-    }
-  }
-
-  /**
    * 上传简历文件进行解析（异步任务）
    * POST /api/resumes/upload
    */
@@ -506,29 +423,8 @@ class ResumeController {
           filePath: file.path
         });
         
-        // 校验AI配额
-        const MembershipController = require('./membershipController');
-        try {
-          await MembershipController.consumeAIQuota(userId, 'resume_parse');
-          console.log('✅ [AI配额] 简历解析配额校验通过并已消耗');
-        } catch (quotaError) {
-          console.log('❌ [AI配额] 简历解析配额校验失败:', quotaError.message);
-          
-          // 清理上传的文件
-          if (req.file && req.file.path) {
-            fs.unlink(req.file.path, (err) => {
-              if (err) console.error('❌ [CLEANUP] 删除临时文件失败:', err);
-              else console.log('✅ [CLEANUP] 临时文件已清理:', req.file.path);
-            });
-          }
-          
-          return res.status(403).json({
-            success: false,
-            message: quotaError.message,
-            error_code: 'QUOTA_EXCEEDED',
-            request_id: requestId
-          });
-        }
+        // 已移除AI配额校验，避免因配额不足导致上传失败
+        console.log('ℹ️ [AI配额] 已跳过简历解析配额校验');
         
         // 创建异步解析任务
         console.log('📋 [UPLOAD_RESUME] 调用taskQueueService.createTask...');
@@ -1035,17 +931,16 @@ class ResumeController {
         targetPosition
       });
 
-      // 校验AI配额
-      const MembershipController = require('./membershipController');
+      // 校验AI配额并消耗
       try {
         // 确保参数为有效的整数或null，避免NaN
         const validResumeId = baseResumeId ? parseInt(baseResumeId) : null;
         const validJobId = jobId ? parseInt(jobId) : null;
         
         await MembershipController.consumeAIQuota(userId, 'resume_generation', validResumeId, validJobId);
-        console.log('✅ [AI配额] 配额校验通过并已消耗');
+        console.log('✅ [AI配额] 岗位专属简历生成配额校验通过并已消耗');
       } catch (quotaError) {
-        console.log('❌ [AI配额] 配额校验失败:', quotaError.message);
+        console.log('❌ [AI配额] 岗位专属简历生成配额校验失败:', quotaError.message);
         return res.status(403).json({
           success: false,
           message: quotaError.message,
