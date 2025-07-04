@@ -11,8 +11,7 @@ import EditJobModal from './EditJobModal';
 import JobCard from './JobCard';
 import JobFilters from './JobFilters';
 import JobStats from './JobStats';
-import GenerateResumeModal from './GenerateResumeModal';
-import ResumePreviewModal from './ResumePreviewModal';
+
 
 const JobsPage = () => {
   // 状态管理
@@ -36,16 +35,7 @@ const JobsPage = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingJob, setEditingJob] = useState(null);
 
-  // 生成简历相关状态
-  const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [selectedJobForResume, setSelectedJobForResume] = useState(null);
-  const [baseResume, setBaseResume] = useState(null);
-  const [generatedResume, setGeneratedResume] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // 新增：定制简历生成状态
+  // 定制简历生成状态
   const [generatingJobId, setGeneratingJobId] = useState(null);
 
   // 加载岗位列表
@@ -133,26 +123,12 @@ const JobsPage = () => {
       const response = await getResumes();
       if (response.success) {
         const baseResumeData = response.data.find(resume => resume.is_base);
-        setBaseResume(baseResumeData);
         return baseResumeData;
       }
     } catch (err) {
       console.error('获取基础简历失败:', err);
       return null;
     }
-  };
-
-  // 处理生成简历点击
-  const handleGenerateResume = async (job) => {
-    // 先检查是否有基础简历
-    const baseResumeData = await loadBaseResume();
-    if (!baseResumeData) {
-      alert('请先创建基础简历后再生成岗位专属简历');
-      return;
-    }
-
-    setSelectedJobForResume(job);
-    setShowGenerateModal(true);
   };
 
   /**
@@ -166,7 +142,6 @@ const JobsPage = () => {
       // 设置加载状态
       setGeneratingJobId(targetJobId);
       setError('');
-
       // 获取基础简历
       console.log('📋 [GENERATE_CUSTOM] 获取基础简历...');
       const baseResumeData = await loadBaseResume();
@@ -248,91 +223,6 @@ const JobsPage = () => {
       setGeneratingJobId(null);
       console.log('🏁 [GENERATE_CUSTOM] 定制简历生成流程结束');
     }
-  };
-
-  // 确认生成简历
-  const handleConfirmGenerate = async (job, userRequirements) => {
-    if (!baseResume) {
-      setError('未找到基础简历');
-      return;
-    }
-
-    try {
-      setIsGenerating(true);
-      
-      const response = await generateJobSpecificResume({
-        baseResumeId: baseResume.id,
-        targetCompany: job.company,
-        targetPosition: job.title,
-        userRequirements: userRequirements || ''
-      });
-
-      if (response.success) {
-        // 关闭生成确认弹窗
-        setShowGenerateModal(false);
-        
-        // 设置生成的简历并显示预览
-        setGeneratedResume(response.data);
-        setShowPreviewModal(true);
-      } else {
-        setError(response.message || '生成简历失败');
-      }
-    } catch (err) {
-      console.error('生成简历失败:', err);
-      
-      // 检查是否是409冲突错误（已存在专属简历）
-      if (err.response && err.response.status === 409) {
-        const errorData = err.response.data;
-        const errorMessage = errorData?.message || '已存在针对该岗位的专属简历';
-        const existingResumeId = errorData?.data?.existingResumeId;
-        
-        // 如果有现有简历ID，提供更友好的错误处理
-        if (existingResumeId) {
-          const confirmMessage = `${errorMessage}\n\n您可以选择：\n1. 点击"确定"查看现有简历\n2. 点击"取消"返回岗位列表`;
-          
-          if (window.confirm(confirmMessage)) {
-            // 用户选择查看现有简历，跳转到简历管理页面
-            window.location.href = '/resumes';
-          }
-        } else {
-          setError(errorMessage);
-        }
-      } else if (err.response && err.response.data?.message) {
-        // 其他API错误，显示具体错误信息
-        setError(err.response.data.message);
-      } else {
-        // 网络错误或其他未知错误
-        setError('生成简历失败，请稍后重试');
-      }
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // 保存生成的简历
-  const handleSaveResume = async (resume) => {
-    try {
-      setIsSaving(true);
-      // 简历已经在后端生成并保存，这里只需要关闭预览弹窗
-      setShowPreviewModal(false);
-      setGeneratedResume(null);
-      setSelectedJobForResume(null);
-      
-      // 可以显示成功消息
-      alert('简历已成功保存！您可以在简历管理页面查看。');
-    } catch (err) {
-      console.error('保存简历失败:', err);
-      setError('保存简历失败');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // 重新生成简历
-  const handleRegenerateResume = () => {
-    setShowPreviewModal(false);
-    setGeneratedResume(null);
-    setShowGenerateModal(true);
   };
 
   // 初始化数据
@@ -621,7 +511,6 @@ const JobsPage = () => {
                 onSelect={(isSelected) => handleJobSelect(job.id, isSelected)}
                 onEdit={() => handleEditJob(job)}
                 onDelete={() => handleDeleteJob(job.id)}
-                onGenerateResume={() => handleGenerateResume(job)}
                 onGenerateCustomResume={handleGenerateCustomResume}
                 isGeneratingCustom={generatingJobId === job.id}
               />
@@ -697,40 +586,9 @@ const JobsPage = () => {
           }}
         />
       )}
-
-      {/* 生成简历确认模态框 */}
-      {showGenerateModal && selectedJobForResume && (
-        <GenerateResumeModal
-          isOpen={showGenerateModal}
-          onClose={() => {
-            setShowGenerateModal(false);
-            setSelectedJobForResume(null);
-          }}
-          job={selectedJobForResume}
-          onConfirm={handleConfirmGenerate}
-          isGenerating={isGenerating}
-        />
-      )}
-
-      {/* 简历预览模态框 */}
-      {showPreviewModal && generatedResume && selectedJobForResume && (
-        <ResumePreviewModal
-          isOpen={showPreviewModal}
-          onClose={() => {
-            setShowPreviewModal(false);
-            setGeneratedResume(null);
-            setSelectedJobForResume(null);
-          }}
-          resume={generatedResume}
-          job={selectedJobForResume}
-          onSave={handleSaveResume}
-          onRegenerate={handleRegenerateResume}
-          isSaving={isSaving}
-        />
-      )}
       </div>
     </div>
   );
 };
 
-export default JobsPage; 
+export default JobsPage;
