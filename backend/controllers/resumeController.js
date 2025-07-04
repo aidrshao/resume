@@ -60,19 +60,97 @@ class ResumeController {
    */
   static async getUserResumes(req, res) {
     try {
+      console.log('🔄 [RESUME_CONTROLLER] 开始处理getUserResumes请求');
+      console.log('🔄 [RESUME_CONTROLLER] 请求ID:', req.requestId);
+      console.log('🔄 [RESUME_CONTROLLER] 用户信息:', {
+        userId: req.user?.id,
+        userObject: req.user,
+        hasUser: !!req.user
+      });
+      
       const userId = req.user.id;
+      console.log('🔍 [RESUME_CONTROLLER] 提取的用户ID:', userId);
+      
+      if (!userId) {
+        console.error('❌ [RESUME_CONTROLLER] 用户ID为空');
+        return res.status(400).json({
+          success: false,
+          message: '用户ID无效'
+        });
+      }
+
+      console.log('🔄 [RESUME_CONTROLLER] 开始调用Resume.findListByUserId...');
+      const startTime = Date.now();
+      
       const resumes = await Resume.findListByUserId(userId);
       
-      res.json({
+      const duration = Date.now() - startTime;
+      console.log('✅ [RESUME_CONTROLLER] Resume.findListByUserId调用成功');
+      console.log('📊 [RESUME_CONTROLLER] 耗时:', duration + 'ms');
+      console.log('📊 [RESUME_CONTROLLER] 返回记录数:', resumes?.length || 0);
+      console.log('📊 [RESUME_CONTROLLER] 数据类型:', typeof resumes);
+      console.log('📊 [RESUME_CONTROLLER] 是否为数组:', Array.isArray(resumes));
+      
+      if (resumes && resumes.length > 0) {
+        console.log('📋 [RESUME_CONTROLLER] 第一条记录样本:', {
+          id: resumes[0].id,
+          title: resumes[0].title,
+          status: resumes[0].status,
+          created_at: resumes[0].created_at
+        });
+      }
+
+      console.log('🔄 [RESUME_CONTROLLER] 开始构造响应...');
+      const response = {
         success: true,
         data: resumes,
         message: '获取简历列表成功'
+      };
+      
+      console.log('📊 [RESUME_CONTROLLER] 响应对象构造完成:', {
+        success: response.success,
+        dataLength: response.data?.length,
+        message: response.message
       });
+
+      console.log('🔄 [RESUME_CONTROLLER] 发送响应...');
+      res.json(response);
+      console.log('✅ [RESUME_CONTROLLER] 响应发送完成');
+      
     } catch (error) {
-      console.error('获取简历列表失败:', error);
-      res.status(500).json({
+      console.error('❌ [RESUME_CONTROLLER] getUserResumes失败');
+      console.error('❌ [RESUME_CONTROLLER] 请求ID:', req.requestId);
+      console.error('❌ [RESUME_CONTROLLER] 用户ID:', req.user?.id);
+      console.error('❌ [RESUME_CONTROLLER] 错误类型:', error.constructor.name);
+      console.error('❌ [RESUME_CONTROLLER] 错误消息:', error.message);
+      console.error('❌ [RESUME_CONTROLLER] 错误堆栈:', error.stack);
+      console.error('❌ [RESUME_CONTROLLER] 错误详情:', error);
+      
+      // 根据错误类型返回不同的错误信息
+      let statusCode = 500;
+      let message = '获取简历列表失败';
+      
+      if (error.code === 'ECONNREFUSED') {
+        message = '数据库连接失败';
+      } else if (error.message && error.message.includes('invalid input syntax')) {
+        message = '数据查询参数错误';
+        statusCode = 400;
+      } else if (error.message && error.message.includes('relation') && error.message.includes('does not exist')) {
+        message = '数据表不存在';
+      }
+      
+      console.error('❌ [RESUME_CONTROLLER] 最终错误响应:', {
+        statusCode,
+        message,
+        timestamp: new Date().toISOString()
+      });
+      
+      res.status(statusCode).json({
         success: false,
-        message: '获取简历列表失败'
+        message: message,
+        error_code: 'RESUME_LIST_ERROR',
+        request_id: req.requestId,
+        timestamp: new Date().toISOString()
       });
     }
   }

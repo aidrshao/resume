@@ -17,6 +17,11 @@ const ResumeDashboard = () => {
   const [error, setError] = useState('');
   const [baseResume, setBaseResume] = useState(null);
   
+  // 🔧 添加重试相关状态
+  const [retryCount, setRetryCount] = useState(0);
+  const [retrying, setRetrying] = useState(false);
+  const [lastErrorTime, setLastErrorTime] = useState(null);
+  
   // 模板系统状态
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [selectedResumeForTemplate, setSelectedResumeForTemplate] = useState(null);
@@ -31,44 +36,205 @@ const ResumeDashboard = () => {
   const currentStyleRef = useRef(null);
   const previewRef = useRef(null);
 
-  // 加载数据
-  useEffect(() => {
-    loadData();
-  }, []);
+  // 🔧 重试逻辑
+  const MAX_RETRY_COUNT = 3;
+  const RETRY_DELAY = 2000; // 2秒延迟
+  
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  
+  const shouldRetry = (error, currentRetryCount) => {
+    if (currentRetryCount >= MAX_RETRY_COUNT) return false;
+    
+    // 可重试的错误类型
+    const retryableErrors = [
+      'Network Error',
+      'timeout',
+      'ERR_NETWORK',
+      'ERR_INTERNET_DISCONNECTED',
+      'ERR_CONNECTION_REFUSED'
+    ];
+    
+    const errorMessage = error.message || '';
+    const shouldRetryError = retryableErrors.some(errorType => 
+      errorMessage.includes(errorType)
+    );
+    
+    // 5xx服务器错误也可以重试
+    const isServerError = error.response && error.response.status >= 500;
+    
+    return shouldRetryError || isServerError;
+  };
+  
+  const loadDataWithRetry = async (attemptCount = 0) => {
+    try {
+      await loadDataCore();
+      setRetryCount(0); // 成功后重置重试计数
+      setRetrying(false);
+    } catch (err) {
+      console.error(`❌ [RESUME_DASHBOARD] 第${attemptCount + 1}次尝试失败:`, err);
+      
+      if (shouldRetry(err, attemptCount)) {
+        console.log(`🔄 [RESUME_DASHBOARD] 将在${RETRY_DELAY}ms后进行第${attemptCount + 2}次重试...`);
+        setRetrying(true);
+        setRetryCount(attemptCount + 1);
+        
+        await sleep(RETRY_DELAY);
+        return loadDataWithRetry(attemptCount + 1);
+      } else {
+        console.error(`❌ [RESUME_DASHBOARD] 已达到最大重试次数或不可重试的错误`);
+        setRetrying(false);
+        throw err;
+      }
+    }
+  };
+  
+  const loadDataCore = async () => {
+    // 原有的loadData逻辑移到这里
+    setError('');
+    
+    // 🔧 添加详细的调试日志
+    console.log('🔄 [RESUME_DASHBOARD] 开始加载数据...');
+    console.log('🔄 [RESUME_DASHBOARD] 当前时间:', new Date().toISOString());
+    
+    // 检查认证状态
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    console.log('🔍 [RESUME_DASHBOARD] 认证状态:', {
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      hasUser: !!user,
+      tokenPrefix: token ? token.substring(0, 20) + '...' : 'null'
+    });
+    
+    if (!token) {
+      console.error('❌ [RESUME_DASHBOARD] 未找到认证token，跳转到登录页');
+      setError('认证已过期，请重新登录');
+      return;
+    }
+    
+    // 🔧 分别处理两个API调用，添加更详细的错误处理
+    console.log('📡 [RESUME_DASHBOARD] 开始并行请求...');
+    
+    let resumesResponse = null;
+    let customizedResponse = null;
+    
+    try {
+      // 分别处理两个API调用
+      const promises = [
+        api.getResumes().catch(err => {
+          console.error('❌ [RESUME_DASHBOARD] 获取基础简历失败:', err);
+          return { success: false, error: err, type: 'resumes' };
+        }),
+        api.getCustomizedResumes().catch(err => {
+          console.error('❌ [RESUME_DASHBOARD] 获取定制简历失败:', err);
+          return { success: false, error: err, type: 'customized' };
+        })
+      ];
+      
+      [resumesResponse, customizedResponse] = await Promise.all(promises);
+      
+      console.log('📊 [RESUME_DASHBOARD] 基础简历响应:', {
+        success: resumesResponse.success,
+        hasData: !!resumesResponse.data,
+        dataType: typeof resumesResponse.data,
+        dataLength: Array.isArray(resumesResponse.data) ? resumesResponse.data.length : 'not_array'
+      });
+      
+      console.log('📊 [RESUME_DASHBOARD] 定制简历响应:', {
+        success: customizedResponse.success,
+        hasData: !!customizedResponse.data,
+        dataType: typeof customizedResponse.data,
+        dataLength: Array.isArray(customizedResponse.data) ? customizedResponse.data.length : 'not_array'
+      });
+      
+    } catch (err) {
+      console.error('❌ [RESUME_DASHBOARD] 并行请求异常:', err);
+      throw err;
+    }
+    
+    // 处理基础简历响应
+    if (resumesResponse && resumesResponse.success) {
+      setResumes(resumesResponse.data || []);
+      const base = (resumesResponse.data || []).find(r => r.is_base);
+      setBaseResume(base);
+      console.log('✅ [RESUME_DASHBOARD] 基础简历处理成功:', {
+        totalCount: resumesResponse.data?.length || 0,
+        hasBaseResume: !!base,
+        baseResumeId: base?.id
+      });
+    } else {
+      console.error('❌ [RESUME_DASHBOARD] 基础简历响应失败:', resumesResponse);
+      if (resumesResponse && resumesResponse.error) {
+        throw resumesResponse.error;
+      }
+    }
+    
+    // 处理定制简历响应
+    if (customizedResponse && customizedResponse.success) {
+      setCustomizedResumes(customizedResponse.data || []);
+      console.log('✅ [RESUME_DASHBOARD] 定制简历处理成功:', {
+        totalCount: customizedResponse.data?.length || 0
+      });
+    } else {
+      console.error('❌ [RESUME_DASHBOARD] 定制简历响应失败:', customizedResponse);
+      // 定制简历失败不影响主要功能，只记录错误
+      if (customizedResponse && customizedResponse.error) {
+        console.error('❌ [RESUME_DASHBOARD] 定制简历错误详情:', customizedResponse.error);
+      }
+    }
+    
+    console.log('✅ [RESUME_DASHBOARD] 数据加载完成');
+  };
 
+  // 🔧 修改原有的loadData方法
   const loadData = async () => {
     try {
       setLoading(true);
-      setError('');
-      
-             // 并行获取基础简历和定制简历
-             const [resumesResponse, customizedResponse] = await Promise.all([
-        api.getResumes(),
-        api.getCustomizedResumes()
-      ]);
-      
-      console.log('基础简历响应:', resumesResponse);
-      console.log('定制简历响应:', customizedResponse);
-      
-      if (resumesResponse.success) {
-        setResumes(resumesResponse.data);
-        const base = resumesResponse.data.find(r => r.is_base);
-        setBaseResume(base);
-        
-        console.log('基础简历:', base);
-      }
-      
-      if (customizedResponse.success) {
-        setCustomizedResumes(customizedResponse.data);
-      }
-      
+      setLastErrorTime(null);
+      await loadDataWithRetry();
     } catch (err) {
-      console.error('加载数据失败:', err);
-      setError('加载数据失败，请刷新页面重试');
+      console.error('❌ [RESUME_DASHBOARD] 数据加载失败:', err);
+      console.error('❌ [RESUME_DASHBOARD] 错误类型:', err.constructor.name);
+      console.error('❌ [RESUME_DASHBOARD] 错误消息:', err.message);
+      console.error('❌ [RESUME_DASHBOARD] 错误堆栈:', err.stack);
+      
+      setLastErrorTime(new Date().toISOString());
+      
+      // 根据错误类型设置不同的错误消息
+      let errorMessage = '加载数据失败，请刷新页面重试';
+      
+      if (err.message && err.message.includes('Network Error')) {
+        errorMessage = '网络连接失败，请检查网络后重试';
+      } else if (err.message && err.message.includes('timeout')) {
+        errorMessage = '请求超时，请稍后重试';
+      } else if (err.response && err.response.status === 401) {
+        errorMessage = '认证已过期，请重新登录';
+        // 清除本地存储的认证信息
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      } else if (err.response && err.response.status === 403) {
+        errorMessage = '没有权限访问该资源';
+      } else if (err.response && err.response.status >= 500) {
+        errorMessage = '服务器错误，请稍后重试';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+  
+  // 🔧 手动重试方法
+  const handleRetry = () => {
+    console.log('🔄 [RESUME_DASHBOARD] 手动重试请求...');
+    setRetryCount(0);
+    loadData();
+  };
+
+  // 🔧 添加useEffect调用loadData
+  useEffect(() => {
+    loadData();
+  }, []);
 
   // 删除简历
   const deleteResume = async (id) => {
@@ -346,7 +512,19 @@ const ResumeDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
+          <p className="mt-4 text-gray-600">
+            {retrying ? (
+              <>
+                加载中... (重试 {retryCount}/{MAX_RETRY_COUNT})
+                <br />
+                <span className="text-sm text-gray-500">
+                  如果网络不稳定，系统会自动重试
+                </span>
+              </>
+            ) : (
+              '加载中...'
+            )}
+          </p>
         </div>
       </div>
     );
@@ -381,17 +559,34 @@ const ResumeDashboard = () => {
           </div>
         </div>
 
-        {/* 错误提示 */}
+        {/* 🔧 更新错误提示UI */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex">
               <div className="flex-shrink-0">
                 <span className="text-red-400">⚠️</span>
               </div>
-              <div className="ml-3">
+              <div className="ml-3 flex-1">
                 <p className="text-sm text-red-800">{error}</p>
+                {lastErrorTime && (
+                  <p className="text-xs text-red-600 mt-1">
+                    错误时间: {new Date(lastErrorTime).toLocaleString()}
+                  </p>
+                )}
+                {retryCount > 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    已重试 {retryCount} 次
+                  </p>
+                )}
               </div>
-              <div className="ml-auto pl-3">
+              <div className="ml-auto pl-3 flex space-x-2">
+                <button 
+                  onClick={handleRetry}
+                  disabled={loading || retrying}
+                  className="inline-flex items-center px-3 py-1 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {retrying ? '重试中...' : '🔄 重试'}
+                </button>
                 <button 
                   onClick={() => setError('')}
                   className="text-red-400 hover:text-red-600"
