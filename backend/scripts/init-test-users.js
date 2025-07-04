@@ -5,7 +5,7 @@
 
 require('dotenv').config();
 const bcrypt = require('bcrypt');
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 /**
  * 测试用户配置

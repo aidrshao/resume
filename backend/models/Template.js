@@ -4,7 +4,7 @@
  * 创建时间：2025-07-02
  */
 
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 /**
  * Template模型类
@@ -17,13 +17,13 @@ class Template {
     /**
      * 获取所有已发布的模板（前端用）
      * @param {Object} options - 查询选项
-     * @returns {Promise<Array>} 模板列表
+     * @returns {Promise<Array>} 模板列表 - 只包含 id, name, thumbnail_url
      */
     async getPublishedTemplates(options = {}) {
         const { category, isPremium } = options;
         
         let query = knex(this.tableName)
-            .select('id', 'name', 'html_content', 'css_content', 'thumbnail_url', 'is_premium', 'category', 'description', 'sort_order')
+            .select('id', 'name', 'thumbnail_url')
             .where('status', 'published')
             .orderBy('sort_order', 'asc')
             .orderBy('created_at', 'desc');

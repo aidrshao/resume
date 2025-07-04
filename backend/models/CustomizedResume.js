@@ -157,9 +157,18 @@ class CustomizedResume {
         query = query.where('customized_resumes.target_job_id', targetJobId);
       }
       
-      // 获取总数
-      const countQuery = query.clone().count('customized_resumes.id as count').first();
-      const { count: total } = await countQuery;
+      // 获取总数 - 使用简单的count查询避免GROUP BY问题
+      let countQuery = db('customized_resumes').where('user_id', userId);
+      
+      if (baseResumeId) {
+        countQuery = countQuery.where('base_resume_id', baseResumeId);
+      }
+      
+      if (targetJobId) {
+        countQuery = countQuery.where('target_job_id', targetJobId);
+      }
+      
+      const [{ count: total }] = await countQuery.count('id as count');
       
       // 获取分页数据
       const data = await query
@@ -227,6 +236,51 @@ class CustomizedResume {
       
     } catch (error) {
       console.error('❌ [CUSTOMIZED_RESUME] 查询用户岗位组合失败:', error.message);
+      throw error;
+    }
+  }
+  
+  /**
+   * 更新专属简历
+   * @param {number} id - 简历ID
+   * @param {Object} updateData - 更新数据
+   * @returns {Promise<Object>} 更新后的简历对象
+   */
+  static async update(id, updateData) {
+    try {
+      console.log(`🔄 [CUSTOMIZED_RESUME] 更新专属简历，ID: ${id}`);
+      
+      const updateFields = {};
+      
+      if (updateData.optimizedData) {
+        updateFields.optimized_data = JSON.stringify(updateData.optimizedData);
+      }
+      
+      if (updateData.updatedAt) {
+        updateFields.updated_at = updateData.updatedAt;
+      }
+      
+      const [result] = await db('customized_resumes')
+        .where('id', id)
+        .update(updateFields)
+        .returning('*');
+      
+      if (!result) {
+        throw new Error('更新失败，专属简历不存在');
+      }
+      
+      console.log('✅ [CUSTOMIZED_RESUME] 专属简历更新成功');
+      
+      // 返回包含解析后数据的对象
+      return {
+        ...result,
+        optimizedData: typeof result.optimized_data === 'string' 
+          ? JSON.parse(result.optimized_data) 
+          : result.optimized_data
+      };
+      
+    } catch (error) {
+      console.error('❌ [CUSTOMIZED_RESUME] 更新失败:', error.message);
       throw error;
     }
   }

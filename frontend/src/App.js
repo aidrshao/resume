@@ -29,6 +29,7 @@ import ResumeBuilder from './components/ResumeBuilder';
 import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import ResumePreviewPage from './components/ResumePreviewPage';
+import TemplateTestPage from './components/TemplateTestPage';
 
 /**
  * 错误边界组件
@@ -82,7 +83,12 @@ function App() {
   
   return (
     <ErrorBoundary>
-      <Router>
+      <Router 
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true
+        }}
+      >
         <div className="App">
           <Routes>
           {/* 首页 - Landing页面 */}
@@ -95,6 +101,7 @@ function App() {
           <Route path="/register" element={<RegisterPage />} />
           
           {/* 模板测试页面 - 用于开发测试 */}
+          <Route path="/template-test" element={<TemplateTestPage />} />
           
           
           {/* 管理员路由 */}

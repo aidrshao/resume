@@ -4,7 +4,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 /**
  * 管理员身份验证中间件

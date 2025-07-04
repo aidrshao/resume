@@ -485,19 +485,104 @@ export const generateJobSpecificResume = (data) => {
 };
 
 /**
- * 生成定制简历（新接口）
- * @param {Object} data - 生成参数
+ * 检查专属简历是否存在
+ * @param {Object} data - 检查参数
  * @param {number} data.baseResumeId - 基础简历ID
  * @param {number} data.targetJobId - 目标岗位ID
  * @returns {Promise} API响应
  */
-export const generateCustomizedResume = (data) => {
-  console.log('🌐 API: 生成定制简历', data);
-  return api.post('/resumes/customize', data).then(response => {
-    console.log('✅ [CUSTOMIZE_RESUME] API响应成功:', response.data);
+export const checkCustomizedResumeExists = (data) => {
+  console.log('🔍 API: 检查专属简历是否存在', data);
+  return api.get('/resumes/customize/check', { params: data }).then(response => {
+    console.log('✅ [CHECK_CUSTOMIZED_RESUME] API响应成功:', response.data);
     return response.data;
   }).catch(error => {
-    console.error('❌ [CUSTOMIZE_RESUME] API响应失败:', error);
+    console.error('❌ [CHECK_CUSTOMIZED_RESUME] API响应失败:', error);
+    throw error;
+  });
+};
+
+/**
+ * 生成定制简历
+ * @param {Object} data - 生成参数
+ * @param {number} data.baseResumeId - 基础简历ID
+ * @param {number} data.targetJobId - 目标岗位ID
+ * @param {boolean} data.forceOverwrite - 是否强制覆盖
+ * @returns {Promise<Object>} 响应数据
+ */
+export const customizeResume = (data) => {
+  console.log('🌐 API: 生成定制简历', data);
+  
+  // 记录开始时间
+  const startTime = Date.now();
+  const requestId = `CUSTOMIZE_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  
+  console.log(`🚀 [CUSTOMIZE_API] 开始请求 - ID: ${requestId}`);
+  console.log(`📊 [CUSTOMIZE_API] 参数:`, {
+    baseResumeId: data.baseResumeId,
+    targetJobId: data.targetJobId,
+    forceOverwrite: data.forceOverwrite,
+    timestamp: new Date().toISOString()
+  });
+  
+  // 创建取消令牌
+  const source = axios.CancelToken.source();
+  
+  // 设置5分钟超时（300秒）
+  const timeout = 300000;
+  
+  console.log(`⏱️ [CUSTOMIZE_API] 超时设置: ${timeout}ms (${timeout/1000}秒)`);
+  
+  // 定时器：每30秒输出一次进度
+  const progressInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    console.log(`⏳ [CUSTOMIZE_API] 进行中... 已耗时: ${elapsed}ms (${(elapsed/1000).toFixed(1)}秒)`);
+  }, 30000);
+  
+  return api.post('/resumes/customize', data, {
+    timeout: timeout,
+    cancelToken: source.token,
+    // 添加请求头标识
+    headers: {
+      'X-Request-ID': requestId,
+      'X-Request-Type': 'customize-resume'
+    }
+  }).then(response => {
+    clearInterval(progressInterval);
+    const duration = Date.now() - startTime;
+    
+    console.log(`✅ [CUSTOMIZE_RESUME] API响应成功: ${JSON.stringify(response.data)}`);
+    console.log(`⏱️ [CUSTOMIZE_API] 总耗时: ${duration}ms (${(duration/1000).toFixed(1)}秒)`);
+    console.log(`📊 [CUSTOMIZE_API] 性能统计:`, {
+      requestId: requestId,
+      duration: duration,
+      success: true,
+      responseSize: JSON.stringify(response.data).length
+    });
+    
+    return response.data;
+  }).catch(error => {
+    clearInterval(progressInterval);
+    const duration = Date.now() - startTime;
+    
+    console.error(`❌ [CUSTOMIZE_RESUME] API响应失败: ${error.constructor.name}`);
+    console.error(`❌ [CUSTOMIZE_API] 错误详情:`, {
+      requestId: requestId,
+      duration: duration,
+      message: error.message,
+      code: error.code,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      isTimeout: error.code === 'ECONNABORTED' && error.message.includes('timeout'),
+      isCancelled: axios.isCancel(error)
+    });
+    
+    // 增强错误信息
+    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+      console.error(`⏰ [CUSTOMIZE_API] 请求超时 - 耗时: ${duration}ms, 超时设置: ${timeout}ms`);
+      error.message = `定制简历生成超时 (${(duration/1000).toFixed(1)}秒)。AI优化过程通常需要2-5分钟，请稍后再试。`;
+    }
+    
     throw error;
   });
 };
@@ -559,6 +644,39 @@ export const deleteCustomizedResume = (customizedResumeId) => {
 export const getResumeTemplates = () => {
   console.log('🎨 [模板API] 开始获取简历模板列表');
   return api.get('/resume-render/templates');
+};
+
+// ===== 新的模板API接口 =====
+
+/**
+ * 获取已发布的模板列表
+ * @returns {Promise} API响应
+ */
+export const getTemplatesList = () => {
+  console.log('🎨 [模板API] 开始获取模板列表');
+  return api.get('/templates').then(response => {
+    console.log('✅ [GET_TEMPLATES] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [GET_TEMPLATES] API响应失败:', error);
+    throw error;
+  });
+};
+
+/**
+ * 获取单个模板详情
+ * @param {number} templateId - 模板ID
+ * @returns {Promise} API响应
+ */
+export const getTemplateById = (templateId) => {
+  console.log('🎨 [模板API] 开始获取模板详情', templateId);
+  return api.get(`/templates/${templateId}`).then(response => {
+    console.log('✅ [GET_TEMPLATE_BY_ID] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [GET_TEMPLATE_BY_ID] API响应失败:', error);
+    throw error;
+  });
 };
 
 /**

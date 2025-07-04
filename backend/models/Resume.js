@@ -278,6 +278,20 @@ class Resume {
   }
 
   /**
+   * 根据ID和用户ID删除简历（验证用户权限）
+   * @param {number} id - 简历ID
+   * @param {number} userId - 用户ID
+   * @returns {Promise<boolean>} 删除结果
+   */
+  static async deleteByIdAndUser(id, userId) {
+    const result = await knex('resumes')
+      .where('id', id)
+      .where('user_id', userId)
+      .del();
+    return result > 0;
+  }
+
+  /**
    * 更新简历状态
    * @param {number} id - 简历ID
    * @param {string} status - 新状态

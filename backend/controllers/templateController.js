@@ -12,6 +12,8 @@ const templateModel = new Template();
 /**
  * 获取所有已发布的模板（前端用）
  * GET /api/templates
+ * @returns {Object} 返回格式：{success: boolean, data: Array, message: string}
+ * @description 返回状态为'published'的模板列表，只包含id, name, thumbnail_url字段
  */
 const getPublishedTemplates = async (req, res) => {
     try {
@@ -72,6 +74,9 @@ const getAllTemplatesForAdmin = async (req, res) => {
 /**
  * 获取单个模板详情
  * GET /api/templates/:id
+ * @param {string} id - 模板ID
+ * @returns {Object} 返回格式：{success: boolean, data: Object, message: string}
+ * @description 返回指定模板的完整信息，包含html_content和css_content等所有字段
  */
 const getTemplateById = async (req, res) => {
     try {

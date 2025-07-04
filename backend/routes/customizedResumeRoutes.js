@@ -19,13 +19,38 @@ const { authenticateToken } = require('../middleware/auth');
 router.use(authenticateToken);
 
 /**
+ * 检查专属简历是否存在
+ * GET /api/resumes/customize/check
+ * 
+ * 查询参数：
+ * - baseResumeId: 基础简历ID
+ * - targetJobId: 目标岗位ID
+ * 
+ * 响应：
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "exists": true,
+ *     "customizedResumeId": 123,
+ *     "baseResumeTitle": "我的基础简历",
+ *     "jobTitle": "高级前端工程师",
+ *     "jobCompany": "科技公司",
+ *     "createdAt": "2025-07-04T06:00:00.000Z"
+ *   },
+ *   "message": "检查完成"
+ * }
+ */
+router.get('/resumes/customize/check', CustomizedResumeController.checkCustomizedResumeExists);
+
+/**
  * 生成专属简历 - MVP核心接口
  * POST /api/resumes/customize
  * 
  * 请求体：
  * {
  *   "baseResumeId": 1,
- *   "targetJobId": 2
+ *   "targetJobId": 2,
+ *   "forceOverwrite": false // 可选，是否强制覆盖已存在的简历
  * }
  * 
  * 响应：

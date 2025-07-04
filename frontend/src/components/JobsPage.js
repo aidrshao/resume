@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getJobs, deleteJob, batchUpdateJobStatus, getJobStats, getResumes, generateJobSpecificResume, generateCustomizedResume } from '../utils/api';
+import { getJobs, deleteJob, batchUpdateJobStatus, getJobStats, getResumes, generateJobSpecificResume, customizeResume, checkCustomizedResumeExists } from '../utils/api';
 import AddJobModal from './AddJobModal';
 import EditJobModal from './EditJobModal';
 import JobCard from './JobCard';
@@ -142,6 +142,7 @@ const JobsPage = () => {
       // 设置加载状态
       setGeneratingJobId(targetJobId);
       setError('');
+      
       // 获取基础简历
       console.log('📋 [GENERATE_CUSTOM] 获取基础简历...');
       const baseResumeData = await loadBaseResume();
@@ -151,11 +152,47 @@ const JobsPage = () => {
 
       console.log('✅ [GENERATE_CUSTOM] 基础简历获取成功，ID:', baseResumeData.id);
 
-      // 调用定制简历API
-      console.log('🌐 [GENERATE_CUSTOM] 调用定制简历API...');
-      const response = await generateCustomizedResume({
+      // === 阶段1：检查是否已存在 ===
+      console.log('🔍 [GENERATE_CUSTOM] 检查是否已存在定制简历...');
+      const checkResponse = await checkCustomizedResumeExists({
         baseResumeId: baseResumeData.id,
         targetJobId: targetJobId
+      });
+
+      console.log('✅ [GENERATE_CUSTOM] 检查完成:', checkResponse);
+
+      let forceOverwrite = false;
+
+      if (checkResponse.success && checkResponse.data.exists) {
+        // 已存在，询问用户是否覆盖
+        const existingData = checkResponse.data;
+        const confirmMessage = `该基础简历和目标岗位的定制简历已存在！\n\n` +
+          `岗位：${existingData.jobTitle} (${existingData.jobCompany})\n` +
+          `创建时间：${new Date(existingData.createdAt).toLocaleString()}\n\n` +
+          `请选择操作：\n` +
+          `• 确定 - 重新生成（覆盖原有版本）\n` +
+          `• 取消 - 查看现有版本`;
+
+        const shouldOverwrite = window.confirm(confirmMessage);
+        
+        if (!shouldOverwrite) {
+          // 用户选择查看现有版本
+          console.log('👁️ [GENERATE_CUSTOM] 用户选择查看现有版本');
+          window.location.href = `/resumes/customized/${existingData.customizedResumeId}`;
+          return;
+        }
+        
+        // 用户选择覆盖
+        forceOverwrite = true;
+        console.log('🔄 [GENERATE_CUSTOM] 用户选择覆盖现有版本');
+      }
+
+      // === 阶段2：生成定制简历 ===
+      console.log('🌐 [GENERATE_CUSTOM] 调用定制简历API...');
+      const response = await customizeResume({
+        baseResumeId: baseResumeData.id,
+        targetJobId: targetJobId,
+        forceOverwrite: forceOverwrite
       });
 
       console.log('✅ [GENERATE_CUSTOM] API调用成功:', response);
@@ -165,7 +202,8 @@ const JobsPage = () => {
         console.log('🎉 [GENERATE_CUSTOM] 定制简历生成成功，ID:', customizedResumeId);
         
         // 显示成功消息
-        alert(`定制简历生成成功！正在跳转到预览页面...`);
+        const actionText = forceOverwrite ? '重新生成' : '生成';
+        alert(`定制简历${actionText}成功！正在跳转到预览页面...`);
         
         // 跳转到定制简历预览页面
         window.location.href = `/resumes/customized/${customizedResumeId}`;
@@ -184,19 +222,7 @@ const JobsPage = () => {
         const status = error.response.status;
         const data = error.response.data;
         
-        if (status === 409) {
-          // 冲突错误，可能是已存在定制简历
-          errorMessage = data.message || '该岗位的定制简历已存在';
-          
-          // 如果有现有简历ID，提供查看选项
-          if (data.data?.existingResumeId) {
-            const confirmMessage = `${errorMessage}\n\n是否查看现有的定制简历？`;
-            if (window.confirm(confirmMessage)) {
-              window.location.href = `/resumes/customized/${data.data.existingResumeId}`;
-              return;
-            }
-          }
-        } else if (status === 400) {
+        if (status === 400) {
           errorMessage = data.message || '请求参数错误';
         } else if (status === 404) {
           errorMessage = '基础简历或目标岗位不存在';

@@ -7,7 +7,7 @@ const { adminLogin, createAdmin, getAdminList } = require('../middleware/adminAu
 const MembershipTier = require('../models/MembershipTier');
 const UserMembership = require('../models/UserMembership');
 const User = require('../models/User');
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 class AdminController {
   /**

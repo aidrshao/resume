@@ -12,6 +12,7 @@ import Handlebars from 'handlebars';
 const ResumeDashboard = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState([]);
+  const [customizedResumes, setCustomizedResumes] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,6 +65,23 @@ const ResumeDashboard = () => {
   }, [navigate]);
 
   /**
+   * 加载定制简历列表
+   */
+  const loadCustomizedResumes = useCallback(async () => {
+    try {
+      const data = await api.getCustomizedResumes();
+      
+      if (data && data.success) {
+        setCustomizedResumes(data.data || []);
+      } else {
+        console.warn('加载定制简历失败:', data?.message);
+      }
+    } catch (error) {
+      console.warn('加载定制简历失败:', error.message);
+    }
+  }, []);
+
+  /**
    * 加载职位列表
    */
   const loadJobs = useCallback(async () => {
@@ -84,7 +102,7 @@ const ResumeDashboard = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        await Promise.all([loadResumes(), loadJobs()]);
+        await Promise.all([loadResumes(), loadCustomizedResumes(), loadJobs()]);
       } catch (error) {
         console.error('数据加载失败:', error);
       } finally {
@@ -153,8 +171,8 @@ const ResumeDashboard = () => {
       const data = await response.json();
       
       if (data.success) {
-        // 刷新简历列表
-        await loadResumes();
+        // 刷新简历列表和定制简历列表
+        await Promise.all([loadResumes(), loadCustomizedResumes()]);
       } else {
         setError(data.message || '生成简历失败');
       }
@@ -200,10 +218,8 @@ const ResumeDashboard = () => {
       
       if (data.success) {
         setTemplates(data.data || []);
-        // 自动选择第一个模板
-        if (data.data && data.data.length > 0) {
-          await handleTemplateSelect(data.data[0]);
-        }
+        // 注意：不在这里自动选择第一个模板，让用户手动选择
+        // 这样可以避免状态更新时序问题
       } else {
         setRenderError(data.message || '获取模板列表失败');
       }
@@ -224,6 +240,12 @@ const ResumeDashboard = () => {
     setRenderError('');
 
     try {
+      // 检查是否有选中的简历
+      if (!selectedResumeForTemplate) {
+        setRenderError('请先选择要渲染的简历');
+        return;
+      }
+
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/templates/${template.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -248,6 +270,11 @@ const ResumeDashboard = () => {
    */
   const renderResumeWithTemplate = async (template, templateData) => {
     try {
+      // 检查是否有选中的简历
+      if (!selectedResumeForTemplate || !selectedResumeForTemplate.id) {
+        throw new Error('请先选择要渲染的简历');
+      }
+
       // 清除旧的样式
       if (currentStyleRef.current) {
         document.head.removeChild(currentStyleRef.current);
@@ -633,54 +660,109 @@ const ResumeDashboard = () => {
             </div>
           </div>
           <div className="p-6">
-            {resumes.filter(resume => !resume.is_base && (resume.target_company || resume.target_position)).length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {resumes
-                  .filter(resume => !resume.is_base && (resume.target_company || resume.target_position))
-                  .map(resume => (
-                    <div key={resume.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            {/* 旧版本专属简历 */}
+            {resumes.filter(resume => !resume.is_base && (resume.target_company || resume.target_position)).length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-md font-medium text-gray-700 mb-4">📄 旧版本专属简历</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {resumes
+                    .filter(resume => !resume.is_base && (resume.target_company || resume.target_position))
+                    .map(resume => (
+                      <div key={resume.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h3 className="text-lg font-medium text-gray-900 truncate">{resume.title}</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              🏢 {resume.target_company} - {resume.target_position}
+                            </p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(resume.status)}`}>
+                            {getStatusText(resume.status)}
+                          </span>
+                        </div>
+                        
+                        <p className="text-sm text-gray-500 mb-4">
+                          生成时间: {new Date(resume.created_at).toLocaleDateString()}
+                        </p>
+                        
+                        <div className="flex justify-between items-center">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleOpenTemplateSelector(resume)}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                            >
+                              👁️ 预览
+                            </button>
+                            <Link 
+                              to={`/resumes/edit/${resume.id}`}
+                              className="text-green-600 hover:text-green-800 text-sm font-medium"
+                            >
+                              ✏️ 编辑
+                            </Link>
+                          </div>
+                          <button
+                            onClick={() => deleteResume(resume.id)}
+                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                          >
+                            🗑️ 删除
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* 定制简历 */}
+            {customizedResumes.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-md font-medium text-gray-700 mb-4">🎯 AI定制简历</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {customizedResumes.map(resume => (
+                    <div key={`customized-${resume.id}`} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900 truncate">{resume.title}</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            🏢 {resume.target_company} - {resume.target_position}
+                          <h3 className="text-lg font-medium text-blue-900 truncate">
+                            {resume.job_title || '专属简历'}
+                          </h3>
+                          <p className="text-sm text-blue-700 mt-1">
+                            🏢 {resume.company_name}
                           </p>
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-2">
+                            AI定制版本
+                          </span>
                         </div>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusStyle(resume.status)}`}>
-                          {getStatusText(resume.status)}
-                        </span>
                       </div>
                       
-                      <p className="text-sm text-gray-500 mb-4">
+                      <p className="text-sm text-blue-600 mb-4">
                         生成时间: {new Date(resume.created_at).toLocaleDateString()}
                       </p>
                       
                       <div className="flex justify-between items-center">
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleOpenTemplateSelector(resume)}
+                          <Link 
+                            to={`/resumes/customized/${resume.id}`}
                             className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                           >
                             👁️ 预览
-                          </button>
+                          </Link>
                           <Link 
-                            to={`/resumes/edit/${resume.id}`}
+                            to={`/resumes/customized/${resume.id}`}
                             className="text-green-600 hover:text-green-800 text-sm font-medium"
                           >
-                            ✏️ 编辑
+                            ✏️ 编辑模板
                           </Link>
                         </div>
-                        <button
-                          onClick={() => deleteResume(resume.id)}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        >
-                          🗑️ 删除
-                        </button>
                       </div>
                     </div>
                   ))}
+                </div>
               </div>
-            ) : (
+            )}
+
+            {/* 空状态 */}
+            {resumes.filter(resume => !resume.is_base && (resume.target_company || resume.target_position)).length === 0 && 
+             customizedResumes.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-gray-600 mb-4">您还没有岗位专属简历</p>
                 {baseResume ? (
@@ -764,29 +846,40 @@ const ResumeDashboard = () => {
                     <div className="flex items-center justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
+                  ) : templates.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>暂无可用模板</p>
+                    </div>
                   ) : (
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {templates.map(template => (
-                        <div
-                          key={template.id}
-                          className={`cursor-pointer border rounded-lg p-3 hover:bg-gray-50 ${
-                            selectedTemplate?.id === template.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                          }`}
-                          onClick={() => handleTemplateSelect(template)}
-                        >
-                          <div className="text-center">
-                            {template.thumbnail_url && (
-                              <img 
-                                src={template.thumbnail_url} 
-                                alt={template.name}
-                                className="w-full h-24 object-cover rounded mb-2"
-                              />
-                            )}
-                            <h5 className="font-medium text-sm text-gray-900">{template.name}</h5>
-                            <p className="text-xs text-gray-600 mt-1">{template.description}</p>
+                    <div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                        <p className="text-sm text-blue-700">
+                          👆 点击下方模板进行预览
+                        </p>
+                      </div>
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {templates.map(template => (
+                          <div
+                            key={template.id}
+                            className={`cursor-pointer border rounded-lg p-3 hover:bg-gray-50 ${
+                              selectedTemplate?.id === template.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                            }`}
+                            onClick={() => handleTemplateSelect(template)}
+                          >
+                            <div className="text-center">
+                              {template.thumbnail_url && (
+                                <img 
+                                  src={template.thumbnail_url} 
+                                  alt={template.name}
+                                  className="w-full h-24 object-cover rounded mb-2"
+                                />
+                              )}
+                              <h5 className="font-medium text-sm text-gray-900">{template.name}</h5>
+                              <p className="text-xs text-gray-600 mt-1">{template.description}</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

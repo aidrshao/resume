@@ -6,6 +6,7 @@
 
 require('dotenv').config();
 const Template = require('../models/Template');
+const axios = require('axios');
 
 /**
  * 测试数据
@@ -170,7 +171,6 @@ async function runTests() {
 async function testAPIEndpoints() {
   console.log('\n🔗 测试API端点...');
   
-  const axios = require('axios');
   const baseURL = process.env.API_BASE_URL || 'http://localhost:8000/api';
   
   try {
@@ -211,4 +211,69 @@ if (require.main === module) {
 module.exports = {
   runTests,
   testAPIEndpoints
-}; 
+};
+
+/**
+ * 测试模板系统完整流程
+ * 验证模板API和渲染功能
+ */
+
+const BASE_URL = 'http://localhost:8000';
+const FRONTEND_URL = 'http://localhost:3016';
+
+async function testTemplateSystem() {
+    console.log('🧪 开始测试模板系统...\n');
+
+    try {
+        // 1. 测试直接访问后端API
+        console.log('1️⃣ 测试直接访问后端API...');
+        const directResponse = await axios.get(`${BASE_URL}/api/templates`);
+        console.log('✅ 直接访问成功:', directResponse.data);
+        console.log('');
+
+        // 2. 测试通过前端代理访问
+        console.log('2️⃣ 测试通过前端代理访问...');
+        const proxyResponse = await axios.get(`${FRONTEND_URL}/api/templates`);
+        console.log('✅ 代理访问成功:', proxyResponse.data);
+        console.log('');
+
+        // 3. 测试获取模板详情
+        if (directResponse.data.success && directResponse.data.data.length > 0) {
+            const templateId = directResponse.data.data[0].id;
+            console.log('3️⃣ 测试获取模板详情...');
+            
+            const detailResponse = await axios.get(`${BASE_URL}/api/templates/${templateId}`);
+            console.log('✅ 获取模板详情成功');
+            console.log('📋 模板信息:', {
+                id: detailResponse.data.data.id,
+                name: detailResponse.data.data.name,
+                hasHtmlContent: !!detailResponse.data.data.html_content,
+                hasCssContent: !!detailResponse.data.data.css_content,
+                status: detailResponse.data.data.status
+            });
+            console.log('');
+        }
+
+        // 4. 测试带Authorization头的请求
+        console.log('4️⃣ 测试带Authorization头的请求...');
+        const authResponse = await axios.get(`${BASE_URL}/api/templates`, {
+            headers: {
+                'Authorization': 'Bearer test-token-123456'
+            }
+        });
+        console.log('✅ 带Authorization头的请求成功:', authResponse.data);
+        console.log('');
+
+        console.log('🎉 所有测试通过！模板系统工作正常！');
+        
+    } catch (error) {
+        console.error('❌ 测试失败:', error.message);
+        if (error.response) {
+            console.error('📋 响应状态:', error.response.status);
+            console.error('📋 响应数据:', error.response.data);
+        }
+    }
+}
+
+// 运行测试
+testTemplateSystem(); 
