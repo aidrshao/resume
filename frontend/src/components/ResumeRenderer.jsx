@@ -7,6 +7,29 @@
 import React, { useEffect, useRef } from 'react';
 import Handlebars from 'handlebars';
 
+// 注册自定义Handlebars helpers
+Handlebars.registerHelper('replace', function(str, find) {
+  console.log('🔄 [replace helper] 处理文本:', { str: typeof str, find });
+  
+  if (typeof str !== 'string') {
+    console.log('⚠️ [replace helper] 输入不是字符串，返回空字符串');
+    return '';
+  }
+  
+  const parts = str.split(find);
+  const filteredParts = parts.filter(part => part.trim() !== '');
+  const result = filteredParts.map(part => `<p>${part}</p>`).join('');
+  
+  console.log('✅ [replace helper] 转换完成:', {
+    原始文本长度: str.length,
+    分割片段数: parts.length,
+    过滤后片段数: filteredParts.length,
+    结果长度: result.length
+  });
+  
+  return new Handlebars.SafeString(result);
+});
+
 const ResumeRenderer = ({ resumeData, template }) => {
   const previewRef = useRef(null);
   const styleRef = useRef(null);

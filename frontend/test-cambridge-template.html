@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剑桥经典模板测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        #preview {
+            border: 2px solid #ddd;
+            min-height: 600px;
+            padding: 20px;
+            background: white;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>剑桥经典模板测试</h1>
+        
+        <div class="section">
+            <h3>测试步骤</h3>
+            <button class="btn" onclick="loadAndRender()">加载并渲染剑桥经典模板</button>
+            <button class="btn" onclick="clearLog()">清空日志</button>
+        </div>
+
+        <div class="section">
+            <h3>日志</h3>
+            <div id="log" class="log">准备测试剑桥经典模板...\n</div>
+        </div>
+
+        <div class="section">
+            <h3>预览</h3>
+            <div id="preview">等待加载模板...</div>
+        </div>
+    </div>
+
+    <!-- 引入Handlebars -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/handlebars.js/4.7.7/handlebars.min.js"></script>
+
+    <script>
+        // 注册replace helper
+        Handlebars.registerHelper('replace', function(str, find) {
+            console.log('🔄 [replace helper] 处理文本:', { str: typeof str, find });
+            
+            if (typeof str !== 'string') {
+                console.log('⚠️ [replace helper] 输入不是字符串，返回空字符串');
+                return '';
+            }
+            
+            const parts = str.split(find);
+            const filteredParts = parts.filter(part => part.trim() !== '');
+            const result = filteredParts.map(part => `<p>${part}</p>`).join('');
+            
+            console.log('✅ [replace helper] 转换完成:', {
+                原始文本长度: str.length,
+                分割片段数: parts.length,
+                过滤后片段数: filteredParts.length,
+                结果长度: result.length
+            });
+            
+            return new Handlebars.SafeString(result);
+        });
+
+        // 日志函数
+        function log(message) {
+            const logElement = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logElement.textContent += `[${timestamp}] ${message}\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').textContent = '日志已清空...\n';
+        }
+
+        // 测试数据
+        const testResumeData = {
+            profile: {
+                name: "张三",
+                email: "zhangsan@test.com",
+                phone: "13800138000",
+                location: "北京市",
+                summary: "专注于前端技术的高级工程师，具有5年React开发经验。"
+            },
+            workExperience: [
+                {
+                    position: "高级前端开发工程师",
+                    company: "ABC科技公司",
+                    duration: "2021-2024",
+                    description: "负责大型React项目的架构设计和开发\n使用TypeScript构建类型安全的前端应用\n配合后端团队完成Node.js API开发\n指导初级开发人员进行技术提升"
+                }
+            ],
+            projectExperience: [
+                {
+                    name: "企业级管理系统",
+                    duration: "2023-2024",
+                    role: "前端技术负责人",
+                    description: "基于React + TypeScript构建的大型企业管理系统\n支持多租户架构\n实现了复杂的权限管理系统"
+                }
+            ],
+            education: [
+                {
+                    school: "北京大学",
+                    degree: "本科",
+                    major: "计算机科学与技术",
+                    duration: "2017-2021"
+                }
+            ],
+            skills: [
+                {
+                    category: "核心技术",
+                    details: "React, TypeScript, JavaScript ES6+, HTML5, CSS3"
+                },
+                {
+                    category: "开发工具",
+                    details: "Node.js, Webpack, Vite, Git, Docker"
+                }
+            ],
+            customSections: [
+                {
+                    title: "获奖经历",
+                    content: "2023年度最佳员工\n公司技术创新奖\n团队协作杰出贡献奖"
+                }
+            ]
+        };
+
+        // 加载并渲染模板
+        async function loadAndRender() {
+            log('🎨 开始加载剑桥经典模板...');
+            
+            try {
+                // 获取模板
+                const response = await fetch('http://localhost:8000/api/templates/5');
+                const data = await response.json();
+                
+                if (!data.success) {
+                    log(`❌ 模板加载失败: ${data.message}`);
+                    return;
+                }
+                
+                const template = data.data;
+                log(`✅ 模板加载成功: ${template.name}`);
+                log(`📝 HTML长度: ${template.html_content.length}`);
+                log(`🎨 CSS长度: ${template.css_content.length}`);
+                
+                // 清理之前的样式
+                const existingStyles = document.querySelectorAll('style[data-template-id]');
+                existingStyles.forEach(style => style.remove());
+                
+                // 编译并渲染
+                log('🔧 编译HTML模板...');
+                const htmlTemplate = Handlebars.compile(template.html_content);
+                
+                log('🎯 生成HTML内容...');
+                const finalHtml = htmlTemplate(testResumeData);
+                
+                // 渲染到预览区
+                const previewElement = document.getElementById('preview');
+                previewElement.innerHTML = finalHtml;
+                
+                // 应用CSS样式
+                if (template.css_content) {
+                    log('🎨 应用CSS样式...');
+                    const styleElement = document.createElement('style');
+                    styleElement.textContent = template.css_content;
+                    styleElement.setAttribute('data-template-id', template.id);
+                    document.head.appendChild(styleElement);
+                }
+                
+                log('✅ 剑桥经典模板渲染完成！');
+                
+            } catch (error) {
+                log(`❌ 渲染失败: ${error.message}`);
+                console.error('渲染错误详情:', error);
+            }
+        }
+
+        // 页面加载完成
+        window.onload = function() {
+            log('📱 测试页面加载完成');
+            log('💡 点击按钮开始测试剑桥经典模板');
+        };
+    </script>
+</body>
+</html> 
