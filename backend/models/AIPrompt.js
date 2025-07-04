@@ -3,7 +3,7 @@
  * 管理系统的AI提示词模板和配置
  */
 
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 class AIPrompt {
   /**

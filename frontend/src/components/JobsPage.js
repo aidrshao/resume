@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getJobs, deleteJob, batchUpdateJobStatus, getJobStats, getResumes, generateJobSpecificResume } from '../utils/api';
+import { getJobs, deleteJob, batchUpdateJobStatus, getJobStats, getResumes, generateJobSpecificResume, generateCustomizedResume } from '../utils/api';
 import AddJobModal from './AddJobModal';
 import EditJobModal from './EditJobModal';
 import JobCard from './JobCard';
@@ -44,6 +44,9 @@ const JobsPage = () => {
   const [generatedResume, setGeneratedResume] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // 新增：定制简历生成状态
+  const [generatingJobId, setGeneratingJobId] = useState(null);
 
   // 加载岗位列表
   const loadJobs = async (page = 1, newFilters = filters) => {
@@ -150,6 +153,101 @@ const JobsPage = () => {
 
     setSelectedJobForResume(job);
     setShowGenerateModal(true);
+  };
+
+  /**
+   * 处理生成定制简历点击事件
+   * @param {number} targetJobId - 目标岗位ID
+   */
+  const handleGenerateCustomResume = async (targetJobId) => {
+    try {
+      console.log('🚀 [GENERATE_CUSTOM] 开始生成定制简历，岗位ID:', targetJobId);
+      
+      // 设置加载状态
+      setGeneratingJobId(targetJobId);
+      setError('');
+
+      // 获取基础简历
+      console.log('📋 [GENERATE_CUSTOM] 获取基础简历...');
+      const baseResumeData = await loadBaseResume();
+      if (!baseResumeData) {
+        throw new Error('请先创建基础简历后再生成定制简历');
+      }
+
+      console.log('✅ [GENERATE_CUSTOM] 基础简历获取成功，ID:', baseResumeData.id);
+
+      // 调用定制简历API
+      console.log('🌐 [GENERATE_CUSTOM] 调用定制简历API...');
+      const response = await generateCustomizedResume({
+        baseResumeId: baseResumeData.id,
+        targetJobId: targetJobId
+      });
+
+      console.log('✅ [GENERATE_CUSTOM] API调用成功:', response);
+
+      if (response.success) {
+        const customizedResumeId = response.data.customizedResumeId;
+        console.log('🎉 [GENERATE_CUSTOM] 定制简历生成成功，ID:', customizedResumeId);
+        
+        // 显示成功消息
+        alert(`定制简历生成成功！正在跳转到预览页面...`);
+        
+        // 跳转到定制简历预览页面
+        window.location.href = `/resumes/customized/${customizedResumeId}`;
+      } else {
+        throw new Error(response.message || '生成定制简历失败');
+      }
+
+    } catch (error) {
+      console.error('❌ [GENERATE_CUSTOM] 生成定制简历失败:', error);
+      
+      // 处理不同类型的错误
+      let errorMessage = '生成定制简历失败';
+      
+      if (error.response) {
+        // API响应错误
+        const status = error.response.status;
+        const data = error.response.data;
+        
+        if (status === 409) {
+          // 冲突错误，可能是已存在定制简历
+          errorMessage = data.message || '该岗位的定制简历已存在';
+          
+          // 如果有现有简历ID，提供查看选项
+          if (data.data?.existingResumeId) {
+            const confirmMessage = `${errorMessage}\n\n是否查看现有的定制简历？`;
+            if (window.confirm(confirmMessage)) {
+              window.location.href = `/resumes/customized/${data.data.existingResumeId}`;
+              return;
+            }
+          }
+        } else if (status === 400) {
+          errorMessage = data.message || '请求参数错误';
+        } else if (status === 404) {
+          errorMessage = '基础简历或目标岗位不存在';
+        } else if (status === 500) {
+          errorMessage = data.message || '服务器内部错误，请稍后重试';
+        } else {
+          errorMessage = data.message || `请求失败 (${status})`;
+        }
+      } else if (error.message) {
+        // 其他错误（如网络错误、自定义错误）
+        errorMessage = error.message;
+      }
+
+      // 显示错误信息
+      setError(errorMessage);
+      
+      // 自动清除错误信息
+      setTimeout(() => {
+        setError('');
+      }, 5000);
+
+    } finally {
+      // 清除加载状态
+      setGeneratingJobId(null);
+      console.log('🏁 [GENERATE_CUSTOM] 定制简历生成流程结束');
+    }
   };
 
   // 确认生成简历
@@ -524,6 +622,8 @@ const JobsPage = () => {
                 onEdit={() => handleEditJob(job)}
                 onDelete={() => handleDeleteJob(job.id)}
                 onGenerateResume={() => handleGenerateResume(job)}
+                onGenerateCustomResume={handleGenerateCustomResume}
+                isGeneratingCustom={generatingJobId === job.id}
               />
             ))}
           </div>

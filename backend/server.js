@@ -8,6 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth');
 const resumeRoutes = require('./routes/resumeRoutes');
+const customizedResumeRoutes = require('./routes/customizedResumeRoutes');
 const jobRoutes = require('./routes/jobRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const membershipRoutes = require('./routes/membershipRoutes');
@@ -151,6 +152,7 @@ app.use('/api/memberships', membershipRoutes);  // 会员路由
 app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
 app.use('/api/templates', templateRoutes);  // 模板管理路由
 app.use('/api/jobs', jobRoutes);
+app.use('/api', customizedResumeRoutes);  // 专属简历路由
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
 
 // 404处理

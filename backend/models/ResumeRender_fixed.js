@@ -3,7 +3,7 @@
  * 用于管理用户简历渲染的历史记录
  */
 
-const db = require('../config/database');
+const { db } = require('../config/database');
 
 class ResumeRender {
   

@@ -3,7 +3,7 @@
  * 处理用户意向岗位的数据库操作
  */
 
-const db = require('../config/database');
+const { db } = require('../config/database');
 
 class JobPosition {
   /**

@@ -484,6 +484,72 @@ export const generateJobSpecificResume = (data) => {
   });
 };
 
+/**
+ * 生成定制简历（新接口）
+ * @param {Object} data - 生成参数
+ * @param {number} data.baseResumeId - 基础简历ID
+ * @param {number} data.targetJobId - 目标岗位ID
+ * @returns {Promise} API响应
+ */
+export const generateCustomizedResume = (data) => {
+  console.log('🌐 API: 生成定制简历', data);
+  return api.post('/resumes/customize', data).then(response => {
+    console.log('✅ [CUSTOMIZE_RESUME] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [CUSTOMIZE_RESUME] API响应失败:', error);
+    throw error;
+  });
+};
+
+/**
+ * 获取定制简历列表
+ * @param {Object} params - 查询参数
+ * @returns {Promise} API响应
+ */
+export const getCustomizedResumes = (params = {}) => {
+  console.log('🌐 API: 获取定制简历列表', params);
+  return api.get('/customized-resumes', { params }).then(response => {
+    console.log('✅ [GET_CUSTOMIZED_RESUMES] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [GET_CUSTOMIZED_RESUMES] API响应失败:', error);
+    throw error;
+  });
+};
+
+/**
+ * 获取定制简历详情
+ * @param {number} customizedResumeId - 定制简历ID
+ * @returns {Promise} API响应
+ */
+export const getCustomizedResumeById = (customizedResumeId) => {
+  console.log('🌐 API: 获取定制简历详情', customizedResumeId);
+  return api.get(`/customized-resumes/${customizedResumeId}`).then(response => {
+    console.log('✅ [GET_CUSTOMIZED_RESUME] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [GET_CUSTOMIZED_RESUME] API响应失败:', error);
+    throw error;
+  });
+};
+
+/**
+ * 删除定制简历
+ * @param {number} customizedResumeId - 定制简历ID
+ * @returns {Promise} API响应
+ */
+export const deleteCustomizedResume = (customizedResumeId) => {
+  console.log('🌐 API: 删除定制简历', customizedResumeId);
+  return api.delete(`/customized-resumes/${customizedResumeId}`).then(response => {
+    console.log('✅ [DELETE_CUSTOMIZED_RESUME] API响应成功:', response.data);
+    return response.data;
+  }).catch(error => {
+    console.error('❌ [DELETE_CUSTOMIZED_RESUME] API响应失败:', error);
+    throw error;
+  });
+};
+
 // ===== 简历模板渲染相关API =====
 
 /**

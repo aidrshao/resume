@@ -6,13 +6,16 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
+// JWT密钥（与server.js保持一致）
+const JWT_SECRET = process.env.JWT_SECRET || 'resume_app_jwt_secret_2024_very_secure_key_change_in_production';
+
 /**
  * 生成JWT token
  * @param {Object} payload - 载荷数据
  * @returns {string} JWT token
  */
 const generateToken = (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
 };
 
 /**
@@ -21,7 +24,7 @@ const generateToken = (payload) => {
  * @returns {Object} 解码后的payload
  */
 const verifyToken = (token) => {
-  return jwt.verify(token, process.env.JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET);
 };
 
 /**
@@ -42,7 +45,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
     const user = await User.findById(decoded.userId);
 
     if (!user) {

@@ -4,7 +4,7 @@
  * 支持统一数据范式 (v2.1)
  */
 
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 const { validateUnifiedSchema, EMPTY_UNIFIED_RESUME } = require('../schemas/schema');
 const { validateAndCompleteUnifiedFormat, createDefaultUnifiedSchema } = require('../utils/dataTransformer');
 

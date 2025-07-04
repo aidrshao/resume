@@ -9,7 +9,7 @@ const ResumeParseService = require('../services/resumeParseService');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 const MembershipController = require('./membershipController');
 
 // 配置文件上传

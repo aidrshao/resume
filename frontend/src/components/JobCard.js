@@ -5,7 +5,7 @@
 
 import React from 'react';
 
-const JobCard = ({ job, isSelected, onSelect, onEdit, onDelete, onGenerateResume }) => {
+const JobCard = ({ job, isSelected, onSelect, onEdit, onDelete, onGenerateResume, onGenerateCustomResume, isGeneratingCustom }) => {
   // 状态显示配置
   const statusConfig = {
     active: {
@@ -208,17 +208,46 @@ const JobCard = ({ job, isSelected, onSelect, onEdit, onDelete, onGenerateResume
             )}
           </div>
           
-          {/* 右侧：生成专属简历按钮 */}
-          <button
-            onClick={() => onGenerateResume(job)}
-            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
-            title="为此岗位生成专属简历"
-          >
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            生成专属简历
-          </button>
+          {/* 右侧：操作按钮组 */}
+          <div className="flex items-center space-x-2">
+            {/* 生成专属简历按钮（旧版本，保留兼容性） */}
+            <button
+              onClick={() => onGenerateResume(job)}
+              className="inline-flex items-center px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+              title="生成专属简历（旧版本）"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              旧版生成
+            </button>
+
+            {/* 生成定制简历按钮（新版本） */}
+            <button
+              onClick={() => onGenerateCustomResume && onGenerateCustomResume(job.id)}
+              disabled={isGeneratingCustom}
+              className={`inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 ${
+                isGeneratingCustom 
+                  ? 'text-gray-400 bg-gray-100 cursor-not-allowed' 
+                  : 'text-white bg-blue-600 hover:bg-blue-700'
+              }`}
+              title="生成定制简历（新版本）"
+            >
+              {isGeneratingCustom ? (
+                <>
+                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-400 mr-1"></div>
+                  生成中...
+                </>
+              ) : (
+                <>
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  生成定制简历
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

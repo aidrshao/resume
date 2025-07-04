@@ -28,6 +28,7 @@ import TemplateManagement from './components/TemplateManagement';
 import ResumeBuilder from './components/ResumeBuilder';
 import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
+import ResumePreviewPage from './components/ResumePreviewPage';
 
 /**
  * 错误边界组件
@@ -232,6 +233,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <JobsPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 定制简历预览页面 - 需要认证 */}
+          <Route 
+            path="/resumes/customized/:id" 
+            element={
+              <ProtectedRoute>
+                <ResumePreviewPage />
               </ProtectedRoute>
             } 
           />
