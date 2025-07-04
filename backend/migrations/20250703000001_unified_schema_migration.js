@@ -26,28 +26,41 @@ exports.up = function(knex) {
         UPDATE resumes 
         SET unified_data = resume_data::jsonb 
         WHERE resume_data IS NOT NULL AND unified_data IS NULL
-      `);
+      `).then(() => ({ hasResumeData, hasContent }));
     } else if (hasContent) {
       console.log('🔄 [MIGRATION] 从content复制数据到unified_data...');
       return knex.raw(`
         UPDATE resumes 
         SET unified_data = content::jsonb 
         WHERE content IS NOT NULL AND unified_data IS NULL
-      `);
+      `).then(() => ({ hasResumeData, hasContent }));
     }
-    return Promise.resolve();
-  }).then(() => {
+    return Promise.resolve({ hasResumeData, hasContent });
+  }).then(({ hasResumeData, hasContent }) => {
     // 删除旧字段（如果存在）
-    return knex.schema.alterTable('resumes', function(table) {
-      if (knex.schema.hasColumn('resumes', 'content')) {
-        table.dropColumn('content');
-        console.log('🗑️ [MIGRATION] 删除了content字段');
-      }
-      if (knex.schema.hasColumn('resumes', 'resume_data')) {
-        table.dropColumn('resume_data');
-        console.log('🗑️ [MIGRATION] 删除了resume_data字段');
-      }
-    });
+    const promises = [];
+    
+    if (hasContent) {
+      promises.push(
+        knex.schema.alterTable('resumes', function(table) {
+          table.dropColumn('content');
+        }).then(() => {
+          console.log('🗑️ [MIGRATION] 删除了content字段');
+        })
+      );
+    }
+    
+    if (hasResumeData) {
+      promises.push(
+        knex.schema.alterTable('resumes', function(table) {
+          table.dropColumn('resume_data');
+        }).then(() => {
+          console.log('🗑️ [MIGRATION] 删除了resume_data字段');
+        })
+      );
+    }
+    
+    return Promise.all(promises);
   }).then(() => {
     console.log('✅ [MIGRATION] 统一数据范式迁移完成');
   }).catch(error => {

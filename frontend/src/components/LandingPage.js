@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { isAuthenticated, getUser, logout } from '../utils/auth';
 import AuthModal from './AuthModal';
 import EditModal from './EditModal';
+import ResumeProgressBar from './ResumeProgressBar';
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -33,12 +34,30 @@ const LandingPage = () => {
   const [uploadResult, setUploadResult] = useState(null);
   const [editedResult, setEditedResult] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 进度条状态管理
+  const [progressStatus, setProgressStatus] = useState('idle'); // 'idle' | 'uploading' | 'parsing' | 'success' | 'error'
+  const [progressMessage, setProgressMessage] = useState('');
+  
+  // 本地进度模拟（用于匀速前进）
+  const [localProgress, setLocalProgress] = useState(0);
+  const [progressInterval, setProgressInterval] = useState(null);
   const [chatMessages, setChatMessages] = useState([
     { type: 'ai', content: '您好！我是AI简历助手，我将通过几个问题来了解您的工作经历和技能。让我们开始吧！\n\n请先告诉我您的姓名？' }
   ]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const fileInputRef = useRef(null);
+
+  // 清理定时器（组件卸载时）
+  React.useEffect(() => {
+    return () => {
+      console.log('🧹 [CLEANUP] 组件卸载，清理进度定时器');
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [progressInterval]);
 
   /**
    * 处理注册按钮点击
@@ -78,6 +97,85 @@ const LandingPage = () => {
   };
 
   /**
+   * 启动本地进度模拟（匀速前进）
+   * 整个流程预计90-120秒，匀速推进到95%，剩余5%等待后端完成
+   */
+  const startLocalProgress = () => {
+    console.log('🏁 [LOCAL_PROGRESS] 启动本地进度模拟');
+    
+    // 清理之前的定时器
+    if (progressInterval) {
+      clearInterval(progressInterval);
+    }
+    
+    setLocalProgress(0);
+    setUploadProgress(0);
+    
+    // 预计总时长105秒（1分45秒），匀速到95%
+    const totalDuration = 105000; // 105秒
+    const targetProgress = 95; // 到95%停止，等待后端
+    const updateInterval = 500; // 每500ms更新一次
+    const incrementPerUpdate = (targetProgress / totalDuration) * updateInterval;
+    
+    const interval = setInterval(() => {
+      setLocalProgress(prev => {
+        const newProgress = prev + incrementPerUpdate;
+        const roundedProgress = Math.round(newProgress);
+        
+        // 同时更新uploadProgress用于组件显示
+        setUploadProgress(roundedProgress);
+        
+        // 根据进度阶段更新友好消息
+        let stageMessage = '';
+        if (roundedProgress < 20) {
+          stageMessage = '正在上传文件...';
+        } else if (roundedProgress < 40) {
+          stageMessage = '文件解析中...';
+        } else if (roundedProgress < 60) {
+          stageMessage = 'AI正在分析简历结构...';
+        } else if (roundedProgress < 80) {
+          stageMessage = 'AI正在提取关键信息...';
+        } else if (roundedProgress < 95) {
+          stageMessage = 'AI正在优化数据格式...';
+        } else {
+          stageMessage = '即将完成，请稍候...';
+        }
+        
+        // 只有当消息改变时才更新（避免频繁更新）
+        if (stageMessage !== progressMessage) {
+          setProgressMessage(stageMessage);
+        }
+        
+        console.log(`📊 [LOCAL_PROGRESS] 当前进度: ${roundedProgress}% - ${stageMessage}`);
+        
+        if (newProgress >= targetProgress) {
+          console.log('🎯 [LOCAL_PROGRESS] 达到95%，等待后端完成');
+          setProgressMessage('正在完成最后的处理...');
+          clearInterval(interval);
+          setProgressInterval(null);
+          return targetProgress;
+        }
+        
+        return newProgress;
+      });
+    }, updateInterval);
+    
+    setProgressInterval(interval);
+    console.log('⚡ [LOCAL_PROGRESS] 进度模拟定时器已启动');
+  };
+  
+  /**
+   * 停止本地进度模拟
+   */
+  const stopLocalProgress = () => {
+    console.log('🛑 [LOCAL_PROGRESS] 停止本地进度模拟');
+    if (progressInterval) {
+      clearInterval(progressInterval);
+      setProgressInterval(null);
+    }
+  };
+
+  /**
    * 处理模式选择
    */
   const handleModeSelect = (mode) => {
@@ -88,6 +186,15 @@ const LandingPage = () => {
     setUploadLoading(false);
     setUploadProgress(0);
     setUploadStage('');
+    
+    // 重置进度条状态
+    setProgressStatus('idle');
+    setProgressMessage('');
+    setLocalProgress(0);
+    
+    // 停止本地进度模拟
+    stopLocalProgress();
+    
     setChatMessages([
       { type: 'ai', content: '您好！我是AI简历助手，我将通过几个问题来了解您的工作经历和技能。让我们开始吧！\n\n请先告诉我您的姓名？' }
     ]);
@@ -234,25 +341,8 @@ const LandingPage = () => {
               console.log('🤖 [POLL_TASK] 进入AI分析阶段，这可能需要3-5分钟...');
             }
             
-            // 🎯 平滑进度条更新：避免进度跳跃
-            let smoothProgress = currentProgress;
-            
-            // 如果进度没有变化且小于100%，模拟小幅增长
-            if (currentProgress === lastProgress && currentProgress < 100 && pollCount > 1) {
-              const maxIncrement = Math.min(3, 100 - lastProgress);
-              const increment = Math.random() * maxIncrement * 0.5;
-              smoothProgress = Math.min(100, lastProgress + increment);
-            }
-            
-            // 如果进度有大幅跳跃（超过15%），进行平滑处理
-            else if (pollCount > 1 && currentProgress - lastProgress > 15 && currentProgress < 100) {
-              const progressDiff = currentProgress - lastProgress;
-              const smoothIncrement = Math.min(progressDiff * 0.6, 12);
-              smoothProgress = Math.min(100, lastProgress + smoothIncrement);
-            }
-            
-            // 更新进度条
-            setUploadProgress(smoothProgress);
+            // 📝 记录后端进度（仅用于日志，界面使用本地进度）
+            console.log(`🔄 [POLL_TASK] 后端进度: ${currentProgress}% (本地进度由startLocalProgress控制)`);
             
             // 生成友好的状态消息
             let displayMessage = task.message || '处理中...';
@@ -308,7 +398,13 @@ const LandingPage = () => {
             // 检查任务是否完成
             if (task.status === 'completed') {
               console.log('✅ [POLL_TASK] 任务完成！');
+              
+              // 🛑 停止本地进度模拟
+              stopLocalProgress();
+              
+              // 立即设置为100%
               setUploadProgress(100);
+              setLocalProgress(100);
               
               // 显示完成消息和性能统计
               let completionMessage = '🎉 解析完成！';
@@ -317,6 +413,10 @@ const LandingPage = () => {
                 completionMessage += ` 总耗时${totalSeconds}秒`;
               }
               setUploadStage(completionMessage);
+              
+              // 设置进度条状态为成功
+              setProgressStatus('success');
+              setProgressMessage(completionMessage);
               
               // 设置解析结果
               if (task.resultData && task.resultData.structuredData) {
@@ -493,6 +593,13 @@ const LandingPage = () => {
     setUploadProgress(0);
     setUploadStage('准备上传文件...');
     
+    // 设置进度条状态为上传中
+    setProgressStatus('uploading');
+    setProgressMessage('');
+    
+    // 🚀 立即启动本地进度模拟（匀速前进）
+    startLocalProgress();
+    
     // 🔧 修复：确保uploadLoading在最后设置，避免被其他状态重置
     setUploadLoading(true);
     
@@ -644,6 +751,10 @@ const LandingPage = () => {
         console.log('✅ [FRONTEND_UPLOAD] 任务详情:', data.data);
         setUploadStage('文件上传成功，开始解析...');
         
+        // 设置进度条状态为解析中
+        setProgressStatus('parsing');
+        setProgressMessage('');
+        
         console.log('🔄 [FRONTEND_UPLOAD] 开始轮询任务状态...');
         await pollTaskStatus(taskId);
       } else {
@@ -689,6 +800,13 @@ const LandingPage = () => {
       
       console.error('❌ [FRONTEND_UPLOAD] 显示给用户的错误消息:', userMessage);
       alert(userMessage);
+      
+      // 🛑 停止本地进度模拟
+      stopLocalProgress();
+      
+      // 设置进度条状态为错误
+      setProgressStatus('error');
+      setProgressMessage(userMessage);
       
       console.log('🧹 [FRONTEND_UPLOAD] 清理UI状态...');
       setUploadStage('');
@@ -1212,40 +1330,24 @@ const LandingPage = () => {
                         className="hidden"
                       />
 
-                      {/* 进度条 */}
-                      {uploadLoading && (
-                        <div className="mt-8">
-                          {console.log('🎯 [PROGRESS_BAR] 进度条正在渲染:', {
-                            uploadLoading,
-                            uploadProgress,
-                            uploadStage,
-                            timestamp: new Date().toISOString()
-                          })}
-                          <div className="bg-white rounded-lg p-6 border border-gray-200">
-                            <div className="flex items-center justify-between mb-4">
-                              <span className="text-sm font-medium text-gray-700">{uploadStage}</span>
-                              <span className="text-sm font-medium text-indigo-600">{uploadProgress}%</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
-                                style={{ width: `${uploadProgress}%` }}
-                              ></div>
-                            </div>
-                            <div className="mt-2 text-xs text-gray-500 text-center">
-                              正在处理您的简历，请稍候...
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      {/* 新的进度条组件 */}
+                      <ResumeProgressBar 
+                        status={progressStatus}
+                        uploadProgress={Math.round(localProgress || uploadProgress)}
+                        message={progressMessage}
+                        className="mt-8"
+                      />
 
                       {/* 🔧 调试信息 */}
                       {process.env.NODE_ENV === 'development' && (
                         <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
                           <h4 className="font-bold mb-2">🔧 调试信息:</h4>
                           <div>uploadLoading: {String(uploadLoading)}</div>
+                          <div>progressStatus: {progressStatus}</div>
+                          <div>localProgress: {Math.round(localProgress)}%</div>
                           <div>uploadProgress: {uploadProgress}%</div>
                           <div>uploadStage: {uploadStage}</div>
+                          <div>progressMessage: {progressMessage}</div>
                           <div>uploadResult: {uploadResult ? '有数据' : '无数据'}</div>
                           <div>editedResult: {editedResult ? '有数据' : '无数据'}</div>
                           <div>selectedMode: {selectedMode}</div>

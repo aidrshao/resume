@@ -14,4 +14,22 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+}
+
+/* 进度条不确定状态动画 */
+@keyframes progressIndeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(350%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* 自定义动画类 */
+.animate-progress-indeterminate {
+  animation: progressIndeterminate 2s ease-in-out infinite;
 } 
