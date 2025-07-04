@@ -9,7 +9,15 @@
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:status": "knex migrate:status",
-    "seed": "knex seed:run"
+    "seed": "knex seed:run",
+    "migrate:unified": "node scripts/run-unified-schema-migration.js",
+    "migrate:unified-db": "node scripts/run-unified-schema-migration.js --database-only",
+    "migrate:unified-data": "node scripts/run-unified-schema-migration.js --data-only",
+    "migrate:complete": "node scripts/complete-data-migration.js",
+    "migrate:complete:run": "node scripts/run-complete-migration.js",
+    "migrate:complete:test": "node scripts/test-complete-migration.js",
+    "migrate:existing": "node scripts/migrate-existing-data.js",
+    "test:unified": "node scripts/test-unified-schema.js"
   },
   "dependencies": {
     "axios": "^1.10.0",

@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>{{name}} - 简历</title>
+  <title>{{profile.name}} - 简历</title>
   <style>
     body {
       margin: 0;
@@ -120,26 +120,28 @@
 
     .skills-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px 30px;
+      grid-template-columns: repeat(1, 1fr);
+      gap: 15px;
     }
 
-    .skill span {
-      font-size: 0.95em;
-      display: block;
-      margin-bottom: 4px;
+    .skill-category {
+      background: #f8f9fa;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 4px solid #f9c922;
     }
 
-    .bar {
-      background: #eee;
-      height: 6px;
-      border-radius: 3px;
-      overflow: hidden;
+    .skill-category-title {
+      font-weight: bold;
+      color: #2c3e50;
+      margin-bottom: 8px;
+      font-size: 1em;
     }
 
-    .bar .fill {
-      height: 100%;
-      background: #f9c922;
+    .skill-list {
+      font-size: 0.9em;
+      color: #555;
+      line-height: 1.4;
     }
 
     .reference-item {
@@ -282,90 +284,64 @@
   <div class="resume">
     <!-- 左侧栏 -->
     <div class="sidebar">
-      {{#if avatar}}
+      {{#if profile.avatar}}
       <div class="photo">
-        <img src="{{avatar}}" alt="{{name}}">
+        <img src="{{profile.avatar}}" alt="{{profile.name}}">
       </div>
       {{/if}}
       
-      {{#if summary}}
+      {{#if profile.summary}}
       <div class="section about">
         <h2>关于我</h2>
-        <p class="about-text">{{summary}}</p>
+        <p class="about-text">{{profile.summary}}</p>
       </div>
       {{/if}}
       
-      {{#if contact}}
       <div class="section contact">
         <h2>联系方式</h2>
         <ul>
-          {{#if contact.phone}}<li>电话: {{contact.phone}}</li>{{/if}}
-          {{#if contact.email}}<li>邮箱: {{contact.email}}</li>{{/if}}
-          {{#if contact.address}}<li>地址: {{contact.address}}</li>{{/if}}
-          {{#if contact.website}}<li><a href="{{contact.website}}">个人网站</a></li>{{/if}}
-          {{#if contact.linkedin}}<li><a href="{{contact.linkedin}}">LinkedIn</a></li>{{/if}}
-          {{#if contact.github}}<li><a href="{{contact.github}}">GitHub</a></li>{{/if}}
+          {{#if profile.phone}}<li>电话: {{profile.phone}}</li>{{/if}}
+          {{#if profile.email}}<li>邮箱: {{profile.email}}</li>{{/if}}
+          {{#if profile.location}}<li>地址: {{profile.location}}</li>{{/if}}
+          {{#if profile.portfolio}}<li><a href="{{profile.portfolio}}">个人网站</a></li>{{/if}}
+          {{#if profile.linkedin}}<li><a href="{{profile.linkedin}}">LinkedIn</a></li>{{/if}}
         </ul>
       </div>
-      {{/if}}
       
-      {{#if languages}}
-      <div class="section languages">
-        <h2>语言能力</h2>
-        <ul>
-          {{#each languages}}
-          <li class="language-item">{{name}} - {{level}}</li>
-          {{/each}}
-        </ul>
+      {{#if customSections}}
+      {{#each customSections}}
+      <div class="section custom-section">
+        <h2>{{title}}</h2>
+        <p>{{content}}</p>
       </div>
-      {{/if}}
-      
-      {{#if references}}
-      <div class="section references">
-        <h2>推荐人</h2>
-        {{#each references}}
-        <div class="reference-item">
-          <p><strong>{{name}}</strong><br>
-          {{#if company}}{{company}}<br>{{/if}}
-          {{#if phone}}电话: {{phone}}<br>{{/if}}
-          {{#if email}}邮箱: {{email}}{{/if}}</p>
-        </div>
-        {{/each}}
-      </div>
+      {{/each}}
       {{/if}}
     </div>
 
     <!-- 右侧内容 -->
     <div class="content">
       <div class="header">
-        <h1>{{name}}</h1>
-        {{#if title}}<p class="title">{{title}}</p>{{/if}}
+        <h1>{{profile.name}}</h1>
+        {{#if profile.title}}<p class="title">{{profile.title}}</p>{{/if}}
         <div class="contact">
-          {{#if contact.phone}}{{contact.phone}}{{/if}}
-          {{#if contact.email}} | {{contact.email}}{{/if}}
-          {{#if contact.address}} | {{contact.address}}{{/if}}
+          {{#if profile.phone}}{{profile.phone}}{{/if}}
+          {{#if profile.email}} | {{profile.email}}{{/if}}
+          {{#if profile.location}} | {{profile.location}}{{/if}}
         </div>
       </div>
 
-      {{#if experiences}}
+      {{#if workExperience}}
       <div class="section work">
         <h2>工作经历</h2>
-        {{#each experiences}}
+        {{#each workExperience}}
         <div class="item">
           <div class="details">
             <h3>{{company}}</h3>
             <p>{{location}}</p>
-            <span>{{start_date}} - {{#if end_date}}{{end_date}}{{else}}至今{{/if}}</span>
+            <span>{{duration}}</span>
           </div>
           <div class="role">{{position}}</div>
           {{#if description}}<p>{{description}}</p>{{/if}}
-          {{#if achievements}}
-          <ul>
-            {{#each achievements}}
-            <li>{{this}}</li>
-            {{/each}}
-          </ul>
-          {{/if}}
         </div>
         {{/each}}
       </div>
@@ -379,11 +355,10 @@
           <div class="details">
             <h3>{{school}}</h3>
             <p>{{location}}</p>
-            <span>{{graduation_date}}</span>
+            <span>{{duration}}</span>
           </div>
           <div class="degree">{{degree}}{{#if major}} - {{major}}{{/if}}</div>
           {{#if description}}<p>{{description}}</p>{{/if}}
-          {{#if gpa}}<p>GPA: {{gpa}}</p>{{/if}}
         </div>
         {{/each}}
       </div>
@@ -394,46 +369,28 @@
         <h2>技能专长</h2>
         <div class="skills-grid">
           {{#each skills}}
-          <div class="skill">
-            <span>{{name}}</span>
-            <div class="bar">
-              <div class="fill" style="width: {{level}}%;"></div>
-            </div>
+          <div class="skill-category">
+            <div class="skill-category-title">{{category}}</div>
+            <div class="skill-list">{{details}}</div>
           </div>
           {{/each}}
         </div>
       </div>
       {{/if}}
 
-      {{#if projects}}
+      {{#if projectExperience}}
       <div class="section projects">
         <h2>项目经历</h2>
-        {{#each projects}}
+        {{#each projectExperience}}
         <div class="item">
           <div class="details">
             <h3>{{name}}</h3>
             <p>{{#if company}}{{company}}{{/if}}</p>
-            <span>{{start_date}} - {{#if end_date}}{{end_date}}{{else}}至今{{/if}}</span>
+            <span>{{duration}}</span>
           </div>
           {{#if role}}<div class="role">{{role}}</div>{{/if}}
           {{#if description}}<p>{{description}}</p>{{/if}}
-          {{#if technologies}}<p><strong>技术栈:</strong> {{technologies}}</p>{{/if}}
-        </div>
-        {{/each}}
-      </div>
-      {{/if}}
-
-      {{#if certifications}}
-      <div class="section certifications">
-        <h2>证书资质</h2>
-        {{#each certifications}}
-        <div class="item">
-          <div class="details">
-            <h3>{{name}}</h3>
-            <p>{{issuer}}</p>
-            <span>{{issue_date}}{{#if expiry_date}} - {{expiry_date}}{{/if}}</span>
-          </div>
-          {{#if description}}<p>{{description}}</p>{{/if}}
+          {{#if url}}<p><strong>项目链接:</strong> <a href="{{url}}">{{url}}</a></p>{{/if}}
         </div>
         {{/each}}
       </div>

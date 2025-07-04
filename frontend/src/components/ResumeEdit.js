@@ -37,10 +37,22 @@ const ResumeEdit = () => {
         
         if (data.success) {
           setResume(data.data);
-          const resumeData = typeof data.data.resume_data === 'string' 
-            ? JSON.parse(data.data.resume_data) 
-            : data.data.resume_data;
-          setEditedResult(resumeData);
+          let resumeData = {};
+          
+          // 优先使用 resume_data 字段，然后是 content 字段
+          if (data.data.resume_data) {
+            resumeData = typeof data.data.resume_data === 'string' 
+              ? JSON.parse(data.data.resume_data) 
+              : data.data.resume_data;
+          } else if (data.data.content) {
+            resumeData = typeof data.data.content === 'string' 
+              ? JSON.parse(data.data.content) 
+              : data.data.content;
+          }
+
+          // 转换为 UNIFIED_RESUME_SCHEMA 格式
+          const standardData = convertToUnifiedFormat(resumeData);
+          setEditedResult(standardData);
         } else {
           setError(data.message);
         }
@@ -58,24 +70,74 @@ const ResumeEdit = () => {
   }, [id, navigate]);
 
   /**
+   * 转换为统一格式
+   */
+  const convertToUnifiedFormat = (data) => {
+    if (!data) return getEmptyResumeData();
+
+    return {
+      profile: {
+        name: data.profile?.name || data.personalInfo?.name || '',
+        email: data.profile?.email || data.personalInfo?.email || '',
+        phone: data.profile?.phone || data.personalInfo?.phone || '',
+        location: data.profile?.location || data.personalInfo?.location || '',
+        portfolio: data.profile?.portfolio || data.personalInfo?.portfolio || '',
+        linkedin: data.profile?.linkedin || data.personalInfo?.linkedin || '',
+        summary: data.profile?.summary || data.personalInfo?.summary || data.summary || ''
+      },
+      workExperience: Array.isArray(data.workExperience) ? data.workExperience :
+                     Array.isArray(data.workExperiences) ? data.workExperiences : [],
+      projectExperience: Array.isArray(data.projectExperience) ? data.projectExperience :
+                        Array.isArray(data.projects) ? data.projects : [],
+      education: Array.isArray(data.education) ? data.education :
+                Array.isArray(data.educations) ? data.educations : [],
+      skills: Array.isArray(data.skills) ? 
+             (data.skills.length > 0 && data.skills[0].category ?
+              data.skills : 
+              [{ category: '技能', details: data.skills.join(', ') }]) :
+             [],
+      customSections: Array.isArray(data.customSections) ? data.customSections : []
+    };
+  };
+
+  /**
+   * 获取空的简历数据结构
+   */
+  const getEmptyResumeData = () => ({
+    profile: {
+      name: '',
+      email: '',
+      phone: '',
+      location: '',
+      portfolio: '',
+      linkedin: '',
+      summary: ''
+    },
+    workExperience: [],
+    projectExperience: [],
+    education: [],
+    skills: [],
+    customSections: []
+  });
+
+  /**
    * 处理编辑更改
    */
   const handleEditChange = (section, field, value) => {
     setEditedResult(prev => {
       const updated = { ...prev };
       
-      if (section === 'skills' && field === 'certifications') {
-        // 处理认证证书字符串转数组
-        updated.skills = {
-          ...updated.skills,
-          [field]: value.split(',').map(item => item.trim()).filter(item => item)
-        };
-      } else if (section === 'skills') {
-        // 处理其他技能字段
-        const skillValue = value.split(',').map(item => item.trim()).filter(item => item);
-        updated.skills = {
-          ...updated.skills,
-          [field]: skillValue
+      if (section === 'skills' && field === 'details') {
+        // 处理技能详情
+        updated.skills = [{
+          category: '技能',
+          details: value
+        }];
+      } else if (section === 'profile') {
+        // 处理个人信息
+        updated.profile = {
+          ...updated.profile,
+          [field]: value
         };
       } else {
         // 处理其他字段
@@ -95,16 +157,13 @@ const ResumeEdit = () => {
   const handleAddExperience = () => {
     setEditedResult(prev => ({
       ...prev,
-      workExperiences: [
-        ...(prev.workExperiences || []),
+      workExperience: [
+        ...(prev.workExperience || []),
         {
           company: '',
           position: '',
-          startDate: '',
-          endDate: '',
-          description: '',
-          achievements: [],
-          technologies: []
+          duration: '',
+          description: ''
         }
       ]
     }));
@@ -116,7 +175,7 @@ const ResumeEdit = () => {
   const handleRemoveExperience = (index) => {
     setEditedResult(prev => ({
       ...prev,
-      workExperiences: prev.workExperiences.filter((_, i) => i !== index)
+      workExperience: prev.workExperience.filter((_, i) => i !== index)
     }));
   };
 
@@ -126,16 +185,13 @@ const ResumeEdit = () => {
   const handleAddEducation = () => {
     setEditedResult(prev => ({
       ...prev,
-      educations: [
-        ...(prev.educations || []),
+      education: [
+        ...(prev.education || []),
         {
           school: '',
           degree: '',
           major: '',
-          startDate: '',
-          endDate: '',
-          gpa: '',
-          description: ''
+          duration: ''
         }
       ]
     }));
@@ -147,7 +203,7 @@ const ResumeEdit = () => {
   const handleRemoveEducation = (index) => {
     setEditedResult(prev => ({
       ...prev,
-      educations: prev.educations.filter((_, i) => i !== index)
+      education: prev.education.filter((_, i) => i !== index)
     }));
   };
 
@@ -157,16 +213,14 @@ const ResumeEdit = () => {
   const handleAddProject = () => {
     setEditedResult(prev => ({
       ...prev,
-      projects: [
-        ...(prev.projects || []),
+      projectExperience: [
+        ...(prev.projectExperience || []),
         {
           name: '',
           role: '',
-          startDate: '',
-          endDate: '',
+          duration: '',
           description: '',
-          achievements: [],
-          technologies: []
+          url: ''
         }
       ]
     }));
@@ -178,7 +232,33 @@ const ResumeEdit = () => {
   const handleRemoveProject = (index) => {
     setEditedResult(prev => ({
       ...prev,
-      projects: prev.projects.filter((_, i) => i !== index)
+      projectExperience: prev.projectExperience.filter((_, i) => i !== index)
+    }));
+  };
+
+  /**
+   * 添加技能
+   */
+  const handleAddSkill = () => {
+    setEditedResult(prev => ({
+      ...prev,
+      skills: [
+        ...(prev.skills || []),
+        {
+          category: '',
+          details: ''
+        }
+      ]
+    }));
+  };
+
+  /**
+   * 删除技能
+   */
+  const handleRemoveSkill = (index) => {
+    setEditedResult(prev => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index)
     }));
   };
 
@@ -196,21 +276,20 @@ const ResumeEdit = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          resume_data: editedResult
+          resume_data: JSON.stringify(editedResult)
         })
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      const result = await response.json();
+      if (result.success) {
         alert('简历保存成功！');
-        navigate(`/resume/${id}`);
+        navigate('/resumes');
       } else {
-        throw new Error(data.message || '保存失败');
+        setError(result.message || '保存失败');
       }
     } catch (error) {
       console.error('保存简历失败:', error);
-      alert('保存失败，请稍后重试');
+      setError('保存失败，请重试');
     } finally {
       setSaving(false);
     }
@@ -301,8 +380,8 @@ const ResumeEdit = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">姓名</label>
                   <input
                     type="text"
-                    value={editedResult?.personalInfo?.name || ''}
-                    onChange={(e) => handleEditChange('personalInfo', 'name', e.target.value)}
+                    value={editedResult?.profile?.name || ''}
+                    onChange={(e) => handleEditChange('profile', 'name', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                     placeholder="请输入姓名"
                   />
@@ -311,8 +390,8 @@ const ResumeEdit = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">电话</label>
                   <input
                     type="text"
-                    value={editedResult?.personalInfo?.phone || ''}
-                    onChange={(e) => handleEditChange('personalInfo', 'phone', e.target.value)}
+                    value={editedResult?.profile?.phone || ''}
+                    onChange={(e) => handleEditChange('profile', 'phone', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                     placeholder="请输入电话号码"
                   />
@@ -321,8 +400,8 @@ const ResumeEdit = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
                   <input
                     type="email"
-                    value={editedResult?.personalInfo?.email || ''}
-                    onChange={(e) => handleEditChange('personalInfo', 'email', e.target.value)}
+                    value={editedResult?.profile?.email || ''}
+                    onChange={(e) => handleEditChange('profile', 'email', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                     placeholder="请输入邮箱地址"
                   />
@@ -331,8 +410,8 @@ const ResumeEdit = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">地址</label>
                   <input
                     type="text"
-                    value={editedResult?.personalInfo?.location || ''}
-                    onChange={(e) => handleEditChange('personalInfo', 'location', e.target.value)}
+                    value={editedResult?.profile?.location || ''}
+                    onChange={(e) => handleEditChange('profile', 'location', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                     placeholder="请输入居住地址"
                   />
@@ -341,8 +420,8 @@ const ResumeEdit = () => {
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">个人简介</label>
                 <textarea
-                  value={editedResult?.personalInfo?.summary || ''}
-                  onChange={(e) => handleEditChange('personalInfo', 'summary', e.target.value)}
+                  value={editedResult?.profile?.summary || ''}
+                  onChange={(e) => handleEditChange('profile', 'summary', e.target.value)}
                   rows="3"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   placeholder="请输入个人简介"
@@ -352,8 +431,8 @@ const ResumeEdit = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">求职意向</label>
                 <input
                   type="text"
-                  value={editedResult?.personalInfo?.objective || ''}
-                  onChange={(e) => handleEditChange('personalInfo', 'objective', e.target.value)}
+                  value={editedResult?.profile?.objective || ''}
+                  onChange={(e) => handleEditChange('profile', 'objective', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                   placeholder="请输入求职意向"
                 />
@@ -372,7 +451,7 @@ const ResumeEdit = () => {
                 </button>
               </div>
               <div className="space-y-4">
-                {(editedResult?.educations || []).map((edu, index) => (
+                {(editedResult?.education || []).map((edu, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <h4 className="text-lg font-medium text-gray-900">教育经历 {index + 1}</h4>
@@ -390,9 +469,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.school || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], school: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="学校名称"
@@ -404,9 +483,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.degree || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], degree: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="学位"
@@ -418,9 +497,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.major || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], major: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="专业"
@@ -432,9 +511,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.gpa || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], gpa: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="GPA"
@@ -446,9 +525,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.startDate || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], startDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2018-09"
@@ -460,9 +539,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={edu.endDate || ''}
                           onChange={(e) => {
-                            const newEducations = [...(editedResult.educations || [])];
+                            const newEducations = [...(editedResult.education || [])];
                             newEducations[index] = { ...newEducations[index], endDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                            setEditedResult(prev => ({ ...prev, education: newEducations }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2022-06"
@@ -474,9 +553,9 @@ const ResumeEdit = () => {
                       <textarea
                         value={edu.description || ''}
                         onChange={(e) => {
-                          const newEducations = [...(editedResult.educations || [])];
+                          const newEducations = [...(editedResult.education || [])];
                           newEducations[index] = { ...newEducations[index], description: e.target.value };
-                          setEditedResult(prev => ({ ...prev, educations: newEducations }));
+                          setEditedResult(prev => ({ ...prev, education: newEducations }));
                         }}
                         rows="2"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -500,7 +579,7 @@ const ResumeEdit = () => {
                 </button>
               </div>
               <div className="space-y-4">
-                {(editedResult?.workExperiences || []).map((work, index) => (
+                {(editedResult?.workExperience || []).map((work, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <h4 className="text-lg font-medium text-gray-900">工作经历 {index + 1}</h4>
@@ -518,9 +597,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.company || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], company: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="公司名称"
@@ -532,9 +611,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.position || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], position: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="职位名称"
@@ -546,9 +625,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.startDate || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], startDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2020-01"
@@ -560,9 +639,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.endDate || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], endDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2023-12 或 至今"
@@ -574,9 +653,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.location || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], location: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="工作地点"
@@ -588,9 +667,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={work.department || ''}
                           onChange={(e) => {
-                            const newExperiences = [...(editedResult.workExperiences || [])];
+                            const newExperiences = [...(editedResult.workExperience || [])];
                             newExperiences[index] = { ...newExperiences[index], department: e.target.value };
-                            setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                            setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="部门"
@@ -602,9 +681,9 @@ const ResumeEdit = () => {
                       <textarea
                         value={work.description || ''}
                         onChange={(e) => {
-                          const newExperiences = [...(editedResult.workExperiences || [])];
+                          const newExperiences = [...(editedResult.workExperience || [])];
                           newExperiences[index] = { ...newExperiences[index], description: e.target.value };
-                          setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                          setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                         }}
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -616,12 +695,12 @@ const ResumeEdit = () => {
                       <textarea
                         value={(work.achievements || []).join('\n')}
                         onChange={(e) => {
-                          const newExperiences = [...(editedResult.workExperiences || [])];
+                          const newExperiences = [...(editedResult.workExperience || [])];
                           newExperiences[index] = { 
                             ...newExperiences[index], 
                             achievements: e.target.value.split('\n').filter(item => item.trim())
                           };
-                          setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                          setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                         }}
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -634,12 +713,12 @@ const ResumeEdit = () => {
                         type="text"
                         value={(work.technologies || []).join(', ')}
                         onChange={(e) => {
-                          const newExperiences = [...(editedResult.workExperiences || [])];
+                          const newExperiences = [...(editedResult.workExperience || [])];
                           newExperiences[index] = { 
                             ...newExperiences[index], 
                             technologies: e.target.value.split(',').map(item => item.trim()).filter(item => item)
                           };
-                          setEditedResult(prev => ({ ...prev, workExperiences: newExperiences }));
+                          setEditedResult(prev => ({ ...prev, workExperience: newExperiences }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                         placeholder="用逗号分隔，如：React, Node.js, Python"
@@ -662,7 +741,7 @@ const ResumeEdit = () => {
                 </button>
               </div>
               <div className="space-y-4">
-                {(editedResult?.projects || []).map((project, index) => (
+                {(editedResult?.projectExperience || []).map((project, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4">
                     <div className="flex justify-between items-start mb-3">
                       <h4 className="text-lg font-medium text-gray-900">项目经历 {index + 1}</h4>
@@ -680,9 +759,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={project.name || ''}
                           onChange={(e) => {
-                            const newProjects = [...(editedResult.projects || [])];
+                            const newProjects = [...(editedResult.projectExperience || [])];
                             newProjects[index] = { ...newProjects[index], name: e.target.value };
-                            setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                            setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="项目名称"
@@ -694,9 +773,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={project.role || ''}
                           onChange={(e) => {
-                            const newProjects = [...(editedResult.projects || [])];
+                            const newProjects = [...(editedResult.projectExperience || [])];
                             newProjects[index] = { ...newProjects[index], role: e.target.value };
-                            setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                            setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="在项目中的角色"
@@ -708,9 +787,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={project.startDate || ''}
                           onChange={(e) => {
-                            const newProjects = [...(editedResult.projects || [])];
+                            const newProjects = [...(editedResult.projectExperience || [])];
                             newProjects[index] = { ...newProjects[index], startDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                            setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2022-01"
@@ -722,9 +801,9 @@ const ResumeEdit = () => {
                           type="text"
                           value={project.endDate || ''}
                           onChange={(e) => {
-                            const newProjects = [...(editedResult.projects || [])];
+                            const newProjects = [...(editedResult.projectExperience || [])];
                             newProjects[index] = { ...newProjects[index], endDate: e.target.value };
-                            setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                            setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                           placeholder="如：2022-12"
@@ -736,9 +815,9 @@ const ResumeEdit = () => {
                       <textarea
                         value={project.description || ''}
                         onChange={(e) => {
-                          const newProjects = [...(editedResult.projects || [])];
+                          const newProjects = [...(editedResult.projectExperience || [])];
                           newProjects[index] = { ...newProjects[index], description: e.target.value };
-                          setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                          setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                         }}
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -750,12 +829,12 @@ const ResumeEdit = () => {
                       <textarea
                         value={(project.achievements || []).join('\n')}
                         onChange={(e) => {
-                          const newProjects = [...(editedResult.projects || [])];
+                          const newProjects = [...(editedResult.projectExperience || [])];
                           newProjects[index] = { 
                             ...newProjects[index], 
                             achievements: e.target.value.split('\n').filter(item => item.trim())
                           };
-                          setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                          setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                         }}
                         rows="3"
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
@@ -768,12 +847,12 @@ const ResumeEdit = () => {
                         type="text"
                         value={(project.technologies || []).join(', ')}
                         onChange={(e) => {
-                          const newProjects = [...(editedResult.projects || [])];
+                          const newProjects = [...(editedResult.projectExperience || [])];
                           newProjects[index] = { 
                             ...newProjects[index], 
                             technologies: e.target.value.split(',').map(item => item.trim()).filter(item => item)
                           };
-                          setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                          setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                         placeholder="用逗号分隔，如：React, Node.js, MongoDB"
@@ -785,9 +864,9 @@ const ResumeEdit = () => {
                         type="url"
                         value={project.url || ''}
                         onChange={(e) => {
-                          const newProjects = [...(editedResult.projects || [])];
+                          const newProjects = [...(editedResult.projectExperience || [])];
                           newProjects[index] = { ...newProjects[index], url: e.target.value };
-                          setEditedResult(prev => ({ ...prev, projects: newProjects }));
+                          setEditedResult(prev => ({ ...prev, projectExperience: newProjects }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
                         placeholder="项目演示或代码链接"
@@ -799,49 +878,58 @@ const ResumeEdit = () => {
             </div>
 
             {/* 技能编辑 */}
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-4 border-b border-gray-200 pb-2">🛠️ 技能专长</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">技术技能</label>
-                  <input
-                    type="text"
-                    value={editedResult?.skills?.technical?.join(', ') || ''}
-                    onChange={(e) => handleEditChange('skills', 'technical', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="用逗号分隔，如：JavaScript, Python, React"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">专业技能</label>
-                  <input
-                    type="text"
-                    value={editedResult?.skills?.professional?.join(', ') || ''}
-                    onChange={(e) => handleEditChange('skills', 'professional', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="用逗号分隔，如：项目管理, 数据分析, 产品设计"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">软技能</label>
-                  <input
-                    type="text"
-                    value={editedResult?.skills?.soft?.join(', ') || ''}
-                    onChange={(e) => handleEditChange('skills', 'soft', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="用逗号分隔，如：团队合作, 沟通能力, 领导力"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">认证证书</label>
-                  <input
-                    type="text"
-                    value={editedResult?.skills?.certifications?.join(', ') || ''}
-                    onChange={(e) => handleEditChange('skills', 'certifications', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                    placeholder="用逗号分隔，如：AWS认证, PMP认证, CPA"
-                  />
-                </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-bold mb-4">技能</h2>
+              <div className="space-y-4">
+                {(editedResult?.skills || []).map((skill, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="text-lg font-semibold">技能 {index + 1}</h3>
+                      <button
+                        onClick={() => handleRemoveSkill(index)}
+                        className="text-red-500 hover:text-red-700 font-medium"
+                      >
+                        删除
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">技能分类</label>
+                        <input
+                          type="text"
+                          value={skill.category || ''}
+                          onChange={(e) => {
+                            const newSkills = [...(editedResult.skills || [])];
+                            newSkills[index] = { ...newSkills[index], category: e.target.value };
+                            setEditedResult(prev => ({ ...prev, skills: newSkills }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          placeholder="如：前端技术、后端技术、设计技能"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">技能详情</label>
+                        <input
+                          type="text"
+                          value={skill.details || ''}
+                          onChange={(e) => {
+                            const newSkills = [...(editedResult.skills || [])];
+                            newSkills[index] = { ...newSkills[index], details: e.target.value };
+                            setEditedResult(prev => ({ ...prev, skills: newSkills }));
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                          placeholder="如：React, Vue, JavaScript, TypeScript"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <button
+                  onClick={handleAddSkill}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
+                >
+                  添加技能
+                </button>
               </div>
             </div>
 

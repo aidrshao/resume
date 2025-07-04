@@ -1,9 +1,11 @@
 /**
  * 简历相关数据模型
  * 提供简历数据的CRUD操作
+ * 支持统一数据范式 (v2.1)
  */
 
 const knex = require('../config/database');
+const { convertToUnifiedSchema, validateUnifiedSchema, EMPTY_UNIFIED_RESUME } = require('../schemas/schema');
 
 class Resume {
   /**
@@ -26,14 +28,37 @@ class Resume {
    * @returns {Promise<Object>} 创建的简历对象
    */
   static async create(resumeData) {
+    // 确保数据符合统一格式
+    let unifiedData = resumeData.unified_data;
+    
+    // 如果没有提供unified_data，但有旧格式数据，则转换
+    if (!unifiedData && (resumeData.resume_data || resumeData.content)) {
+      unifiedData = convertToUnifiedSchema(resumeData.resume_data || resumeData.content);
+    }
+    
+    // 如果仍然没有数据，使用默认空模板
+    if (!unifiedData) {
+      unifiedData = EMPTY_UNIFIED_RESUME;
+    }
+
+    // 验证数据格式
+    const validation = validateUnifiedSchema(unifiedData);
+    if (!validation.valid) {
+      throw new Error(`简历数据格式错误: ${validation.error}`);
+    }
+
     const [resume] = await knex('resumes')
       .insert({
         ...resumeData,
+        unified_data: JSON.stringify(unifiedData),
+        schema_version: '2.1',
         created_at: new Date(),
         updated_at: new Date()
       })
       .returning('*');
-    return resume;
+    
+    // 返回时包含解析后的数据
+    return this.enrichResumeData(resume);
   }
 
   /**
@@ -53,7 +78,8 @@ class Resume {
       )
       .where('resumes.id', id)
       .first();
-    return resume;
+    
+    return resume ? this.enrichResumeData(resume) : null;
   }
 
   /**
@@ -63,6 +89,8 @@ class Resume {
    * @returns {Promise<Object|null>} 简历对象
    */
   static async findByIdAndUser(id, userId) {
+    console.log(`🔍 [RESUME_MODEL] 查询简历 ID: ${id}, 用户ID: ${userId}`);
+    
     const resume = await knex('resumes')
       .leftJoin('resume_templates', 'resumes.template_id', 'resume_templates.id')
       .select(
@@ -74,18 +102,13 @@ class Resume {
       .where('resumes.user_id', userId)
       .first();
     
-    if (resume && resume.resume_data) {
-      // 如果resume_data是字符串，解析为JSON
-      if (typeof resume.resume_data === 'string') {
-        try {
-          resume.resume_data = JSON.parse(resume.resume_data);
-        } catch (e) {
-          console.warn('解析简历数据失败:', e);
-        }
-      }
+    if (!resume) {
+      console.log(`❌ [RESUME_MODEL] 简历未找到或无权限访问`);
+      return null;
     }
-    
-    return resume;
+
+    console.log(`✅ [RESUME_MODEL] 简历找到，开始数据处理`);
+    return this.enrichResumeData(resume);
   }
 
   /**
@@ -99,10 +122,7 @@ class Resume {
         .where('user_id', userId)
         .orderBy('updated_at', 'desc');
       
-      return results.map(resume => ({
-        ...resume,
-        content: typeof resume.resume_data === 'string' ? JSON.parse(resume.resume_data) : resume.resume_data
-      }));
+      return results.map(resume => this.enrichResumeData(resume));
     } catch (error) {
       console.error('查询用户简历失败:', error);
       throw error;
@@ -118,7 +138,7 @@ class Resume {
     const startTime = Date.now();
     try {
       console.log(`🗄️ [RESUME_MODEL] 开始查询用户简历列表，用户ID: ${userId}`);
-      console.log(`🔍 [SQL_QUERY] 查询字段: id, user_id, template_id, title, generation_mode, target_company, target_position, status, created_at, updated_at, is_base, source`);
+      console.log(`🔍 [SQL_QUERY] 查询字段: id, user_id, template_id, title, generation_mode, target_company, target_position, status, created_at, updated_at, is_base, source, schema_version`);
       
       const queryStartTime = Date.now();
       const results = await knex('resumes')
@@ -134,7 +154,8 @@ class Resume {
           'created_at',
           'updated_at',
           'is_base',
-          'source'
+          'source',
+          'schema_version'
         ])
         .where('user_id', userId)
         .orderBy('updated_at', 'desc');
@@ -151,6 +172,7 @@ class Resume {
           id: results[0].id,
           title: results[0].title,
           status: results[0].status,
+          schema_version: results[0].schema_version,
           created_at: results[0].created_at
         })}`);
       }
@@ -175,14 +197,7 @@ class Resume {
         .where('is_base', true)
         .first();
       
-      if (result) {
-        return {
-          ...result,
-          content: typeof result.resume_data === 'string' ? JSON.parse(result.resume_data) : result.resume_data
-        };
-      }
-      
-      return null;
+      return result ? this.enrichResumeData(result) : null;
     } catch (error) {
       console.error('查询基础简历失败:', error);
       throw error;
@@ -196,6 +211,29 @@ class Resume {
    * @returns {Promise<Object>} 更新后的简历对象
    */
   static async update(id, updateData) {
+    // 如果更新数据包含unified_data，验证格式
+    if (updateData.unified_data) {
+      let unifiedData = updateData.unified_data;
+      
+      // 如果是字符串，解析为对象
+      if (typeof unifiedData === 'string') {
+        try {
+          unifiedData = JSON.parse(unifiedData);
+        } catch (error) {
+          throw new Error('简历数据格式错误：无效的JSON');
+        }
+      }
+
+      // 验证数据格式
+      const validation = validateUnifiedSchema(unifiedData);
+      if (!validation.valid) {
+        throw new Error(`简历数据格式错误: ${validation.error}`);
+      }
+
+      updateData.unified_data = JSON.stringify(unifiedData);
+      updateData.schema_version = '2.1';
+    }
+
     const [resume] = await knex('resumes')
       .where('id', id)
       .update({
@@ -203,7 +241,8 @@ class Resume {
         updated_at: new Date()
       })
       .returning('*');
-    return resume;
+    
+    return resume ? this.enrichResumeData(resume) : null;
   }
 
   /**
@@ -239,7 +278,114 @@ class Resume {
       .where('id', id)
       .update(updateData)
       .returning('*');
-    return resume;
+    
+    return resume ? this.enrichResumeData(resume) : null;
+  }
+
+  /**
+   * 丰富简历数据，处理数据格式和向后兼容性
+   * @param {Object} resume - 原始简历对象
+   * @returns {Object} 处理后的简历对象
+   */
+  static enrichResumeData(resume) {
+    if (!resume) return null;
+
+    console.log(`🔄 [RESUME_MODEL] 处理简历数据 ID: ${resume.id}`);
+    console.log(`📊 [RESUME_MODEL] Schema版本: ${resume.schema_version || '未知'}`);
+    console.log(`📊 [RESUME_MODEL] 字段检查: unified_data=${!!resume.unified_data}`);
+
+    let unifiedData = null;
+    let content = null;
+
+    // 优先使用unified_data（新格式）
+    if (resume.unified_data) {
+      try {
+        unifiedData = typeof resume.unified_data === 'string' 
+          ? JSON.parse(resume.unified_data) 
+          : resume.unified_data;
+        
+        console.log(`✅ [RESUME_MODEL] 使用unified_data格式`);
+        console.log(`🔍 [RESUME_DATA] 用户姓名: ${unifiedData.profile?.name || '未知'}`);
+      } catch (error) {
+        console.error(`❌ [RESUME_MODEL] 解析unified_data失败:`, error);
+        unifiedData = EMPTY_UNIFIED_RESUME;
+      }
+    }
+    // 如果没有unified_data，尝试转换旧格式
+    else if (resume.resume_data || resume.content) {
+      console.log(`🔄 [RESUME_MODEL] 转换旧格式数据`);
+      
+      const oldData = resume.resume_data || resume.content;
+      unifiedData = convertToUnifiedSchema(oldData);
+      
+      console.log(`✅ [RESUME_MODEL] 旧格式转换完成`);
+      console.log(`🔍 [CONVERTED_DATA] 用户姓名: ${unifiedData.profile?.name || '未知'}`);
+    }
+    // 都没有则使用默认空模板
+    else {
+      console.log(`⚠️ [RESUME_MODEL] 无数据，使用默认模板`);
+      unifiedData = EMPTY_UNIFIED_RESUME;
+    }
+
+    // 生成向后兼容的content字段
+    content = unifiedData;
+
+    const result = {
+      ...resume,
+      unified_data: unifiedData,
+      content: content,
+      // 保持向后兼容
+      resume_data: unifiedData
+    };
+
+    console.log(`✅ [RESUME_MODEL] 数据处理完成 ID: ${resume.id}`);
+    return result;
+  }
+
+  /**
+   * 迁移旧数据到统一格式
+   * @param {number} id - 简历ID
+   * @returns {Promise<boolean>} 迁移结果
+   */
+  static async migrateToUnifiedSchema(id) {
+    try {
+      const resume = await knex('resumes').where('id', id).first();
+      if (!resume) {
+        throw new Error('简历不存在');
+      }
+
+      // 如果已经是新格式，跳过
+      if (resume.unified_data && resume.schema_version === '2.1') {
+        return true;
+      }
+
+      // 获取旧数据
+      const oldData = resume.resume_data || resume.content;
+      
+      // 转换为统一格式
+      const unifiedData = convertToUnifiedSchema(oldData);
+      
+      // 验证数据
+      const validation = validateUnifiedSchema(unifiedData);
+      if (!validation.valid) {
+        throw new Error(`数据验证失败: ${validation.error}`);
+      }
+
+      // 更新数据库
+      await knex('resumes')
+        .where('id', id)
+        .update({
+          unified_data: JSON.stringify(unifiedData),
+          schema_version: '2.1',
+          updated_at: new Date()
+        });
+
+      console.log(`✅ [MIGRATION] 简历 ${id} 迁移完成`);
+      return true;
+    } catch (error) {
+      console.error(`❌ [MIGRATION] 简历 ${id} 迁移失败:`, error);
+      throw error;
+    }
   }
 }
 

@@ -378,16 +378,27 @@ const ResumeDashboard = () => {
       }
 
       console.log('📊 [简历数据] 获取成功，开始解析...');
+      console.log('📊 [原始简历数据]:', resumeData.data);
 
       // 解析简历内容
       let parsedContent = {};
       try {
         // 尝试解析JSON格式的内容
         if (resumeData.data.content && typeof resumeData.data.content === 'string') {
+          console.log('📊 [解析] 解析字符串格式的content字段');
           parsedContent = JSON.parse(resumeData.data.content);
         } else if (typeof resumeData.data.content === 'object') {
+          console.log('📊 [解析] 使用对象格式的content字段');
           parsedContent = resumeData.data.content;
+        } else if (resumeData.data.resume_data) {
+          console.log('📊 [解析] 使用resume_data字段');
+          if (typeof resumeData.data.resume_data === 'string') {
+            parsedContent = JSON.parse(resumeData.data.resume_data);
+          } else {
+            parsedContent = resumeData.data.resume_data;
+          }
         } else {
+          console.log('📊 [解析] 没有找到有效数据，使用空对象');
           parsedContent = {};
         }
       } catch (error) {
@@ -395,19 +406,24 @@ const ResumeDashboard = () => {
         parsedContent = { summary: resumeData.data.content || '' };
       }
 
-      // 创建符合新规范的完整数据结构
+      console.log('📊 [解析后的数据]:', parsedContent);
+
+      // 创建符合 UNIFIED_RESUME_SCHEMA 的完整数据结构
       const standardResumeData = {
-        // 个人信息 - 按新规范格式
-        personalInfo: {
-          name: parsedContent.personalInfo?.name || resumeData.data.title || '姓名',
-          email: parsedContent.personalInfo?.email || 'user@example.com',
-          phone: parsedContent.personalInfo?.phone || '138-0000-0000',
-          location: parsedContent.personalInfo?.location || '北京市',
-          summary: parsedContent.personalInfo?.summary || parsedContent.summary || '优秀的专业人士'
+        // 个人信息 - 按新规范格式 (profile)
+        profile: {
+          name: parsedContent.profile?.name || parsedContent.personalInfo?.name || resumeData.data.title || '姓名',
+          email: parsedContent.profile?.email || parsedContent.personalInfo?.email || 'user@example.com',
+          phone: parsedContent.profile?.phone || parsedContent.personalInfo?.phone || '138-0000-0000',
+          location: parsedContent.profile?.location || parsedContent.personalInfo?.location || '北京市',
+          portfolio: parsedContent.profile?.portfolio || parsedContent.personalInfo?.portfolio || '',
+          linkedin: parsedContent.profile?.linkedin || parsedContent.personalInfo?.linkedin || '',
+          summary: parsedContent.profile?.summary || parsedContent.personalInfo?.summary || parsedContent.summary || '优秀的专业人士'
         },
         
-        // 工作经历 - 确保是数组格式
-        workExperiences: Array.isArray(parsedContent.workExperiences) ? parsedContent.workExperiences : [
+        // 工作经历 - 新格式 workExperience (非复数)
+        workExperience: Array.isArray(parsedContent.workExperience) ? parsedContent.workExperience : 
+                       Array.isArray(parsedContent.workExperiences) ? parsedContent.workExperiences : [
           {
             position: '待完善职位',
             company: '待完善公司',
@@ -416,8 +432,21 @@ const ResumeDashboard = () => {
           }
         ],
         
-        // 教育背景 - 确保是数组格式
-        educations: Array.isArray(parsedContent.educations) ? parsedContent.educations : [
+        // 项目经历 - 新格式 projectExperience
+        projectExperience: Array.isArray(parsedContent.projectExperience) ? parsedContent.projectExperience :
+                          Array.isArray(parsedContent.projects) ? parsedContent.projects : [
+          {
+            name: '待完善项目',
+            role: '项目角色',
+            duration: '待完善时间',
+            description: '请在简历编辑中完善项目经历信息。',
+            url: ''
+          }
+        ],
+        
+        // 教育背景 - 新格式 education (非复数)
+        education: Array.isArray(parsedContent.education) ? parsedContent.education :
+                  Array.isArray(parsedContent.educations) ? parsedContent.educations : [
           {
             degree: '待完善学历',
             school: '待完善学校',
@@ -426,39 +455,40 @@ const ResumeDashboard = () => {
           }
         ],
         
-        // 技能 - 确保是数组格式
-        skills: Array.isArray(parsedContent.skills) ? parsedContent.skills : 
-               (parsedContent.skills ? [parsedContent.skills] : ['待完善技能']),
+        // 技能 - 新格式，支持分类结构
+        skills: Array.isArray(parsedContent.skills) ? 
+               (parsedContent.skills.length > 0 && parsedContent.skills[0].category ?
+                parsedContent.skills : 
+                [{ category: '技能', details: parsedContent.skills.join(', ') }]) :
+               [{ category: '技能', details: '待完善技能' }],
         
-        // 项目经历 - 确保是数组格式
-        projects: Array.isArray(parsedContent.projects) ? parsedContent.projects : [
-          {
-            name: '待完善项目',
-            duration: '待完善时间',
-            description: '请在简历编辑中完善项目经历信息。',
-            technologies: '技术栈'
-          }
-        ],
-        
-        // 语言能力 - 确保是数组格式
-        languages: Array.isArray(parsedContent.languages) ? parsedContent.languages : [
-          { name: '中文', level: '母语' },
-          { name: '英语', level: '待完善' }
-        ]
+        // 自定义模块
+        customSections: Array.isArray(parsedContent.customSections) ? parsedContent.customSections : []
       };
 
+      // 为了兼容旧模板，添加向后兼容的属性
+      standardResumeData.personalInfo = standardResumeData.profile; // 向后兼容
+      standardResumeData.workExperiences = standardResumeData.workExperience; // 向后兼容
+      standardResumeData.projects = standardResumeData.projectExperience; // 向后兼容
+      standardResumeData.educations = standardResumeData.education; // 向后兼容
+
       // 添加便捷访问属性
-      standardResumeData.workExperiences.first = standardResumeData.workExperiences[0] || {};
-      standardResumeData.educations.first = standardResumeData.educations[0] || {};
-      standardResumeData.skills.list = standardResumeData.skills.join(', ');
+      standardResumeData.workExperience.first = standardResumeData.workExperience[0] || {};
+      standardResumeData.education.first = standardResumeData.education[0] || {};
+      
+      // 为skills创建字符串列表（向后兼容）
+      const skillsStringList = standardResumeData.skills.map(skill => skill.details).filter(d => d).join(', ');
+      standardResumeData.skills.list = skillsStringList;
 
       console.log('✅ [数据规范化] 数据结构标准化完成:', {
-        personalInfo: !!standardResumeData.personalInfo.name,
-        workExperiences: standardResumeData.workExperiences.length,
-        educations: standardResumeData.educations.length,
-        skills: standardResumeData.skills.length,
-        projects: standardResumeData.projects.length
+        profile: !!standardResumeData.profile.name,
+        workExperience: standardResumeData.workExperience.length,
+        projectExperience: standardResumeData.projectExperience.length,
+        education: standardResumeData.education.length,
+        skills: standardResumeData.skills.length
       });
+
+      console.log('🔍 [数据验证] 最终数据结构:', standardResumeData);
 
       // 使用Handlebars编译模板
       let compiledTemplate;
@@ -482,13 +512,27 @@ const ResumeDashboard = () => {
         // 为了支持旧模板，同时进行简单变量替换
         console.log('🔄 [向后兼容] 开始处理旧格式变量...');
         
-        // 简单格式兼容性替换
-        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.personalInfo.name);
-        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.personalInfo.email);
-        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.personalInfo.phone);
-        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.personalInfo.location);
-        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.personalInfo.summary);
-        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperiences.first.position || '职位');
+        // 新格式变量替换 (profile.*)
+        htmlContent = htmlContent.replace(/\{\{profile\.name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{profile\.email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{profile\.phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{profile\.location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{profile\.summary\}\}/g, standardResumeData.profile.summary);
+
+        // 旧格式兼容性替换 (personalInfo.*)
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.summary\}\}/g, standardResumeData.profile.summary);
+        
+        // 简单格式兼容性替换 (直接变量)
+        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.profile.summary);
+        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperience.first.position || '职位');
 
         // 移除任何未处理的Handlebars语法
         htmlContent = htmlContent.replace(/\{\{#[^}]+\}\}/g, function(match) {
@@ -505,10 +549,10 @@ const ResumeDashboard = () => {
         }
         
         console.log('🔍 [变量替换] 个人信息验证:');
-        console.log('姓名:', standardResumeData.personalInfo.name);
-        console.log('邮箱:', standardResumeData.personalInfo.email);
-        console.log('电话:', standardResumeData.personalInfo.phone);
-        console.log('地址:', standardResumeData.personalInfo.location);
+        console.log('姓名:', standardResumeData.profile.name);
+        console.log('邮箱:', standardResumeData.profile.email);
+        console.log('电话:', standardResumeData.profile.phone);
+        console.log('地址:', standardResumeData.profile.location);
 
         setRenderedHtml(htmlContent);
         console.log('✅ [简历渲染] 渲染完成');
@@ -520,44 +564,69 @@ const ResumeDashboard = () => {
         // Handlebars失败时，降级到简单替换模式
         let htmlContent = templateData.html_content;
         
-        // 使用标准数据进行简单替换
-        htmlContent = htmlContent.replace(/\{\{personalInfo\.name\}\}/g, standardResumeData.personalInfo.name);
-        htmlContent = htmlContent.replace(/\{\{personalInfo\.email\}\}/g, standardResumeData.personalInfo.email);
-        htmlContent = htmlContent.replace(/\{\{personalInfo\.phone\}\}/g, standardResumeData.personalInfo.phone);
-        htmlContent = htmlContent.replace(/\{\{personalInfo\.location\}\}/g, standardResumeData.personalInfo.location);
-        htmlContent = htmlContent.replace(/\{\{personalInfo\.summary\}\}/g, standardResumeData.personalInfo.summary);
+        // 新格式变量替换
+        htmlContent = htmlContent.replace(/\{\{profile\.name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{profile\.email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{profile\.phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{profile\.location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{profile\.summary\}\}/g, standardResumeData.profile.summary);
+        
+        // 使用标准数据进行简单替换（向后兼容）
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{personalInfo\.summary\}\}/g, standardResumeData.profile.summary);
         
         // 旧格式兼容
-        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.personalInfo.name);
-        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.personalInfo.email);
-        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.personalInfo.phone);
-        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.personalInfo.location);
-        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.personalInfo.summary);
-        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperiences.first.position || '职位');
+        htmlContent = htmlContent.replace(/\{\{name\}\}/g, standardResumeData.profile.name);
+        htmlContent = htmlContent.replace(/\{\{email\}\}/g, standardResumeData.profile.email);
+        htmlContent = htmlContent.replace(/\{\{phone\}\}/g, standardResumeData.profile.phone);
+        htmlContent = htmlContent.replace(/\{\{location\}\}/g, standardResumeData.profile.location);
+        htmlContent = htmlContent.replace(/\{\{summary\}\}/g, standardResumeData.profile.summary);
+        htmlContent = htmlContent.replace(/\{\{position\}\}/g, standardResumeData.workExperience.first.position || '职位');
 
-        // 简单的列表替换
-        const workExpHtml = standardResumeData.workExperiences.map(exp => 
+        // 简单的列表替换 - 工作经历
+        const workExpHtml = standardResumeData.workExperience.map(exp => 
           `<div class="work-item">
             <h4>${exp.position || '职位'}</h4>
             <div class="work-meta">${exp.company || '公司'} | ${exp.duration || '工作时间'}</div>
             <p>${exp.description || '工作描述'}</p>
           </div>`
         ).join('');
-        htmlContent = htmlContent.replace(/\{\{workExperiences\}\}/g, workExpHtml);
+        htmlContent = htmlContent.replace(/\{\{workExperience\}\}/g, workExpHtml);
+        htmlContent = htmlContent.replace(/\{\{workExperiences\}\}/g, workExpHtml); // 向后兼容
 
-        const educationHtml = standardResumeData.educations.map(edu => 
+        // 简单的列表替换 - 教育背景
+        const educationHtml = standardResumeData.education.map(edu => 
           `<div class="education-item">
             <h4>${edu.degree || '学位'}</h4>
             <div class="education-meta">${edu.school || '学校'} | ${edu.duration || '就读时间'}</div>
             <p>${edu.major || '专业'}</p>
           </div>`
         ).join('');
-        htmlContent = htmlContent.replace(/\{\{educations\}\}/g, educationHtml);
+        htmlContent = htmlContent.replace(/\{\{education\}\}/g, educationHtml);
+        htmlContent = htmlContent.replace(/\{\{educations\}\}/g, educationHtml); // 向后兼容
 
+        // 简单的列表替换 - 技能
         const skillsHtml = standardResumeData.skills.map(skill => 
-          `<span class="skill-tag">${skill}</span>`
+          `<div class="skill-category">
+            <h5>${skill.category}</h5>
+            <span class="skill-details">${skill.details}</span>
+          </div>`
         ).join('');
         htmlContent = htmlContent.replace(/\{\{skills\}\}/g, skillsHtml);
+
+        // 项目经历
+        const projectsHtml = standardResumeData.projectExperience.map(proj => 
+          `<div class="project-item">
+            <h4>${proj.name || '项目名称'}</h4>
+            <div class="project-meta">${proj.role || '角色'} | ${proj.duration || '时间'}</div>
+            <p>${proj.description || '项目描述'}</p>
+          </div>`
+        ).join('');
+        htmlContent = htmlContent.replace(/\{\{projectExperience\}\}/g, projectsHtml);
+        htmlContent = htmlContent.replace(/\{\{projects\}\}/g, projectsHtml); // 向后兼容
 
         // 移除未处理的Handlebars语法
         htmlContent = htmlContent.replace(/\{\{#[^}]+\}\}/g, '');
