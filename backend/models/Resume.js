@@ -5,7 +5,8 @@
  */
 
 const knex = require('../config/database');
-const { convertToUnifiedSchema, validateUnifiedSchema, EMPTY_UNIFIED_RESUME } = require('../schemas/schema');
+const { validateUnifiedSchema, EMPTY_UNIFIED_RESUME } = require('../schemas/schema');
+const { validateAndCompleteUnifiedFormat, createDefaultUnifiedSchema } = require('../utils/dataTransformer');
 
 class Resume {
   /**
@@ -33,18 +34,26 @@ class Resume {
     
     // 如果没有提供unified_data，但有旧格式数据，则转换
     if (!unifiedData && (resumeData.resume_data || resumeData.content)) {
-      unifiedData = convertToUnifiedSchema(resumeData.resume_data || resumeData.content);
+      unifiedData = validateAndCompleteUnifiedFormat(resumeData.resume_data || resumeData.content);
     }
     
     // 如果仍然没有数据，使用默认空模板
     if (!unifiedData) {
-      unifiedData = EMPTY_UNIFIED_RESUME;
+      unifiedData = createDefaultUnifiedSchema();
     }
 
     // 验证数据格式
     const validation = validateUnifiedSchema(unifiedData);
     if (!validation.valid) {
       throw new Error(`简历数据格式错误: ${validation.error}`);
+    }
+
+    // 🔧 新增：处理resume_data字段（向后兼容）
+    if (resumeData.resume_data && typeof resumeData.resume_data === 'object') {
+      console.log('🔧 [RESUME_CREATE] 处理resume_data字段...');
+      resumeData.resume_data = JSON.stringify(resumeData.resume_data);
+      console.log('✅ [RESUME_CREATE] resume_data对象已转换为JSON字符串');
+      console.log('📏 [RESUME_CREATE] resume_data长度:', resumeData.resume_data.length);
     }
 
     const [resume] = await knex('resumes')
@@ -138,7 +147,7 @@ class Resume {
     const startTime = Date.now();
     try {
       console.log(`🗄️ [RESUME_MODEL] 开始查询用户简历列表，用户ID: ${userId}`);
-      console.log(`🔍 [SQL_QUERY] 查询字段: id, user_id, template_id, title, generation_mode, target_company, target_position, status, created_at, updated_at, is_base, source, schema_version`);
+      console.log(`🔍 [SQL_QUERY] 查询字段: id, user_id, template_id, title, generation_mode, target_company, target_position, status, created_at, updated_at, is_base, source`);
       
       const queryStartTime = Date.now();
       const results = await knex('resumes')
@@ -154,8 +163,7 @@ class Resume {
           'created_at',
           'updated_at',
           'is_base',
-          'source',
-          'schema_version'
+          'source'
         ])
         .where('user_id', userId)
         .orderBy('updated_at', 'desc');
@@ -172,7 +180,6 @@ class Resume {
           id: results[0].id,
           title: results[0].title,
           status: results[0].status,
-          schema_version: results[0].schema_version,
           created_at: results[0].created_at
         })}`);
       }
@@ -232,6 +239,19 @@ class Resume {
 
       updateData.unified_data = JSON.stringify(unifiedData);
       updateData.schema_version = '2.1';
+    }
+    
+    // 🔧 新增：处理resume_data字段（向后兼容）
+    if (updateData.resume_data) {
+      console.log('🔧 [RESUME_UPDATE] 处理resume_data字段...');
+      
+      // 如果resume_data是对象，转换为JSON字符串
+      if (typeof updateData.resume_data === 'object') {
+        updateData.resume_data = JSON.stringify(updateData.resume_data);
+        console.log('✅ [RESUME_UPDATE] resume_data对象已转换为JSON字符串');
+      }
+      
+      console.log('📏 [RESUME_UPDATE] resume_data长度:', updateData.resume_data.length);
     }
 
     const [resume] = await knex('resumes')
@@ -316,7 +336,7 @@ class Resume {
       console.log(`🔄 [RESUME_MODEL] 转换旧格式数据`);
       
       const oldData = resume.resume_data || resume.content;
-      unifiedData = convertToUnifiedSchema(oldData);
+      unifiedData = validateAndCompleteUnifiedFormat(oldData);
       
       console.log(`✅ [RESUME_MODEL] 旧格式转换完成`);
       console.log(`🔍 [CONVERTED_DATA] 用户姓名: ${unifiedData.profile?.name || '未知'}`);
@@ -363,7 +383,7 @@ class Resume {
       const oldData = resume.resume_data || resume.content;
       
       // 转换为统一格式
-      const unifiedData = convertToUnifiedSchema(oldData);
+      const unifiedData = validateAndCompleteUnifiedFormat(oldData);
       
       // 验证数据
       const validation = validateUnifiedSchema(unifiedData);

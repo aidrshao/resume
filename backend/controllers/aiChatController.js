@@ -299,24 +299,24 @@ class AIChatController {
       console.log('💾 保存收集到的用户信息');
       
       // 保存个人信息
-      if (collectedInfo.personalInfo) {
+      if (collectedInfo.profile) {
         await UserProfile.upsert(userId, {
-          full_name: collectedInfo.personalInfo.name,
-          phone: collectedInfo.personalInfo.phone,
-          location: collectedInfo.personalInfo.location,
-          summary: collectedInfo.personalInfo.summary,
+          full_name: collectedInfo.profile.name,
+          phone: collectedInfo.profile.phone,
+          location: collectedInfo.profile.location,
+          summary: collectedInfo.profile.summary,
           skills: collectedInfo.skills || [],
           languages: collectedInfo.languages || []
         });
       }
       
       // 保存教育经历
-      if (collectedInfo.educations && collectedInfo.educations.length > 0) {
+      if (collectedInfo.education && collectedInfo.education.length > 0) {
         // 先删除现有的教育经历
         await knex('educations').where('user_id', userId).del();
         
         // 插入新的教育经历
-        const educations = collectedInfo.educations.map((edu, index) => ({
+        const educations = collectedInfo.education.map((edu, index) => ({
           user_id: userId,
           school: edu.school,
           degree: edu.degree,
@@ -334,12 +334,12 @@ class AIChatController {
       }
       
       // 保存工作经历
-      if (collectedInfo.workExperiences && collectedInfo.workExperiences.length > 0) {
+      if (collectedInfo.workExperience && collectedInfo.workExperience.length > 0) {
         // 先删除现有的工作经历
         await knex('work_experiences').where('user_id', userId).del();
         
         // 插入新的工作经历
-        const workExperiences = collectedInfo.workExperiences.map((work, index) => ({
+        const workExperiences = collectedInfo.workExperience.map((work, index) => ({
           user_id: userId,
           company: work.company,
           position: work.position,
@@ -359,12 +359,12 @@ class AIChatController {
       }
       
       // 保存项目经历
-      if (collectedInfo.projects && collectedInfo.projects.length > 0) {
+      if (collectedInfo.projectExperience && collectedInfo.projectExperience.length > 0) {
         // 先删除现有的项目经历
         await knex('projects').where('user_id', userId).del();
         
         // 插入新的项目经历
-        const projects = collectedInfo.projects.map((project, index) => ({
+        const projects = collectedInfo.projectExperience.map((project, index) => ({
           user_id: userId,
           name: project.name,
           role: project.role,

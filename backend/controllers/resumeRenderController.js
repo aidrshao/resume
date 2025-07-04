@@ -327,9 +327,8 @@ class ResumeRenderController {
       content = {};
     }
 
-    // 处理个人信息
-    const personalInfo = content.personalInfo || {};
-    
+    const profile = content.profile || {};
+
     // 处理技能数据 - 转换为数组格式
     let skillsArray = [];
     if (content.skills) {
@@ -367,21 +366,21 @@ class ResumeRenderController {
     }
 
     const formattedData = {
-      // 基本信息
-      name: personalInfo.name || content.name || '姓名',
-      title: content.title || resume.title || '职位',
-      email: personalInfo.email || content.email || '',
-      phone: personalInfo.phone || content.phone || '',
-      location: personalInfo.location || content.location || '',
-      website: content.website || '',
-      linkedin: content.linkedin || '',
-      github: content.github || '',
+      // 个人信息 - 使用新格式
+      name: profile.name || content.name || '姓名',
+      title: profile.title || content.title || '',
+      email: profile.email || content.email || '',
+      phone: profile.phone || content.phone || '',
+      location: profile.location || content.location || '',
+      portfolio: profile.portfolio || content.portfolio || '',
+      linkedin: profile.linkedin || content.linkedin || '',
+      github: profile.github || content.github || '',
       
-      // 个人简介
-      summary: personalInfo.summary || personalInfo.objective || content.summary || content.profile || '',
+      // 简介/目标
+      summary: profile.summary || content.summary || '',
       
-      // 工作经历 - 使用正确的字段名
-      experience: ResumeRenderController.formatWorkExperience(content.workExperiences || content.work_experience || content.experience || []),
+      // 工作经历 - 使用新格式
+      experience: ResumeRenderController.formatWorkExperience(content.workExperience || content.work_experience || content.experience || []),
       
       // 教育背景 - 使用正确的字段名
       education: ResumeRenderController.formatEducation(content.educations || content.education || []),
@@ -751,7 +750,7 @@ class ResumeRenderController {
               ${data.email ? `<span class="contact-item">📧 ${data.email}</span>` : ''}
               ${data.phone ? `<span class="contact-item">📱 ${data.phone}</span>` : ''}
               ${data.location ? `<span class="contact-item">📍 ${data.location}</span>` : ''}
-              ${data.website ? `<span class="contact-item">🌐 ${data.website}</span>` : ''}
+              ${data.portfolio ? `<span class="contact-item">🌐 ${data.portfolio}</span>` : ''}
             </div>
           </div>
         `;

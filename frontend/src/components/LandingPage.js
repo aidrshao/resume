@@ -211,9 +211,20 @@ const LandingPage = () => {
                 progress: currentProgress,
                 stage: currentStage,
                 message: task.message,
-                hasResultData: !!task.resultData,
+                hasResultData: task.hasResultData,
+                resultDataExists: !!task.resultData,
                 pollCount: pollCount
               });
+              
+              // 🔍 详细调试数据结构
+              console.log('🔍 [POLL_TASK] 详细数据结构分析:');
+              console.log('🔍 [POLL_TASK] - task对象keys:', Object.keys(task));
+              console.log('🔍 [POLL_TASK] - task.hasResultData:', task.hasResultData);
+              console.log('🔍 [POLL_TASK] - task.resultData:', task.resultData);
+              if (task.resultData) {
+                console.log('🔍 [POLL_TASK] - task.resultData.structuredData存在:', !!task.resultData.structuredData);
+                console.log('🔍 [POLL_TASK] - task.resultData keys:', Object.keys(task.resultData));
+              }
             }
             
             // 检测是否进入AI分析阶段
@@ -223,8 +234,25 @@ const LandingPage = () => {
               console.log('🤖 [POLL_TASK] 进入AI分析阶段，这可能需要3-5分钟...');
             }
             
+            // 🎯 平滑进度条更新：避免进度跳跃
+            let smoothProgress = currentProgress;
+            
+            // 如果进度没有变化且小于100%，模拟小幅增长
+            if (currentProgress === lastProgress && currentProgress < 100 && pollCount > 1) {
+              const maxIncrement = Math.min(3, 100 - lastProgress);
+              const increment = Math.random() * maxIncrement * 0.5;
+              smoothProgress = Math.min(100, lastProgress + increment);
+            }
+            
+            // 如果进度有大幅跳跃（超过15%），进行平滑处理
+            else if (pollCount > 1 && currentProgress - lastProgress > 15 && currentProgress < 100) {
+              const progressDiff = currentProgress - lastProgress;
+              const smoothIncrement = Math.min(progressDiff * 0.6, 12);
+              smoothProgress = Math.min(100, lastProgress + smoothIncrement);
+            }
+            
             // 更新进度条
-            setUploadProgress(currentProgress);
+            setUploadProgress(smoothProgress);
             
             // 生成友好的状态消息
             let displayMessage = task.message || '处理中...';
@@ -355,7 +383,7 @@ const LandingPage = () => {
               pollTimeout = setTimeout(executePoll, currentInterval);
             }
             
-            lastProgress = currentProgress;
+            lastProgress = smoothProgress;
           } else {
             console.error('❌ [POLL_TASK] API返回失败:', data);
             throw new Error(data.message || '获取任务状态失败');
@@ -461,12 +489,14 @@ const LandingPage = () => {
 
     console.log('📋 [FRONTEND_UPLOAD] 设置上传状态...');
     setUploadFile(file);
-    setUploadLoading(true);
     setUploadResult(null);
     setUploadProgress(0);
     setUploadStage('准备上传文件...');
     
-    console.log('📋 [FRONTEND_UPLOAD] UI状态已更新');
+    // 🔧 修复：确保uploadLoading在最后设置，避免被其他状态重置
+    setUploadLoading(true);
+    
+    console.log('📋 [FRONTEND_UPLOAD] UI状态已更新，uploadLoading已设置为true');
 
     try {
       // 双重检查用户认证状态
@@ -665,11 +695,13 @@ const LandingPage = () => {
       setUploadProgress(0);
       console.log('🧹 [FRONTEND_UPLOAD] UI状态清理完成');
     } finally {
+      // 🔧 修复：延长延迟时间，确保用户能看到完成状态
       setTimeout(() => {
+        console.log('🏁 [FRONTEND_UPLOAD] 重置uploadLoading状态');
         setUploadLoading(false);
         const totalDuration = Date.now() - startTime;
         console.log(`🏁 [FRONTEND_UPLOAD] 处理完成，总耗时: ${totalDuration}ms`);
-      }, 1000);
+      }, 2000); // 延长到2秒，让用户能看到完成状态
     }
   };
 
@@ -809,7 +841,24 @@ const LandingPage = () => {
       }
       
       // 创建一个干净的数据副本，移除可能的DOM引用
-      const cleanData = JSON.parse(JSON.stringify(dataToSave));
+      let cleanData = JSON.parse(JSON.stringify(dataToSave));
+      
+      // 🔧 修复数据结构：如果数据包含 structuredData 字段，则提取其内容
+      if (cleanData.structuredData && typeof cleanData.structuredData === 'object') {
+        cleanData = cleanData.structuredData;
+      }
+      
+      // 验证必要字段
+      if (!cleanData.profile) {
+        throw new Error('简历数据格式无效：缺少个人信息(profile)字段');
+      }
+      
+      console.log('📤 [SAVE_BASE_RESUME] 准备保存的数据:', {
+        hasProfile: !!cleanData.profile,
+        hasWorkExperience: !!cleanData.workExperience,
+        hasEducation: !!cleanData.education,
+        profileName: cleanData.profile?.name || '未知'
+      });
       
       const response = await fetch('/api/resumes/save-base', {
         method: 'POST',
@@ -818,7 +867,7 @@ const LandingPage = () => {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
-          resumeData: cleanData,
+          content: cleanData,
           source: selectedMode === 'upload' ? 'upload' : 'chat',
           forceOverwrite: forceOverwrite
         })
@@ -859,8 +908,6 @@ const LandingPage = () => {
   const handleCancelEdit = () => {
     setEditedResult(null);
   };
-
-
 
   return (
     <div className="min-h-screen bg-white">
@@ -1093,30 +1140,28 @@ const LandingPage = () => {
           </div>
         </div>
 
-
-
-                  {!selectedMode ? (
-            /* 底部CTA区域 */
-            <div>
-              {/* 底部渐变CTA */}
-              <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-3xl p-12 text-center text-white relative overflow-hidden">
-                <div className="absolute inset-0 bg-black opacity-10"></div>
-                <div className="relative z-10">
-                  <h2 className="text-3xl font-bold mb-4">准备好提升您的简历了吗？</h2>
-                  <p className="text-xl mb-8 text-blue-100">AI智能优化，让您的简历脱颖而出</p>
-                  <button
-                    onClick={() => handleModeSelect('upload')}
-                    className="bg-white text-purple-600 text-lg font-semibold px-10 py-4 rounded-full hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
-                  >
-                    立即开始体验
-                  </button>
-                </div>
-                {/* 装饰性元素 */}
-                <div className="absolute top-4 right-4 w-16 h-16 bg-white bg-opacity-10 rounded-full"></div>
-                <div className="absolute bottom-4 left-4 w-20 h-20 bg-white bg-opacity-5 rounded-full"></div>
+        {!selectedMode ? (
+          /* 底部CTA区域 */
+          <div>
+            {/* 底部渐变CTA */}
+            <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 rounded-3xl p-12 text-center text-white relative overflow-hidden">
+              <div className="absolute inset-0 bg-black opacity-10"></div>
+              <div className="relative z-10">
+                <h2 className="text-3xl font-bold mb-4">准备好提升您的简历了吗？</h2>
+                <p className="text-xl mb-8 text-blue-100">AI智能优化，让您的简历脱颖而出</p>
+                <button
+                  onClick={() => handleModeSelect('upload')}
+                  className="bg-white text-purple-600 text-lg font-semibold px-10 py-4 rounded-full hover:bg-gray-50 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                >
+                  立即开始体验
+                </button>
               </div>
+              {/* 装饰性元素 */}
+              <div className="absolute top-4 right-4 w-16 h-16 bg-white bg-opacity-10 rounded-full"></div>
+              <div className="absolute bottom-4 left-4 w-20 h-20 bg-white bg-opacity-5 rounded-full"></div>
             </div>
-          ) : (
+          </div>
+        ) : (
           /* 弹窗背景遮罩 */
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
             <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
@@ -1170,6 +1215,12 @@ const LandingPage = () => {
                       {/* 进度条 */}
                       {uploadLoading && (
                         <div className="mt-8">
+                          {console.log('🎯 [PROGRESS_BAR] 进度条正在渲染:', {
+                            uploadLoading,
+                            uploadProgress,
+                            uploadStage,
+                            timestamp: new Date().toISOString()
+                          })}
                           <div className="bg-white rounded-lg p-6 border border-gray-200">
                             <div className="flex items-center justify-between mb-4">
                               <span className="text-sm font-medium text-gray-700">{uploadStage}</span>
@@ -1177,11 +1228,27 @@ const LandingPage = () => {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <div 
-                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out" 
+                                className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
                                 style={{ width: `${uploadProgress}%` }}
                               ></div>
                             </div>
+                            <div className="mt-2 text-xs text-gray-500 text-center">
+                              正在处理您的简历，请稍候...
+                            </div>
                           </div>
+                        </div>
+                      )}
+
+                      {/* 🔧 调试信息 */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <div className="mt-4 p-4 bg-gray-100 rounded-lg text-xs">
+                          <h4 className="font-bold mb-2">🔧 调试信息:</h4>
+                          <div>uploadLoading: {String(uploadLoading)}</div>
+                          <div>uploadProgress: {uploadProgress}%</div>
+                          <div>uploadStage: {uploadStage}</div>
+                          <div>uploadResult: {uploadResult ? '有数据' : '无数据'}</div>
+                          <div>editedResult: {editedResult ? '有数据' : '无数据'}</div>
+                          <div>selectedMode: {selectedMode}</div>
                         </div>
                       )}
                     </div>
@@ -1196,41 +1263,41 @@ const LandingPage = () => {
                       </div>
 
                       {/* 个人信息 */}
-                      {uploadResult.personalInfo && (
+                      {uploadResult.profile && (
                         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
                           <h4 className="font-medium text-blue-900 mb-3">👤 个人信息</h4>
                           <div className="grid grid-cols-2 gap-4 text-sm">
-                            {uploadResult.personalInfo.name && (
-                              <div><span className="font-medium">姓名：</span>{uploadResult.personalInfo.name}</div>
+                            {uploadResult.profile.name && (
+                              <div><span className="font-medium">姓名：</span>{uploadResult.profile.name}</div>
                             )}
-                            {uploadResult.personalInfo.phone && (
-                              <div><span className="font-medium">电话：</span>{uploadResult.personalInfo.phone}</div>
+                            {uploadResult.profile.phone && (
+                              <div><span className="font-medium">电话：</span>{uploadResult.profile.phone}</div>
                             )}
-                            {uploadResult.personalInfo.email && (
-                              <div><span className="font-medium">邮箱：</span>{uploadResult.personalInfo.email}</div>
+                            {uploadResult.profile.email && (
+                              <div><span className="font-medium">邮箱：</span>{uploadResult.profile.email}</div>
                             )}
-                            {uploadResult.personalInfo.location && (
-                              <div><span className="font-medium">地址：</span>{uploadResult.personalInfo.location}</div>
+                            {uploadResult.profile.location && (
+                              <div><span className="font-medium">地址：</span>{uploadResult.profile.location}</div>
                             )}
                           </div>
-                          {uploadResult.personalInfo.summary && (
+                          {uploadResult.profile.summary && (
                             <div className="mt-3">
                               <span className="font-medium">个人简介：</span>
-                              <p className="text-gray-700 mt-1">{uploadResult.personalInfo.summary}</p>
+                              <p className="text-gray-700 mt-1">{uploadResult.profile.summary}</p>
                             </div>
                           )}
                         </div>
                       )}
 
                       {/* 教育经历 */}
-                      {uploadResult.educations && uploadResult.educations.length > 0 && (
+                      {uploadResult.education && uploadResult.education.length > 0 && (
                         <div className="mb-6 p-4 bg-green-50 rounded-lg">
                           <h4 className="font-medium text-green-900 mb-3">🎓 教育经历</h4>
-                          {uploadResult.educations.map((edu, index) => (
+                          {uploadResult.education.map((edu, index) => (
                             <div key={index} className="mb-3 last:mb-0">
-                              <div className="font-medium">{edu.school} - {edu.major}</div>
+                              <div className="font-medium">{edu.school} - {edu.major || edu.degree}</div>
                               <div className="text-sm text-gray-600">
-                                {edu.degree} | {edu.startDate} - {edu.endDate}
+                                {edu.degree} | {edu.duration}
                                 {edu.gpa && ` | GPA: ${edu.gpa}`}
                               </div>
                             </div>
@@ -1239,15 +1306,13 @@ const LandingPage = () => {
                       )}
 
                       {/* 工作经历 */}
-                      {uploadResult.workExperiences && uploadResult.workExperiences.length > 0 && (
+                      {uploadResult.workExperience && uploadResult.workExperience.length > 0 && (
                         <div className="mb-6 p-4 bg-purple-50 rounded-lg">
                           <h4 className="font-medium text-purple-900 mb-3">💼 工作经历</h4>
-                          {uploadResult.workExperiences.map((work, index) => (
+                          {uploadResult.workExperience.map((work, index) => (
                             <div key={index} className="mb-3 last:mb-0">
                               <div className="font-medium">{work.company} - {work.position}</div>
-                              <div className="text-sm text-gray-600">
-                                {work.startDate} - {work.endDate}
-                              </div>
+                              <div className="text-sm text-gray-600">{work.duration}</div>
                               {work.description && (
                                 <div className="text-sm text-gray-700 mt-1">{work.description}</div>
                               )}
@@ -1257,10 +1322,10 @@ const LandingPage = () => {
                       )}
 
                       {/* 项目经历 */}
-                      {uploadResult.projects && uploadResult.projects.length > 0 && (
+                      {uploadResult.projectExperience && uploadResult.projectExperience.length > 0 && (
                         <div className="mb-6 p-4 bg-orange-50 rounded-lg">
                           <h4 className="font-medium text-orange-900 mb-3">🚀 项目经历</h4>
-                          {uploadResult.projects.map((project, index) => (
+                          {uploadResult.projectExperience.map((project, index) => (
                             <div key={index} className="mb-3 last:mb-0">
                               <div className="font-medium">{project.name}</div>
                               {project.role && (
@@ -1269,35 +1334,43 @@ const LandingPage = () => {
                               {project.description && (
                                 <div className="text-sm text-gray-700 mt-1">{project.description}</div>
                               )}
+                              {project.url && (
+                                <div className="text-sm mt-1">
+                                  <a href={project.url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                                    查看项目
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
                       )}
 
                       {/* 技能 */}
-                      {uploadResult.skills && (
+                      {uploadResult.skills && uploadResult.skills.length > 0 && (
                         <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
                           <h4 className="font-medium text-indigo-900 mb-3">💪 技能</h4>
                           <div className="space-y-2 text-sm">
-                            {uploadResult.skills.technical && uploadResult.skills.technical.length > 0 && (
-                              <div>
-                                <span className="font-medium">技术技能：</span>
-                                {uploadResult.skills.technical.join(', ')}
+                            {uploadResult.skills.map((skillGroup, index) => (
+                              <div key={index}>
+                                <span className="font-medium">{skillGroup.category}：</span>
+                                {skillGroup.details}
                               </div>
-                            )}
-                            {uploadResult.skills.professional && uploadResult.skills.professional.length > 0 && (
-                              <div>
-                                <span className="font-medium">专业技能：</span>
-                                {uploadResult.skills.professional.join(', ')}
-                              </div>
-                            )}
-                            {uploadResult.skills.soft && uploadResult.skills.soft.length > 0 && (
-                              <div>
-                                <span className="font-medium">软技能：</span>
-                                {uploadResult.skills.soft.join(', ')}
-                              </div>
-                            )}
+                            ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* 自定义部分 */}
+                      {uploadResult.customSections && uploadResult.customSections.length > 0 && (
+                        <div className="mb-6 p-4 bg-yellow-50 rounded-lg">
+                          <h4 className="font-medium text-yellow-900 mb-3">📄 其他信息</h4>
+                          {uploadResult.customSections.map((section, index) => (
+                            <div key={index} className="mb-3 last:mb-0">
+                              <div className="font-medium">{section.title}</div>
+                              <div className="text-sm text-gray-700 mt-1">{section.content}</div>
+                            </div>
+                          ))}
                         </div>
                       )}
 

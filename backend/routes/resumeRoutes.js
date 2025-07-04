@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const ResumeController = require('../controllers/resumeController');
+const upload = ResumeController.upload; // 从ResumeController获取upload
 const AIChatController = require('../controllers/aiChatController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -39,7 +40,7 @@ router.post('/resumes/:id/generate', ResumeController.generateResume);
 router.post('/resumes/generate-for-job', ResumeController.generateJobSpecificResume);
 
 // 简历上传和解析
-router.post('/resumes/upload', ResumeController.uploadAndParseResume);
+router.post('/resumes/upload', upload.single('resume'), ResumeController.uploadAndParseResume);
 
 // 任务状态查询
 router.get('/tasks/:taskId/status', ResumeController.getTaskStatus);

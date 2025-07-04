@@ -6,6 +6,7 @@
 const knex = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const EventEmitter = require('events');
+const { validateAndCompleteUnifiedFormat } = require('../utils/dataTransformer');
 
 class TaskQueueService extends EventEmitter {
   constructor() {
@@ -456,9 +457,9 @@ class TaskQueueService extends EventEmitter {
         clearInterval(progressInterval);
         
         console.log('🔧 [RESUME_PARSE_TASK] AI结构化完成:', {
-          hasPersonalInfo: !!(structuredData && structuredData.personalInfo),
-          hasWorkExperiences: !!(structuredData && structuredData.workExperiences),
-          hasEducations: !!(structuredData && structuredData.educations),
+          hasProfile: !!(structuredData && structuredData.profile),
+          hasWorkExperience: !!(structuredData && structuredData.workExperience),
+          hasEducation: !!(structuredData && structuredData.education),
           aiCallTime: aiCallDuration + 'ms'
         });
 
@@ -476,12 +477,39 @@ class TaskQueueService extends EventEmitter {
         
         console.log('🔧 [RESUME_PARSE_TASK] 开始数据清理验证...');
         const cleanupStartTime = Date.now();
-        const cleanedData = ResumeParseService.validateAndCleanData(structuredData);
+        
+        console.log('✅ [TASK_QUEUE] AI解析完成!');
+        console.log('📊 [TASK_QUEUE] 原始AI返回数据:', JSON.stringify(structuredData, null, 2));
+
+        // 记录解析结果统计
+        const stats = {
+          hasProfile: !!(structuredData && structuredData.profile),
+          hasWorkExperience: !!(structuredData && structuredData.workExperience),
+          hasEducation: !!(structuredData && structuredData.education),
+          hasSkills: !!(structuredData && structuredData.skills),
+          hasProjectExperience: !!(structuredData && structuredData.projectExperience)
+        };
+
+        console.log('📊 [TASK_QUEUE] 解析结果统计:', stats);
+
+        // 转换为统一格式
+        const unifiedData = validateAndCompleteUnifiedFormat(structuredData);
+
+        console.log('✅ [TASK_QUEUE] 数据转换完成, 保存简历...');
+
         const cleanupDuration = Date.now() - cleanupStartTime;
         
         console.log(`⏱️ [PERFORMANCE] 数据清理耗时: ${cleanupDuration}ms`);
         
         await this.updateTask(taskId, 'processing', 95, progressMessages.cleanup[1]);
+
+        // 直接使用统一格式保存，不需要兼容性处理
+        const resumeId = await ResumeParseService.saveBaseResume(
+          taskData.userId,
+          extractedText,
+          unifiedData  // 直接使用统一格式
+        );
+
         await this.updateTask(taskId, 'processing', 98, progressMessages.cleanup[2]);
         
         const stage4Duration = Date.now() - stageStartTime;
@@ -496,11 +524,11 @@ class TaskQueueService extends EventEmitter {
         console.log(`  - 阶段3(AI分析): ${stage3Duration}ms (${((stage3Duration/totalDuration)*100).toFixed(1)}%)`);
         console.log(`  - 阶段4(数据清理): ${stage4Duration}ms`);
         console.log(`  - 总计: ${totalDuration}ms (${(totalDuration/1000).toFixed(1)}s)`);
-        
+
         // 完成任务
         await this.updateTask(taskId, 'completed', 100, `🎉 解析完成！总耗时${(totalDuration/1000).toFixed(1)}秒`, {
           extractedText,
-          structuredData: cleanedData,
+          structuredData: unifiedData,  // 使用统一格式数据
           performance: {
             totalDuration,
             stages: {
