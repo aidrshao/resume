@@ -397,19 +397,37 @@ class ResumeRenderController {
       awards: ResumeRenderController.formatAwards(content.awards || [])
     };
 
+    // ⚡️ 新增：为Handlebars模板提供兼容字段
+    const templateCompatibleData = {
+      ...formattedData,
+      profile: {
+        name: formattedData.name,
+        title: formattedData.title,
+        email: formattedData.email,
+        phone: formattedData.phone,
+        location: formattedData.location,
+        portfolio: formattedData.portfolio,
+        linkedin: formattedData.linkedin,
+        github: formattedData.github,
+        summary: formattedData.summary
+      },
+      workExperience: formattedData.experience,
+      projectExperience: formattedData.projects
+    };
+
     console.log('✅ [数据格式化] 格式化完成:', {
-      name: formattedData.name,
-      hasSummary: !!formattedData.summary,
-      experienceCount: formattedData.experience.length,
-      educationCount: formattedData.education.length,
-      skillsCount: formattedData.skills.length,
-      projectsCount: formattedData.projects.length,
-      languagesCount: formattedData.languages.length,
-      certificationsCount: formattedData.certifications.length,
-      awardsCount: formattedData.awards.length
+      name: templateCompatibleData.profile.name,
+      hasSummary: !!templateCompatibleData.profile.summary,
+      experienceCount: templateCompatibleData.workExperience.length,
+      educationCount: templateCompatibleData.education.length,
+      skillsCount: templateCompatibleData.skills.length,
+      projectsCount: templateCompatibleData.projectExperience.length,
+      languagesCount: templateCompatibleData.languages.length,
+      certificationsCount: templateCompatibleData.certifications.length,
+      awardsCount: templateCompatibleData.awards.length
     });
 
-    return formattedData;
+    return templateCompatibleData;
   }
 
   /**
@@ -457,7 +475,9 @@ class ResumeRenderController {
     return skills.map(skill => ({
       name: skill.name || skill,
       level: skill.level || '',
-      category: skill.category || '技能'
+      category: skill.category || '技能',
+      // 为模板兼容提供 details 字段（如果缺失，则使用 name 代替）
+      details: skill.details || skill.name || skill
     }));
   }
 

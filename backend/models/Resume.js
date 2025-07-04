@@ -421,6 +421,35 @@ class Resume {
       throw error;
     }
   }
+
+  /**
+   * 根据ID和用户ID更新简历（验证用户权限）
+   * @param {number} id - 简历ID
+   * @param {number} userId - 用户ID
+   * @param {Object} updateData - 更新数据
+   * @returns {Promise<Object|null>} 更新后的简历对象；若未找到或无权限则返回null
+   */
+  static async updateByIdAndUser(id, userId, updateData) {
+    try {
+      // 先检查简历是否存在且属于当前用户
+      const existing = await knex('resumes')
+        .where('id', id)
+        .where('user_id', userId)
+        .first();
+
+      if (!existing) {
+        // 简历不存在或无权限
+        return null;
+      }
+
+      // 复用现有 update 逻辑以保持数据格式校验和兼容处理
+      // update 方法内部已做 unified_data / resume_data 处理
+      return await this.update(id, updateData);
+    } catch (error) {
+      console.error('更新简历(带用户验证)失败:', error);
+      throw error;
+    }
+  }
 }
 
 class UserProfile {
