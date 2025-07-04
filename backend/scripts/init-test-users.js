@@ -87,11 +87,14 @@ async function initTestUsers() {
         .insert(insertData)
         .returning('id');
 
-      console.log(`✅ [INIT_TEST_USERS] 用户创建成功: ${userData.email} (ID: ${userId})`);
+      // 确保userId是数字而不是对象
+      const actualUserId = typeof userId === 'object' ? userId.id : userId;
+
+      console.log(`✅ [INIT_TEST_USERS] 用户创建成功: ${userData.email} (ID: ${actualUserId})`);
       console.log(`🔑 [INIT_TEST_USERS] 密码: ${userData.password}`);
 
       // 为用户创建免费版会员资格
-      await ensureUserMembership(userId);
+      await ensureUserMembership(actualUserId);
     }
 
     console.log('\n🎉 [INIT_TEST_USERS] 所有测试用户初始化完成！');

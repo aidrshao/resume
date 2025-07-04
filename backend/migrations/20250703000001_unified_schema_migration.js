@@ -4,12 +4,25 @@
  */
 
 exports.up = function(knex) {
-  return knex.schema.alterTable('resumes', function(table) {
-    // 添加新字段
-    table.jsonb('unified_data').nullable().comment('统一格式的简历数据');
-    table.string('schema_version', 10).defaultTo('2.1').comment('数据结构版本');
-    
-    console.log('✅ [MIGRATION] 添加了unified_data和schema_version字段');
+  return knex.schema.hasColumn('resumes', 'unified_data').then(hasUnifiedData => {
+    return knex.schema.hasColumn('resumes', 'schema_version').then(hasSchemaVersion => {
+      if (!hasUnifiedData || !hasSchemaVersion) {
+        return knex.schema.alterTable('resumes', function(table) {
+          // 只添加不存在的字段
+          if (!hasUnifiedData) {
+            table.jsonb('unified_data').nullable().comment('统一格式的简历数据');
+          }
+          if (!hasSchemaVersion) {
+            table.string('schema_version', 10).defaultTo('2.1').comment('数据结构版本');
+          }
+          
+          console.log('✅ [MIGRATION] 添加了unified_data和schema_version字段');
+        });
+      } else {
+        console.log('ℹ️ [MIGRATION] 字段already存在，跳过添加');
+        return Promise.resolve();
+      }
+    });
   }).then(() => {
     // 检查是否存在resume_data或content字段
     return knex.schema.hasColumn('resumes', 'resume_data').then(hasResumeData => {

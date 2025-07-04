@@ -4,7 +4,7 @@
  */
 
 const bcrypt = require('bcrypt');
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 async function initAdmin() {
   console.log('🚀 [INIT_ADMIN] 开始初始化管理员账号...');
