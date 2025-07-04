@@ -203,7 +203,7 @@ class ResumeController {
       const resumeData = {
         user_id: userId,
         title: title || '新简历',
-        resume_data: content || {},
+        unified_data: content || {},
         template_id: template_id || null,
         status: 'draft'
       };
@@ -434,7 +434,7 @@ class ResumeController {
       const resumeData = {
         user_id: userId,
         title: `${job.title} - ${job.company}`,
-        resume_data: result.data,
+        unified_data: result.data,
         generation_mode,
         target_company: job.company,
         target_position: job.title,

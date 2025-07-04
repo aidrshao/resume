@@ -531,7 +531,7 @@ ${text}
         const updateData = {
           title: resumeTitle,
           generation_log: originalText, // 🔧 临时使用generation_log保存原始文本
-          resume_data: JSON.stringify(unifiedData), // 手动转换为JSON字符串
+          unified_data: unifiedData, // 使用统一数据格式
           source: 'ai_parsed',
           updated_at: new Date()
         };
@@ -548,7 +548,7 @@ ${text}
           user_id: userId,
           title: resumeTitle,
           generation_log: originalText, // 🔧 临时使用generation_log保存原始文本
-          resume_data: JSON.stringify(unifiedData), // 手动转换为JSON字符串
+          unified_data: unifiedData, // 使用统一数据格式
           template_id: 1, // 默认模板
           source: 'ai_parsed',
           is_base: true, // 标记为基础简历
