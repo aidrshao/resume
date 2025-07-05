@@ -50,7 +50,7 @@ exports.up = function(knex) {
     }
     return Promise.resolve({ hasResumeData, hasContent });
   }).then(({ hasResumeData, hasContent }) => {
-    // 删除旧字段（如果存在）
+    // 为了向后兼容，保留 resume_data 字段，只删除 content 字段
     const promises = [];
     
     if (hasContent) {
@@ -63,14 +63,9 @@ exports.up = function(knex) {
       );
     }
     
+    // 保留 resume_data 字段以确保向后兼容性
     if (hasResumeData) {
-      promises.push(
-        knex.schema.alterTable('resumes', function(table) {
-          table.dropColumn('resume_data');
-        }).then(() => {
-          console.log('🗑️ [MIGRATION] 删除了resume_data字段');
-        })
-      );
+      console.log('ℹ️ [MIGRATION] 保留resume_data字段以确保向后兼容性');
     }
     
     return Promise.all(promises);
@@ -83,18 +78,40 @@ exports.up = function(knex) {
 };
 
 exports.down = function(knex) {
-  return knex.schema.alterTable('resumes', function(table) {
-    // 恢复旧字段
-    table.text('resume_data').nullable();
-    table.text('content').nullable();
-    
-    console.log('🔄 [ROLLBACK] 恢复了resume_data和content字段');
+  return knex.schema.hasColumn('resumes', 'resume_data').then(hasResumeData => {
+    return knex.schema.hasColumn('resumes', 'content').then(hasContent => {
+      const promises = [];
+      
+      // 如果 resume_data 不存在，则恢复它
+      if (!hasResumeData) {
+        promises.push(
+          knex.schema.alterTable('resumes', function(table) {
+            table.text('resume_data').nullable();
+          }).then(() => {
+            console.log('🔄 [ROLLBACK] 恢复了resume_data字段');
+          })
+        );
+      }
+      
+      // 如果 content 不存在，则恢复它
+      if (!hasContent) {
+        promises.push(
+          knex.schema.alterTable('resumes', function(table) {
+            table.text('content').nullable();
+          }).then(() => {
+            console.log('🔄 [ROLLBACK] 恢复了content字段');
+          })
+        );
+      }
+      
+      return Promise.all(promises);
+    });
   }).then(() => {
-    // 将数据从unified_data复制回resume_data
+    // 将数据从unified_data复制回resume_data（如果需要）
     return knex.raw(`
       UPDATE resumes 
       SET resume_data = unified_data::text 
-      WHERE unified_data IS NOT NULL
+      WHERE unified_data IS NOT NULL AND (resume_data IS NULL OR resume_data = '')
     `);
   }).then(() => {
     // 删除新字段

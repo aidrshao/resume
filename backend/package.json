@@ -17,7 +17,9 @@
     "migrate:complete:run": "node scripts/run-complete-migration.js",
     "migrate:complete:test": "node scripts/test-complete-migration.js",
     "migrate:existing": "node scripts/migrate-existing-data.js",
-    "test:unified": "node scripts/test-unified-schema.js"
+    "test:unified": "node scripts/test-unified-schema.js",
+    "init:dev": "node scripts/init-dev-environment.js",
+    "setup:permissions": "node scripts/init-dev-environment.js"
   },
   "dependencies": {
     "axios": "^1.10.0",

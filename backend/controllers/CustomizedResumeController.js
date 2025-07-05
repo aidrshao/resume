@@ -215,16 +215,19 @@ class CustomizedResumeController {
       
       // 准备AI调用参数
       const aiParams = {
+        targetCompany: targetJob.company || '',
+        targetPosition: targetJob.title || '',
         jobDescription: targetJob.description || '',
-        preAnalyzedInfo: targetJob.requirements || '',
-        baseResumeData: JSON.stringify(resumeData, null, 2)
+        resumeData: JSON.stringify(resumeData, null, 2),
+        userRequirements: ''
       };
       
       console.log('📊 [CUSTOMIZE_RESUME] AI参数准备完成:', {
+        targetCompany: aiParams.targetCompany,
+        targetPosition: aiParams.targetPosition,
         jobDescriptionLength: aiParams.jobDescription.length,
-        preAnalyzedInfoLength: aiParams.preAnalyzedInfo.length,
-        baseResumeDataLength: aiParams.baseResumeData.length,
-        baseResumeDataType: typeof resumeData,
+        resumeDataLength: aiParams.resumeData.length,
+        resumeDataType: typeof resumeData,
         parametersReady: true
       });
       

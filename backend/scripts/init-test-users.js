@@ -217,7 +217,7 @@ async function testUserLogin() {
         const jwt = require('jsonwebtoken');
         const token = jwt.sign(
           { userId: user.id },
-          process.env.JWT_SECRET || 'your-secret-key',
+          process.env.JWT_SECRET || 'resume_app_jwt_secret_2024_very_secure_key_change_in_production',
           { expiresIn: '7d' }
         );
         
