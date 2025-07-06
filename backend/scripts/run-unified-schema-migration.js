@@ -15,6 +15,7 @@ const path = require('path');
 class UnifiedSchemaMigrationRunner {
   constructor() {
     this.projectRoot = path.resolve(__dirname, '../..');
+    this.backendDir = path.resolve(__dirname, '..');
   }
 
   /**
@@ -48,7 +49,7 @@ class UnifiedSchemaMigrationRunner {
   async runDatabaseMigration() {
     return new Promise((resolve, reject) => {
       const migrationProcess = spawn('npm', ['run', 'migrate'], {
-        cwd: this.projectRoot,
+        cwd: this.backendDir,
         stdio: 'inherit'
       });
 

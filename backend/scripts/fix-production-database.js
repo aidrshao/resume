@@ -5,7 +5,7 @@
  * 修复简历上传功能中的数据库字段问题
  */
 
-const knex = require('../config/database');
+const { db: knex } = require('../config/database');
 
 async function fixProductionDatabase() {
   console.log('🔧 开始修复生产环境数据库...');

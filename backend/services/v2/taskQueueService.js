@@ -11,6 +11,11 @@ class TaskQueueService {
     this.queues = new Map(); // 内存队列作为备用
     this.taskCallbacks = new Map(); // 任务处理回调
     this.processingQueues = new Set(); // 正在处理的队列，避免重复处理
+    
+    // 新增：任务处理器相关属性
+    this.taskHandlers = new Map(); // 存储不同类型的任务处理器
+    this.isProcessing = false; // 是否正在处理任务
+    this.processingInterval = null; // 定时处理间隔
   }
 
   /**
@@ -252,14 +257,20 @@ class TaskQueueService {
         startedAt: new Date().toISOString()
       });
 
-      // 根据队列名称选择处理器
-      if (queueName === 'resume_parse') {
+      // 优先使用主任务处理器（通过startProcessing传入）
+      if (this.mainTaskHandler && typeof this.mainTaskHandler.handleTask === 'function') {
+        console.log(`🔧 [TASK_QUEUE_V2] 使用主任务处理器处理任务: ${taskId}`);
+        await this.mainTaskHandler.handleTask(taskId, taskData, queueName);
+      } 
+      // 如果没有主处理器，使用原有逻辑
+      else if (queueName === 'resume_parse') {
+        console.log(`🔧 [TASK_QUEUE_V2] 使用默认处理器处理任务: ${taskId}`);
         const ResumeParseTaskHandler = require('./resumeParseTaskHandler');
         // 传入当前的TaskQueueService实例，确保使用同一个Redis连接和状态管理
         const handler = new ResumeParseTaskHandler(this);
         await handler.process(taskId, taskData);
       } else {
-        throw new Error(`未知的队列类型: ${queueName}`);
+        throw new Error(`未知的队列类型: ${queueName}，且没有配置主任务处理器`);
       }
 
       console.log(`✅ [TASK_QUEUE_V2] 任务执行完成: ${taskId}`);
@@ -464,6 +475,149 @@ class TaskQueueService {
       console.log('✅ [TASK_QUEUE_V2] 连接已关闭');
     } catch (error) {
       console.error('❌ [TASK_QUEUE_V2] 关闭连接失败:', error);
+    }
+  }
+
+  /**
+   * 启动任务处理器
+   * @param {Object} taskHandler - 任务处理器实例
+   * @param {Object} options - 配置选项
+   */
+  async startProcessing(taskHandler, options = {}) {
+    try {
+      console.log('🚀 [TASK_QUEUE_V2] 启动任务处理器...');
+      
+      // 配置默认选项
+      const config = {
+        checkInterval: options.checkInterval || 5000, // 检查间隔：5秒
+        maxConcurrentTasks: options.maxConcurrentTasks || 3, // 最大并发任务数
+        queues: options.queues || ['resume_parse'], // 要处理的队列列表
+        ...options
+      };
+
+      // 保存任务处理器
+      this.mainTaskHandler = taskHandler;
+      this.processingConfig = config;
+      this.isProcessing = true;
+
+      console.log('✅ [TASK_QUEUE_V2] 任务处理器配置:', {
+        checkInterval: config.checkInterval,
+        maxConcurrentTasks: config.maxConcurrentTasks,
+        queues: config.queues,
+        redisConnected: this.isRedisConnected
+      });
+
+      // 立即进行一次处理
+      await this.processAllQueues();
+
+      // 设置定时处理
+      this.processingInterval = setInterval(async () => {
+        if (this.isProcessing) {
+          await this.processAllQueues();
+        }
+      }, config.checkInterval);
+
+      console.log('✅ [TASK_QUEUE_V2] 任务处理器启动成功');
+      
+    } catch (error) {
+      console.error('❌ [TASK_QUEUE_V2] 任务处理器启动失败:', error);
+      this.isProcessing = false;
+      throw error;
+    }
+  }
+
+  /**
+   * 停止任务处理器
+   */
+  async stopProcessing() {
+    try {
+      console.log('⏹️ [TASK_QUEUE_V2] 停止任务处理器...');
+      
+      this.isProcessing = false;
+      
+      if (this.processingInterval) {
+        clearInterval(this.processingInterval);
+        this.processingInterval = null;
+      }
+
+      // 等待当前处理中的任务完成
+      const timeout = 30000; // 30秒超时
+      const start = Date.now();
+      
+      while (this.processingQueues.size > 0 && (Date.now() - start) < timeout) {
+        console.log(`⏳ [TASK_QUEUE_V2] 等待 ${this.processingQueues.size} 个队列处理完成...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      console.log('✅ [TASK_QUEUE_V2] 任务处理器已停止');
+      
+    } catch (error) {
+      console.error('❌ [TASK_QUEUE_V2] 停止任务处理器失败:', error);
+    }
+  }
+
+  /**
+   * 处理所有配置的队列
+   */
+  async processAllQueues() {
+    if (!this.isProcessing || !this.processingConfig) {
+      return;
+    }
+
+    const { queues, maxConcurrentTasks } = this.processingConfig;
+    
+    try {
+      // 检查当前并发任务数
+      const currentProcessing = this.processingQueues.size;
+      
+      if (currentProcessing >= maxConcurrentTasks) {
+        console.log(`⏳ [TASK_QUEUE_V2] 达到最大并发数 (${currentProcessing}/${maxConcurrentTasks})，等待...`);
+        return;
+      }
+
+      // 处理每个队列
+      for (const queueName of queues) {
+        if (this.processingQueues.has(queueName)) {
+          continue; // 队列已在处理中
+        }
+
+        if (this.processingQueues.size >= maxConcurrentTasks) {
+          break; // 达到最大并发数
+        }
+
+        // 检查队列是否有任务
+        const hasTask = await this.checkQueueHasTask(queueName);
+        if (hasTask) {
+          console.log(`🎯 [TASK_QUEUE_V2] 发现待处理任务，启动队列处理: ${queueName}`);
+          // 异步处理队列，不等待完成
+          this.processQueue(queueName).catch(error => {
+            console.error(`❌ [TASK_QUEUE_V2] 队列处理出错: ${queueName}`, error);
+          });
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ [TASK_QUEUE_V2] 处理队列失败:', error);
+    }
+  }
+
+  /**
+   * 检查队列是否有待处理任务
+   * @param {string} queueName - 队列名称
+   * @returns {Promise<boolean>} 是否有任务
+   */
+  async checkQueueHasTask(queueName) {
+    try {
+      if (this.isRedisConnected) {
+        const queueLength = await this.redis.llen(`queue:${queueName}`);
+        return queueLength > 0;
+      } else {
+        const queue = this.queues.get(queueName);
+        return queue && queue.length > 0;
+      }
+    } catch (error) {
+      console.error(`❌ [TASK_QUEUE_V2] 检查队列失败: ${queueName}`, error);
+      return false;
     }
   }
 }

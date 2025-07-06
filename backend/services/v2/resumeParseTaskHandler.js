@@ -21,6 +21,17 @@ class ResumeParseTaskHandler {
   }
 
   /**
+   * 标准任务处理器接口方法
+   * @param {string} taskId - 任务ID
+   * @param {Object} taskData - 任务数据
+   * @param {string} queueName - 队列名称
+   */
+  async handleTask(taskId, taskData, queueName) {
+    // 委托给现有的process方法
+    return await this.process(taskId, taskData);
+  }
+
+  /**
    * 处理简历解析任务
    * @param {string} taskId - 任务ID
    * @param {Object} taskData - 任务数据
