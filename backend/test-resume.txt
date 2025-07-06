@@ -1,0 +1,34 @@
+
+张三
+软件工程师
+
+联系方式：
+电话：13800138000
+邮箱：zhangsan@example.com
+地址：北京市朝阳区
+
+工作经验：
+2020-2023  ABC科技公司  高级软件工程师
+- 负责前端开发和后端API设计
+- 使用React、Node.js、Python等技术栈
+- 带领团队完成多个重要项目
+
+教育背景：
+2016-2020  北京理工大学  计算机科学与技术  本科
+
+技能：
+- 编程语言：JavaScript、Python、Java
+- 框架：React、Vue.js、Django、Spring Boot
+- 数据库：MySQL、MongoDB、Redis
+- 工具：Git、Docker、Kubernetes
+
+项目经验：
+1. 电商系统开发
+   - 使用React和Node.js开发全栈电商平台
+   - 实现用户管理、商品管理、订单处理等功能
+   - 日活用户达到10万+
+
+2. 数据分析平台
+   - 使用Python和Django开发数据分析平台
+   - 集成多种数据源，提供可视化分析
+   - 帮助公司提升决策效率50%

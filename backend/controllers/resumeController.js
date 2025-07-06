@@ -290,18 +290,44 @@ class ResumeController {
    * 上传并解析简历
    */
   static async uploadAndParseResume(req, res) {
+    const uploadStartTime = Date.now();
+    const requestId = `UPLOAD_${uploadStartTime}_${Math.random().toString(36).substr(2, 9)}`;
+    
     try {
-      console.log('📤 [UPLOAD_DEBUG] 开始处理文件上传');
-      console.log('📤 [UPLOAD_DEBUG] req.file:', req.file);
-      console.log('📤 [UPLOAD_DEBUG] req.files:', req.files);
-      console.log('📤 [UPLOAD_DEBUG] req.body:', req.body);
-      console.log('📤 [UPLOAD_DEBUG] Content-Type:', req.get('content-type'));
+      console.log(`🚀 [${requestId}] =========================== 开始文件上传处理 ===========================`);
+      console.log(`📤 [${requestId}] 请求时间:`, new Date().toISOString());
+      console.log(`📤 [${requestId}] 用户ID:`, req.user?.id);
+      console.log(`📤 [${requestId}] req.file 存在:`, !!req.file);
+      console.log(`📤 [${requestId}] req.files 存在:`, !!req.files);
+      console.log(`📤 [${requestId}] req.body:`, req.body);
+      console.log(`📤 [${requestId}] Content-Type:`, req.get('content-type'));
+      
+      if (req.file) {
+        console.log(`📄 [${requestId}] 文件详细信息:`);
+        console.log(`📄 [${requestId}] - 原始文件名:`, req.file.originalname);
+        console.log(`📄 [${requestId}] - 服务器文件名:`, req.file.filename);
+        console.log(`📄 [${requestId}] - 文件大小:`, req.file.size, 'bytes');
+        console.log(`📄 [${requestId}] - MIME类型:`, req.file.mimetype);
+        console.log(`📄 [${requestId}] - 存储路径:`, req.file.path);
+        console.log(`📄 [${requestId}] - 字段名:`, req.file.fieldname);
+        
+        // 检查文件是否真实存在
+        const fs = require('fs');
+        const fileExists = fs.existsSync(req.file.path);
+        const fileStats = fileExists ? fs.statSync(req.file.path) : null;
+        console.log(`📄 [${requestId}] - 文件实际存在:`, fileExists);
+        if (fileStats) {
+          console.log(`📄 [${requestId}] - 文件实际大小:`, fileStats.size, 'bytes');
+          console.log(`📄 [${requestId}] - 文件修改时间:`, fileStats.mtime);
+        }
+      }
       
       if (!req.file) {
-        console.error('❌ [UPLOAD_DEBUG] req.file 不存在');
+        console.error(`❌ [${requestId}] req.file 不存在`);
         return res.status(400).json({
           success: false,
-          message: '请选择要上传的文件'
+          message: '请选择要上传的文件',
+          requestId
         });
       }
 
@@ -311,6 +337,9 @@ class ResumeController {
       // 从文件扩展名获取文件类型
       const fileExtension = path.extname(req.file.originalname).toLowerCase();
       let fileType;
+      
+      console.log(`🔍 [${requestId}] 文件类型识别:`);
+      console.log(`🔍 [${requestId}] - 文件扩展名:`, fileExtension);
       
       switch (fileExtension) {
         case '.pdf':
@@ -326,30 +355,71 @@ class ResumeController {
           fileType = 'txt';
           break;
         default:
-          console.error('❌ [UPLOAD_DEBUG] 不支持的文件类型:', fileExtension);
+          console.error(`❌ [${requestId}] 不支持的文件类型:`, fileExtension);
           return res.status(400).json({
             success: false,
-            message: `不支持的文件类型: ${fileExtension}`
+            message: `不支持的文件类型: ${fileExtension}`,
+            requestId
           });
       }
       
-      console.log('📄 [UPLOAD_DEBUG] 检测到文件类型:', fileType);
+      console.log(`✅ [${requestId}] 检测到文件类型:`, fileType);
 
-      // 解析简历内容 - 修复参数传递错误
+      // 🔧 关键监控点：解析简历内容
+      console.log(`🔧 [${requestId}] =================== 开始解析简历内容 ===================`);
+      const parseStartTime = Date.now();
+      
       const parseResult = await ResumeParseService.parseResumeFile(filePath, fileType);
       
-      // 清理临时文件
-      fs.unlink(filePath, (err) => {
-        if (err) console.error('删除临时文件失败:', err);
-      });
-
-      if (!parseResult.success) {
-        return res.status(500).json(parseResult);
+      const parseEndTime = Date.now();
+      const parseDuration = parseEndTime - parseStartTime;
+      
+      console.log(`📊 [${requestId}] 解析耗时:`, parseDuration, 'ms');
+      console.log(`📊 [${requestId}] 解析结果详细分析:`);
+      console.log(`📊 [${requestId}] - success:`, parseResult.success);
+      console.log(`📊 [${requestId}] - error:`, parseResult.error);
+      console.log(`📊 [${requestId}] - extractedText存在:`, !!parseResult.extractedText);
+      console.log(`📊 [${requestId}] - extractedText长度:`, parseResult.extractedText ? parseResult.extractedText.length : 0);
+      console.log(`📊 [${requestId}] - extractedText前200字符:`, parseResult.extractedText ? parseResult.extractedText.substring(0, 200) : '(无)');
+      console.log(`📊 [${requestId}] - structuredData存在:`, !!parseResult.structuredData);
+      
+      if (parseResult.structuredData) {
+        console.log(`📊 [${requestId}] - structuredData.profile存在:`, !!parseResult.structuredData.profile);
+        if (parseResult.structuredData.profile) {
+          console.log(`📊 [${requestId}] - 姓名:`, parseResult.structuredData.profile.name || '(空)');
+          console.log(`📊 [${requestId}] - 邮箱:`, parseResult.structuredData.profile.email || '(空)');
+          console.log(`📊 [${requestId}] - 手机:`, parseResult.structuredData.profile.phone || '(空)');
+        }
+        console.log(`📊 [${requestId}] - 工作经历数量:`, parseResult.structuredData.workExperience?.length || 0);
+        console.log(`📊 [${requestId}] - 教育经历数量:`, parseResult.structuredData.education?.length || 0);
+        console.log(`📊 [${requestId}] - 技能数量:`, parseResult.structuredData.skills?.length || 0);
       }
       
-      console.log('✅ [UPLOAD_DEBUG] 文件解析成功，开始保存到数据库');
+      // 🔧 临时禁用文件删除以便调试PDF解析问题
+      console.log(`🧹 [${requestId}] 临时保留文件用于调试:`, filePath);
+      console.log(`🧹 [${requestId}] 文件大小:`, fs.existsSync(filePath) ? fs.statSync(filePath).size : '文件不存在');
+      // fs.unlink(filePath, (err) => {
+      //   if (err) {
+      //     console.error(`❌ [${requestId}] 删除临时文件失败:`, err);
+      //   } else {
+      //     console.log(`✅ [${requestId}] 临时文件删除成功`);
+      //   }
+      // });
 
-      // 保存解析结果到数据库
+      if (!parseResult.success) {
+        console.error(`❌ [${requestId}] 文件解析失败:`, parseResult.error);
+        return res.status(500).json({
+          ...parseResult,
+          requestId
+        });
+      }
+      
+      console.log(`✅ [${requestId}] 文件解析成功，开始保存到数据库`);
+
+      // 🔧 关键监控点：保存解析结果到数据库
+      console.log(`💾 [${requestId}] =================== 开始保存到数据库 ===================`);
+      const saveStartTime = Date.now();
+
       try {
         const savedResume = await ResumeParseService.saveBaseResume(
           userId, 
@@ -357,36 +427,78 @@ class ResumeController {
           parseResult.structuredData
         );
         
-        console.log('✅ [UPLOAD_DEBUG] 简历保存成功，ID:', savedResume.id);
+        const saveEndTime = Date.now();
+        const saveDuration = saveEndTime - saveStartTime;
+        
+        console.log(`✅ [${requestId}] 简历保存成功:`);
+        console.log(`💾 [${requestId}] - 简历ID:`, savedResume.id);
+        console.log(`💾 [${requestId}] - 保存耗时:`, saveDuration, 'ms');
+        console.log(`💾 [${requestId}] - 简历标题:`, savedResume.title);
+
+        const totalDuration = Date.now() - uploadStartTime;
+        console.log(`🎯 [${requestId}] =================== 上传处理完成 ===================`);
+        console.log(`🎯 [${requestId}] 总耗时:`, totalDuration, 'ms');
+        console.log(`🎯 [${requestId}] 性能分析:`);
+        console.log(`🎯 [${requestId}] - 解析耗时: ${parseDuration}ms (${((parseDuration/totalDuration)*100).toFixed(1)}%)`);
+        console.log(`🎯 [${requestId}] - 保存耗时: ${saveDuration}ms (${((saveDuration/totalDuration)*100).toFixed(1)}%)`);
 
         // 返回前端期望的格式
-        res.json({
+        const responseData = {
           success: true,
           data: {
-            taskId: savedResume.id.toString(), // 使用简历ID作为taskId
+            taskId: savedResume.id.toString(),
             resumeId: savedResume.id,
             extractedText: parseResult.extractedText,
             structuredData: parseResult.structuredData
           },
-          message: '简历解析并保存成功'
+          message: '简历解析并保存成功',
+          requestId,
+          performance: {
+            totalDuration,
+            parseDuration,
+            saveDuration
+          }
+        };
+        
+        console.log(`📤 [${requestId}] 准备返回响应:`, {
+          taskId: responseData.data.taskId,
+          resumeId: responseData.data.resumeId,
+          extractedTextLength: responseData.data.extractedText.length,
+          hasStructuredData: !!responseData.data.structuredData
         });
 
+        res.json(responseData);
+
       } catch (saveError) {
-        console.error('❌ [UPLOAD_DEBUG] 保存简历失败:', saveError);
+        const saveEndTime = Date.now();
+        const saveDuration = saveEndTime - saveStartTime;
+        
+        console.error(`❌ [${requestId}] 保存简历失败:`);
+        console.error(`❌ [${requestId}] - 错误信息:`, saveError.message);
+        console.error(`❌ [${requestId}] - 错误堆栈:`, saveError.stack);
+        console.error(`❌ [${requestId}] - 保存耗时:`, saveDuration, 'ms');
+        
         return res.status(500).json({
           success: false,
           error: `保存简历失败: ${saveError.message}`,
           extractedText: parseResult.extractedText,
-          structuredData: parseResult.structuredData
+          structuredData: parseResult.structuredData,
+          requestId
         });
       }
 
     } catch (error) {
-      console.error('上传解析简历失败:', error);
+      const totalDuration = Date.now() - uploadStartTime;
+      console.error(`❌ [${requestId}] 上传解析简历失败:`);
+      console.error(`❌ [${requestId}] - 错误信息:`, error.message);
+      console.error(`❌ [${requestId}] - 错误堆栈:`, error.stack);
+      console.error(`❌ [${requestId}] - 总耗时:`, totalDuration, 'ms');
+      
       res.status(500).json({
         success: false,
         error: error.message,
-        message: '简历解析失败'
+        message: '简历解析失败',
+        requestId
       });
     }
   }
@@ -465,16 +577,50 @@ class ResumeController {
    */
   static async saveBaseResume(req, res) {
     try {
+      console.log('💾 [SAVE_BASE_RESUME] ==> 开始处理保存基础简历请求');
+      console.log('💾 [SAVE_BASE_RESUME] 请求ID:', req.requestId);
+      console.log('💾 [SAVE_BASE_RESUME] 用户ID:', req.user?.id);
+      console.log('💾 [SAVE_BASE_RESUME] 请求体结构:', {
+        hasContent: !!req.body.content,
+        bodyKeys: Object.keys(req.body),
+        contentType: typeof req.body.content
+      });
+      
       const { content } = req.body;
       const userId = req.user.id;
 
+      console.log('🔍 [SAVE_BASE_RESUME] 接收到的content数据:');
+      console.log('🔍 [SAVE_BASE_RESUME] content完整结构:', JSON.stringify(content, null, 2));
+      console.log('🔍 [SAVE_BASE_RESUME] content数据分析:');
+      console.log('  - 数据类型:', typeof content);
+      console.log('  - 是否为对象:', typeof content === 'object' && content !== null);
+      console.log('  - 主要字段:', Object.keys(content || {}));
+      console.log('  - profile存在:', !!content?.profile);
+      console.log('  - 姓名:', content?.profile?.name || '未提供');
+      console.log('  - 邮箱:', content?.profile?.email || '未提供');
+      console.log('  - 电话:', content?.profile?.phone || '未提供');
+      console.log('  - 工作经验数量:', content?.workExperience?.length || 0);
+      console.log('  - 教育背景数量:', content?.education?.length || 0);
+
       // 验证content是否为统一格式数据
       if (!content || !content.profile) {
+        console.error('❌ [SAVE_BASE_RESUME] 数据验证失败: 缺少profile字段');
         return res.status(400).json({
           success: false,
           message: '简历数据格式无效：必须包含profile字段'
         });
       }
+
+      console.log('✅ [SAVE_BASE_RESUME] 数据验证通过，调用服务层保存');
+      console.log('🔄 [SAVE_BASE_RESUME] 传递给服务层的参数:');
+      console.log('  - userId:', userId);
+      console.log('  - originalText: (空字符串)');
+      console.log('  - unifiedData:', {
+        profileName: content.profile?.name,
+        workExpCount: content.workExperience?.length || 0,
+        educationCount: content.education?.length || 0,
+        dataSize: JSON.stringify(content).length + ' 字符'
+      });
 
       // 调用服务层保存基础简历，参数顺序：userId, originalText, unifiedData
       const savedResume = await ResumeParseService.saveBaseResume(
@@ -482,6 +628,11 @@ class ResumeController {
         '', // originalText - 这里为空，因为是用户编辑后的数据
         content // unifiedData - 统一格式的简历数据
       );
+
+      console.log('✅ [SAVE_BASE_RESUME] 服务层保存成功:', {
+        resumeId: savedResume.id,
+        title: savedResume.title
+      });
 
       res.json({
         success: true,
@@ -491,11 +642,23 @@ class ResumeController {
         },
         message: '基础简历保存成功'
       });
+      
+      console.log('✅ [SAVE_BASE_RESUME] 响应已发送，保存流程完成');
+      
     } catch (error) {
-      console.error('保存基础简历失败:', error);
+      console.error('❌ [SAVE_BASE_RESUME] 保存基础简历失败:', error);
+      console.error('❌ [SAVE_BASE_RESUME] 错误详情:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack.split('\n').slice(0, 10).join('\n')
+      });
+      
       res.status(500).json({
         success: false,
-        message: '保存基础简历失败'
+        message: '保存基础简历失败',
+        error_code: 'SAVE_FAILED',
+        request_id: req.requestId,
+        timestamp: new Date().toISOString()
       });
     }
   }

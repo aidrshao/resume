@@ -57,18 +57,32 @@ class Logger {
         return;
       }
       
-      await fetch(`${this.apiUrl}/logs/frontend`, {
+      const response = await fetch(`${this.apiUrl}/logs/frontend`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(logEntry),
-        keepalive: true
+        keepalive: true,
+        timeout: 5000 // 5秒超时
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
     } catch (error) {
       // 如果发送失败，加入队列
       this.logQueue.push(logEntry);
-      console.warn('Failed to send log to backend:', error);
+      
+      // 增强错误处理，避免循环日志
+      if (error.message.includes('ERR_CONNECTION_REFUSED')) {
+        console.warn('⚠️ [LOGGER] 后端服务暂时不可用，日志已加入队列');
+      } else if (error.message.includes('Failed to fetch')) {
+        console.warn('⚠️ [LOGGER] 网络请求失败，日志已加入队列');
+      } else {
+        console.warn('⚠️ [LOGGER] 发送日志失败，日志已加入队列:', error.message);
+      }
     }
   }
   

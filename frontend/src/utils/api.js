@@ -6,7 +6,7 @@
 import axios from 'axios';
 import logger from './logger';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
 // 导出API基础URL
 export { API_BASE_URL };
@@ -19,6 +19,29 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// 添加重试机制
+const retryRequest = async (config, maxRetries = 3, delay = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await api(config);
+      return response;
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      // 如果是连接拒绝或网络错误，进行重试
+      if (error.message.includes('ERR_CONNECTION_REFUSED') || 
+          error.message.includes('Network Error') ||
+          error.message.includes('ERR_NETWORK')) {
+        console.warn(`⚠️ [API_RETRY] 第${i + 1}次重试失败，${delay}ms后重试...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // 指数退避
+      } else {
+        throw error;
+      }
+    }
+  }
+};
 
 // 请求拦截器
 api.interceptors.request.use(
@@ -122,7 +145,7 @@ api.interceptors.response.use(
       // 检查是否是连接拒绝
       if (error.message.includes('ERR_CONNECTION_REFUSED')) {
         logger.error('连接被拒绝', { message: error.message });
-        error.userMessage = '无法连接到服务器，请联系技术支持';
+        error.userMessage = '无法连接到服务器，请检查网络连接后重试';
       }
     } else {
       logger.error('其他API错误', {
@@ -712,6 +735,113 @@ export const downloadResumePDF = (filename) => {
   console.log('🎨 [模板API] 开始下载简历PDF', filename);
   return api.get(`/resume-render/download/${filename}`, {
     responseType: 'blob'
+  });
+};
+
+// ===== V2 简历解析 API =====
+
+/**
+ * V2 简历解析 - 上传文件并创建解析任务
+ * @param {File} file - 简历文件
+ * @returns {Promise} API响应，包含taskId
+ */
+export const parseResumeV2 = (file) => {
+  logger.info('V2简历解析开始', { 
+    fileName: file.name, 
+    fileSize: file.size,
+    fileType: file.type 
+  });
+  
+  const formData = new FormData();
+  formData.append('resume', file);
+  
+  return api.post('/v2/resumes/parse', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 120000, // 2分钟超时
+  }).then(response => {
+    logger.info('V2简历解析请求成功', { 
+      taskId: response.data.data?.taskId,
+      status: response.data.data?.status 
+    });
+    return response.data;
+  }).catch(error => {
+    logger.error('V2简历解析请求失败', error);
+    throw error;
+  });
+};
+
+/**
+ * V2 简历解析 - 查询任务状态
+ * @param {string} taskId - 任务ID
+ * @returns {Promise} API响应，包含任务状态
+ */
+export const getTaskStatusV2 = async (taskId) => {
+  try {
+    const response = await retryRequest({
+      method: 'get',
+      url: `/v2/tasks/${taskId}/status`
+    });
+    
+    logger.info('V2任务状态查询', { 
+      taskId, 
+      status: response.data.data?.status,
+      progress: response.data.data?.progress 
+    });
+    return response.data;
+  } catch (error) {
+    logger.error('V2任务状态查询失败', { taskId, error: error.message });
+    throw error;
+  }
+};
+
+/**
+ * V2 简历解析 - 获取解析结果
+ * @param {string} taskId - 任务ID
+ * @returns {Promise} API响应，包含解析结果
+ */
+export const getTaskResultV2 = (taskId) => {
+  logger.info('V2解析结果获取开始', { taskId });
+  
+  return api.get(`/v2/tasks/${taskId}/result`).then(response => {
+    logger.info('V2解析结果获取成功', { 
+      taskId,
+      dataSize: JSON.stringify(response.data.data?.resume_data || {}).length 
+    });
+    return response.data;
+  }).catch(error => {
+    logger.error('V2解析结果获取失败', { taskId, error: error.message });
+    throw error;
+  });
+};
+
+/**
+ * 保存基础简历 - 将编辑后的简历数据保存为用户的基础简历
+ * @param {Object} resumeData - 简历数据（符合UNIFIED_RESUME_SCHEMA格式）
+ * @returns {Promise} API响应
+ */
+export const saveBaseResume = (resumeData) => {
+  logger.info('保存基础简历开始', { 
+    hasProfile: !!resumeData.profile,
+    workExperienceCount: resumeData.workExperience?.length || 0,
+    educationCount: resumeData.education?.length || 0 
+  });
+  
+  // 🔧 修复：确保传递给后端的格式正确
+  const requestData = {
+    content: resumeData  // 后端期望的是 { content: ... } 格式
+  };
+  
+  return api.post('/resumes/save-base', requestData).then(response => {
+    logger.info('基础简历保存成功', { 
+      success: response.data.success,
+      resumeId: response.data.data?.resumeId 
+    });
+    return response.data;
+  }).catch(error => {
+    logger.error('基础简历保存失败', { error: error.message });
+    throw error;
   });
 };
 

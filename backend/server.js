@@ -15,6 +15,11 @@ const membershipRoutes = require('./routes/membershipRoutes');
 const resumeRenderRoutes = require('./routes/resumeRenderRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const logRoutes = require('./routes/logRoutes');
+const v2TaskRoutes = require('./routes/v2/tasks');
+const { autoSetup } = require('./scripts/auto-setup');
+
+// 自动化设置标志
+const shouldAutoSetup = process.env.AUTO_SETUP !== 'false';
 
 const app = express();
 const PORT = process.env.PORT || 8000;
@@ -151,6 +156,7 @@ app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之�
 app.use('/api/memberships', membershipRoutes);  // 会员路由
 app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
 app.use('/api/templates', templateRoutes);  // 模板管理路由
+app.use('/api/v2', v2TaskRoutes);  // V2版本任务路由（新的简历解析服务）
 app.use('/api/jobs', jobRoutes);
 app.use('/api', customizedResumeRoutes);  // 专属简历路由
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
@@ -191,7 +197,62 @@ app.use((error, req, res, next) => {
   });
 });
 
+// 自动化启动函数
+async function startServer() {
+  try {
+    // 检查是否需要自动设置
+    if (shouldAutoSetup) {
+      console.log('🚀 [AUTO_SETUP] 开始自动化设置...');
+      console.log('🚀 [AUTO_SETUP] 环境变量 AUTO_SETUP =', process.env.AUTO_SETUP);
+      console.log('🚀 [AUTO_SETUP] 将自动运行数据库迁移和种子数据');
+      
+      try {
+        await autoSetup();
+        console.log('✅ [AUTO_SETUP] 自动化设置完成');
+      } catch (error) {
+        console.error('❌ [AUTO_SETUP] 自动化设置失败:', error.message);
+        console.error('⚠️ [AUTO_SETUP] 服务器将继续启动，但某些功能可能不可用');
+        console.error('💡 [AUTO_SETUP] 请手动运行: npm run migrate && npm run seed');
+      }
+    } else {
+      console.log('⏭️ [AUTO_SETUP] 跳过自动化设置 (AUTO_SETUP=false)');
+    }
+
+    // 启动服务器
+    app.listen(PORT, () => {
+      console.log('🎉 [SERVER] =============================================');
+      console.log(`🎉 [SERVER] 服务器成功启动! http://localhost:${PORT}`);
+      console.log('🎉 [SERVER] 环境:', process.env.NODE_ENV || 'development');
+      console.log('🎉 [SERVER] 时间:', new Date().toISOString());
+      console.log('🎉 [SERVER] 进程ID:', process.pid);
+      console.log('🎉 [SERVER] Node版本:', process.version);
+      console.log('🎉 [SERVER] =============================================');
+      
+      // 启动V2任务处理器（如果需要）
+      if (process.env.ENABLE_TASK_PROCESSOR !== 'false') {
+        console.log('🔄 [TASK_PROCESSOR] 启动任务处理器...');
+        try {
+          const TaskQueueService = require('./services/v2/taskQueueService');
+          const ResumeParseTaskHandler = require('./services/v2/resumeParseTaskHandler');
+          
+          const taskQueue = new TaskQueueService();
+          const taskHandler = new ResumeParseTaskHandler(taskQueue);
+          
+          // 开始处理任务队列
+          taskQueue.startProcessing(taskHandler);
+          console.log('✅ [TASK_PROCESSOR] 任务处理器启动成功');
+        } catch (error) {
+          console.error('❌ [TASK_PROCESSOR] 任务处理器启动失败:', error.message);
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('💥 [SERVER] 服务器启动失败:', error.message);
+    console.error('💥 [SERVER] 错误堆栈:', error.stack);
+    process.exit(1);
+  }
+}
+
 // 启动服务器
-app.listen(PORT, () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
-}); 
+startServer(); 

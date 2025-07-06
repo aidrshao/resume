@@ -90,12 +90,75 @@ class ResumeParseService {
    * @returns {Promise<string>} 提取的文本
    */
   static async extractTextFromPDF(filePath) {
+    const extractId = `PDF_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
     try {
+      console.log(`📄 [${extractId}] =================== 开始PDF文本提取 ===================`);
+      console.log(`📄 [${extractId}] 文件路径:`, filePath);
+      
+      // 检查文件是否存在
+      const fs = require('fs');
+      const fileExists = fs.existsSync(filePath);
+      console.log(`📄 [${extractId}] 文件是否存在:`, fileExists);
+      
+      if (!fileExists) {
+        throw new Error(`PDF文件不存在: ${filePath}`);
+      }
+      
+      const fileStats = fs.statSync(filePath);
+      console.log(`📄 [${extractId}] 文件大小:`, fileStats.size, 'bytes');
+      console.log(`📄 [${extractId}] 文件修改时间:`, fileStats.mtime);
+      
+      // 读取文件缓冲区
+      console.log(`📄 [${extractId}] 开始读取文件缓冲区...`);
       const dataBuffer = fs.readFileSync(filePath);
+      console.log(`📄 [${extractId}] 缓冲区大小:`, dataBuffer.length, 'bytes');
+      console.log(`📄 [${extractId}] 缓冲区前20字节:`, dataBuffer.slice(0, 20));
+      
+      // 检查PDF文件头
+      const pdfHeader = dataBuffer.slice(0, 4).toString();
+      console.log(`📄 [${extractId}] PDF文件头:`, pdfHeader);
+      
+      if (!pdfHeader.startsWith('%PDF')) {
+        console.warn(`⚠️ [${extractId}] 警告：文件头不是标准PDF格式`);
+      }
+      
+      // 使用pdf-parse解析
+      console.log(`📄 [${extractId}] 开始PDF解析...`);
+      const parseStartTime = Date.now();
+      
       const data = await pdfParse(dataBuffer);
+      
+      const parseEndTime = Date.now();
+      const parseDuration = parseEndTime - parseStartTime;
+      
+      console.log(`📄 [${extractId}] PDF解析完成:`);
+      console.log(`📄 [${extractId}] - 解析耗时:`, parseDuration, 'ms');
+      console.log(`📄 [${extractId}] - 页面数量:`, data.numpages);
+      console.log(`📄 [${extractId}] - 文本长度:`, data.text.length);
+      console.log(`📄 [${extractId}] - 信息对象:`, data.info);
+      console.log(`📄 [${extractId}] - 元数据:`, data.metadata);
+      
+      if (data.text.length === 0) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本长度为0`);
+      }
+      
+      if (data.text.length < 50) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本内容过少（<50字符）`);
+        console.log(`📄 [${extractId}] 完整提取文本:`, JSON.stringify(data.text));
+      } else {
+        console.log(`📄 [${extractId}] 文本前200字符:`, data.text.substring(0, 200));
+        console.log(`📄 [${extractId}] 文本后200字符:`, data.text.substring(Math.max(0, data.text.length - 200)));
+      }
+      
+      console.log(`✅ [${extractId}] PDF文本提取成功`);
       return data.text;
+      
     } catch (error) {
-      console.error('PDF文本提取失败:', error);
+      console.error(`❌ [${extractId}] PDF文本提取失败:`);
+      console.error(`❌ [${extractId}] - 错误类型:`, error.constructor.name);
+      console.error(`❌ [${extractId}] - 错误信息:`, error.message);
+      console.error(`❌ [${extractId}] - 错误堆栈:`, error.stack);
       throw new Error('PDF文件解析失败');
     }
   }
@@ -106,11 +169,71 @@ class ResumeParseService {
    * @returns {Promise<string>} 提取的文本
    */
   static async extractTextFromWord(filePath) {
+    const extractId = `WORD_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
     try {
+      console.log(`📄 [${extractId}] =================== 开始Word文档文本提取 ===================`);
+      console.log(`📄 [${extractId}] 文件路径:`, filePath);
+      
+      // 检查文件是否存在
+      const fs = require('fs');
+      const fileExists = fs.existsSync(filePath);
+      console.log(`📄 [${extractId}] 文件是否存在:`, fileExists);
+      
+      if (!fileExists) {
+        throw new Error(`Word文档不存在: ${filePath}`);
+      }
+      
+      const fileStats = fs.statSync(filePath);
+      console.log(`📄 [${extractId}] 文件大小:`, fileStats.size, 'bytes');
+      console.log(`📄 [${extractId}] 文件修改时间:`, fileStats.mtime);
+      
+      // 检查文件扩展名
+      const path = require('path');
+      const fileExt = path.extname(filePath).toLowerCase();
+      console.log(`📄 [${extractId}] 文件扩展名:`, fileExt);
+      
+      // 使用mammoth解析
+      console.log(`📄 [${extractId}] 开始Word文档解析...`);
+      const parseStartTime = Date.now();
+      
       const result = await mammoth.extractRawText({ path: filePath });
+      
+      const parseEndTime = Date.now();
+      const parseDuration = parseEndTime - parseStartTime;
+      
+      console.log(`📄 [${extractId}] Word文档解析完成:`);
+      console.log(`📄 [${extractId}] - 解析耗时:`, parseDuration, 'ms');
+      console.log(`📄 [${extractId}] - 文本长度:`, result.value.length);
+      console.log(`📄 [${extractId}] - 消息数量:`, result.messages.length);
+      
+      if (result.messages.length > 0) {
+        console.log(`📄 [${extractId}] 解析消息:`);
+        result.messages.forEach((msg, index) => {
+          console.log(`📄 [${extractId}] - 消息${index + 1}:`, msg.type, msg.message);
+        });
+      }
+      
+      if (result.value.length === 0) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本长度为0`);
+      }
+      
+      if (result.value.length < 50) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本内容过少（<50字符）`);
+        console.log(`📄 [${extractId}] 完整提取文本:`, JSON.stringify(result.value));
+      } else {
+        console.log(`📄 [${extractId}] 文本前200字符:`, result.value.substring(0, 200));
+        console.log(`📄 [${extractId}] 文本后200字符:`, result.value.substring(Math.max(0, result.value.length - 200)));
+      }
+      
+      console.log(`✅ [${extractId}] Word文档文本提取成功`);
       return result.value;
+      
     } catch (error) {
-      console.error('Word文档文本提取失败:', error);
+      console.error(`❌ [${extractId}] Word文档文本提取失败:`);
+      console.error(`❌ [${extractId}] - 错误类型:`, error.constructor.name);
+      console.error(`❌ [${extractId}] - 错误信息:`, error.message);
+      console.error(`❌ [${extractId}] - 错误堆栈:`, error.stack);
       throw new Error('Word文档解析失败');
     }
   }
@@ -121,11 +244,58 @@ class ResumeParseService {
    * @returns {Promise<string>} 提取的文本
    */
   static async extractTextFromTXT(filePath) {
+    const extractId = `TXT_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
     try {
+      console.log(`📄 [${extractId}] =================== 开始TXT文件文本提取 ===================`);
+      console.log(`📄 [${extractId}] 文件路径:`, filePath);
+      
+      // 检查文件是否存在
+      const fs = require('fs');
+      const fileExists = fs.existsSync(filePath);
+      console.log(`📄 [${extractId}] 文件是否存在:`, fileExists);
+      
+      if (!fileExists) {
+        throw new Error(`TXT文件不存在: ${filePath}`);
+      }
+      
+      const fileStats = fs.statSync(filePath);
+      console.log(`📄 [${extractId}] 文件大小:`, fileStats.size, 'bytes');
+      console.log(`📄 [${extractId}] 文件修改时间:`, fileStats.mtime);
+      
+      // 读取文件内容
+      console.log(`📄 [${extractId}] 开始读取TXT文件...`);
+      const readStartTime = Date.now();
+      
       const text = fs.readFileSync(filePath, 'utf8');
+      
+      const readEndTime = Date.now();
+      const readDuration = readEndTime - readStartTime;
+      
+      console.log(`📄 [${extractId}] TXT文件读取完成:`);
+      console.log(`📄 [${extractId}] - 读取耗时:`, readDuration, 'ms');
+      console.log(`📄 [${extractId}] - 文本长度:`, text.length);
+      
+      if (text.length === 0) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本长度为0`);
+      }
+      
+      if (text.length < 50) {
+        console.warn(`⚠️ [${extractId}] 警告：提取的文本内容过少（<50字符）`);
+        console.log(`📄 [${extractId}] 完整提取文本:`, JSON.stringify(text));
+      } else {
+        console.log(`📄 [${extractId}] 文本前200字符:`, text.substring(0, 200));
+        console.log(`📄 [${extractId}] 文本后200字符:`, text.substring(Math.max(0, text.length - 200)));
+      }
+      
+      console.log(`✅ [${extractId}] TXT文件文本提取成功`);
       return text;
+      
     } catch (error) {
-      console.error('TXT文件读取失败:', error);
+      console.error(`❌ [${extractId}] TXT文件文本提取失败:`);
+      console.error(`❌ [${extractId}] - 错误类型:`, error.constructor.name);
+      console.error(`❌ [${extractId}] - 错误信息:`, error.message);
+      console.error(`❌ [${extractId}] - 错误堆栈:`, error.stack);
       throw new Error('TXT文件读取失败');
     }
   }
@@ -496,13 +666,34 @@ ${text}
    * @returns {Promise<Object>} 保存的简历对象
    */
   static async saveBaseResume(userId, originalText, unifiedData) {
-    console.log('💾 [SAVE_BASE_RESUME] 开始保存基础简历...');
-    console.log('📊 [SAVE_BASE_RESUME] 参数检查:', {
-      userId,
-      hasOriginalText: !!originalText,
-      hasUnifiedData: !!unifiedData,
-      hasProfile: !!(unifiedData && unifiedData.profile)
-    });
+    const saveId = `SAVE_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    
+    console.log(`💾 [${saveId}] =================== 开始保存基础简历 ===================`);
+    console.log(`📊 [${saveId}] 输入参数检查:`);
+    console.log(`📊 [${saveId}] - userId:`, userId, typeof userId);
+    console.log(`📊 [${saveId}] - hasOriginalText:`, !!originalText);
+    console.log(`📊 [${saveId}] - originalText长度:`, originalText ? originalText.length : 0);
+    console.log(`📊 [${saveId}] - hasUnifiedData:`, !!unifiedData);
+    console.log(`📊 [${saveId}] - unifiedData类型:`, typeof unifiedData);
+    console.log(`📊 [${saveId}] - hasProfile:`, !!(unifiedData && unifiedData.profile));
+
+    if (unifiedData && unifiedData.profile) {
+      console.log(`📊 [${saveId}] - profile内容:`);
+      console.log(`📊 [${saveId}]   - 姓名:`, unifiedData.profile.name || '(空)');
+      console.log(`📊 [${saveId}]   - 邮箱:`, unifiedData.profile.email || '(空)');
+      console.log(`📊 [${saveId}]   - 手机:`, unifiedData.profile.phone || '(空)');
+      console.log(`📊 [${saveId}]   - 位置:`, unifiedData.profile.location || '(空)');
+      console.log(`📊 [${saveId}]   - 简介:`, unifiedData.profile.summary || '(空)');
+    }
+
+    if (unifiedData) {
+      console.log(`📊 [${saveId}] - 其他数据:`);
+      console.log(`📊 [${saveId}]   - 工作经历数量:`, unifiedData.workExperience?.length || 0);
+      console.log(`📊 [${saveId}]   - 教育经历数量:`, unifiedData.education?.length || 0);
+      console.log(`📊 [${saveId}]   - 技能数量:`, unifiedData.skills?.length || 0);
+      console.log(`📊 [${saveId}]   - 项目经历数量:`, unifiedData.projectExperience?.length || 0);
+      console.log(`📊 [${saveId}]   - 自定义部分数量:`, unifiedData.customSections?.length || 0);
+    }
 
     try {
       const { Resume } = require('../models/Resume');
@@ -517,56 +708,173 @@ ${text}
         throw new Error('简历数据格式无效：缺少profile字段');
       }
 
-      // 查询现有基础简历
-      console.log('🔍 [SAVE_BASE_RESUME] 查询用户现有基础简历...');
+      // 🔧 关键监控点：查询现有基础简历
+      console.log(`🔍 [${saveId}] =================== 查询现有基础简历 ===================`);
+      const queryStartTime = Date.now();
+      
       const existingBaseResume = await Resume.findBaseResumeByUserId(userId);
+      
+      const queryEndTime = Date.now();
+      const queryDuration = queryEndTime - queryStartTime;
+      
+      console.log(`🔍 [${saveId}] 基础简历查询完成:`);
+      console.log(`🔍 [${saveId}] - 查询耗时:`, queryDuration, 'ms');
+      console.log(`🔍 [${saveId}] - 找到现有基础简历:`, !!existingBaseResume);
+      
+      if (existingBaseResume) {
+        console.log(`🔍 [${saveId}] - 现有简历详情:`);
+        console.log(`🔍 [${saveId}]   - ID:`, existingBaseResume.id);
+        console.log(`🔍 [${saveId}]   - 标题:`, existingBaseResume.title);
+        console.log(`🔍 [${saveId}]   - 来源:`, existingBaseResume.source);
+        console.log(`🔍 [${saveId}]   - 状态:`, existingBaseResume.status);
+        console.log(`🔍 [${saveId}]   - 创建时间:`, existingBaseResume.created_at);
+        console.log(`🔍 [${saveId}]   - 更新时间:`, existingBaseResume.updated_at);
+        console.log(`🔍 [${saveId}]   - 是否基础简历:`, existingBaseResume.is_base);
+        console.log(`🔍 [${saveId}]   - content长度:`, (existingBaseResume.content || '').length);
+        console.log(`🔍 [${saveId}]   - unified_data长度:`, (existingBaseResume.unified_data || '').length);
+        console.log(`🔍 [${saveId}]   - resume_data长度:`, (existingBaseResume.resume_data || '').length);
+        console.log(`🔍 [${saveId}]   - generation_log长度:`, (existingBaseResume.generation_log || '').length);
+      }
       
       let savedResume;
       const resumeTitle = `${unifiedData.profile.name || '用户'}的基础简历`;
       
       if (existingBaseResume) {
-        // 更新现有基础简历
-        console.log('🔄 [SAVE_BASE_RESUME] 更新现有基础简历，ID:', existingBaseResume.id);
+        // 🔧 关键监控点：更新现有基础简历
+        console.log(`🔄 [${saveId}] =================== 更新现有基础简历 ===================`);
+        console.log(`🔄 [${saveId}] 更新简历ID:`, existingBaseResume.id);
         
         const updateData = {
           title: resumeTitle,
-          generation_log: originalText, // 🔧 临时使用generation_log保存原始文本
-          unified_data: unifiedData, // 使用统一数据格式
+          content: JSON.stringify(unifiedData),      // 🔧 修复：使用content字段保存结构化数据
+          generation_log: originalText,              // 保存原始文本到generation_log
+          unified_data: unifiedData,                 // 使用统一数据格式
           source: 'ai_parsed',
           updated_at: new Date()
         };
         
-        await Resume.update(existingBaseResume.id, updateData);
-        savedResume = await Resume.findById(existingBaseResume.id);
+        console.log(`🔄 [${saveId}] 准备更新的数据:`);
+        console.log(`🔄 [${saveId}] - 标题:`, updateData.title);
+        console.log(`🔄 [${saveId}] - content长度:`, updateData.content.length);
+        console.log(`🔄 [${saveId}] - generation_log长度:`, updateData.generation_log.length);
+        console.log(`🔄 [${saveId}] - unified_data类型:`, typeof updateData.unified_data);
+        console.log(`🔄 [${saveId}] - 来源:`, updateData.source);
         
-        console.log('✅ [SAVE_BASE_RESUME] 基础简历更新成功');
+        const updateStartTime = Date.now();
+        
+        await Resume.update(existingBaseResume.id, updateData);
+        
+        const updateEndTime = Date.now();
+        const updateDuration = updateEndTime - updateStartTime;
+        
+        console.log(`🔄 [${saveId}] 简历更新完成:`);
+        console.log(`🔄 [${saveId}] - 更新耗时:`, updateDuration, 'ms');
+        
+        // 重新获取更新后的简历
+        const refetchStartTime = Date.now();
+        savedResume = await Resume.findById(existingBaseResume.id);
+        const refetchEndTime = Date.now();
+        const refetchDuration = refetchEndTime - refetchStartTime;
+        
+        console.log(`🔄 [${saveId}] 重新获取简历完成:`);
+        console.log(`🔄 [${saveId}] - 重新获取耗时:`, refetchDuration, 'ms');
+        console.log(`🔄 [${saveId}] - 更新后标题:`, savedResume.title);
+        
+        console.log(`✅ [${saveId}] 基础简历更新成功`);
       } else {
-        // 创建新的基础简历
-        console.log('➕ [SAVE_BASE_RESUME] 创建新的基础简历...');
+        // 🔧 关键监控点：创建新的基础简历
+        console.log(`➕ [${saveId}] =================== 创建新的基础简历 ===================`);
         
         const resumeInfo = {
           user_id: userId,
           title: resumeTitle,
-          generation_log: originalText, // 🔧 临时使用generation_log保存原始文本
-          unified_data: unifiedData, // 使用统一数据格式
-          template_id: 1, // 默认模板
+          content: JSON.stringify(unifiedData),      // 🔧 修复：使用content字段保存结构化数据
+          generation_log: originalText,              // 保存原始文本到generation_log
+          unified_data: unifiedData,                 // 使用统一数据格式
+          template_id: 1,                            // 默认模板
           source: 'ai_parsed',
-          is_base: true, // 标记为基础简历
+          is_base: true,                             // 标记为基础简历
           status: 'draft'
         };
 
+        console.log(`➕ [${saveId}] 准备创建的数据:`);
+        console.log(`➕ [${saveId}] - 用户ID:`, resumeInfo.user_id);
+        console.log(`➕ [${saveId}] - 标题:`, resumeInfo.title);
+        console.log(`➕ [${saveId}] - content长度:`, resumeInfo.content.length);
+        console.log(`➕ [${saveId}] - generation_log长度:`, resumeInfo.generation_log.length);
+        console.log(`➕ [${saveId}] - unified_data类型:`, typeof resumeInfo.unified_data);
+        console.log(`➕ [${saveId}] - 模板ID:`, resumeInfo.template_id);
+        console.log(`➕ [${saveId}] - 来源:`, resumeInfo.source);
+        console.log(`➕ [${saveId}] - 是否基础简历:`, resumeInfo.is_base);
+        console.log(`➕ [${saveId}] - 状态:`, resumeInfo.status);
+
+        const createStartTime = Date.now();
+        
         savedResume = await Resume.create(resumeInfo);
-        console.log('✅ [SAVE_BASE_RESUME] 基础简历创建成功，ID:', savedResume.id);
+        
+        const createEndTime = Date.now();
+        const createDuration = createEndTime - createStartTime;
+        
+        console.log(`➕ [${saveId}] 简历创建完成:`);
+        console.log(`➕ [${saveId}] - 创建耗时:`, createDuration, 'ms');
+        console.log(`➕ [${saveId}] - 新简历ID:`, savedResume.id);
+        console.log(`➕ [${saveId}] - 创建后标题:`, savedResume.title);
+        
+        console.log(`✅ [${saveId}] 基础简历创建成功`);
       }
 
-      // 保存用户详细信息
-      console.log('👤 [SAVE_BASE_RESUME] 保存用户详细信息...');
+      // 🔧 关键监控点：保存用户详细信息
+      console.log(`👤 [${saveId}] =================== 保存用户详细信息 ===================`);
+      const profileStartTime = Date.now();
+      
       await this.saveUserProfileFromUnified(userId, unifiedData);
-      console.log('✅ [SAVE_BASE_RESUME] 用户详细信息保存成功');
+      
+      const profileEndTime = Date.now();
+      const profileDuration = profileEndTime - profileStartTime;
+      
+      console.log(`👤 [${saveId}] 用户详细信息保存完成:`);
+      console.log(`👤 [${saveId}] - 保存耗时:`, profileDuration, 'ms');
+      console.log(`✅ [${saveId}] 用户详细信息保存成功`);
 
+      // 🔧 最终验证：检查保存结果
+      console.log(`🔍 [${saveId}] =================== 最终验证保存结果 ===================`);
+      const finalResume = await Resume.findById(savedResume.id);
+      
+      console.log(`🔍 [${saveId}] 最终简历验证:`);
+      console.log(`🔍 [${saveId}] - ID:`, finalResume.id);
+      console.log(`🔍 [${saveId}] - 标题:`, finalResume.title);
+      console.log(`🔍 [${saveId}] - content类型:`, typeof finalResume.content);
+      console.log(`🔍 [${saveId}] - content长度:`, (finalResume.content || '').length);
+      console.log(`🔍 [${saveId}] - unified_data类型:`, typeof finalResume.unified_data);
+      console.log(`🔍 [${saveId}] - resume_data类型:`, typeof finalResume.resume_data);
+      
+      // 尝试解析保存的数据
+      try {
+        const parsedUnifiedData = typeof finalResume.unified_data === 'string' 
+          ? JSON.parse(finalResume.unified_data) 
+          : finalResume.unified_data;
+        
+        console.log(`🔍 [${saveId}] unified_data解析成功:`);
+        console.log(`🔍 [${saveId}] - 姓名:`, parsedUnifiedData.profile?.name || '(空)');
+        console.log(`🔍 [${saveId}] - 手机:`, parsedUnifiedData.profile?.phone || '(空)');
+        console.log(`🔍 [${saveId}] - 邮箱:`, parsedUnifiedData.profile?.email || '(空)');
+        console.log(`🔍 [${saveId}] - 工作经历数量:`, parsedUnifiedData.workExperience?.length || 0);
+        console.log(`🔍 [${saveId}] - 教育经历数量:`, parsedUnifiedData.education?.length || 0);
+        console.log(`🔍 [${saveId}] - 技能数量:`, parsedUnifiedData.skills?.length || 0);
+        
+      } catch (parseError) {
+        console.error(`❌ [${saveId}] unified_data解析失败:`, parseError.message);
+        console.error(`❌ [${saveId}] 原始unified_data:`, finalResume.unified_data);
+      }
+
+      console.log(`🎯 [${saveId}] =================== 基础简历保存完成 ===================`);
       return savedResume;
+      
     } catch (error) {
-      console.error('❌ [SAVE_BASE_RESUME] 保存基础简历失败:', error.message);
+      console.error(`❌ [${saveId}] 保存基础简历失败:`);
+      console.error(`❌ [${saveId}] - 错误类型:`, error.constructor.name);
+      console.error(`❌ [${saveId}] - 错误信息:`, error.message);
+      console.error(`❌ [${saveId}] - 错误堆栈:`, error.stack);
       throw error;
     }
   }

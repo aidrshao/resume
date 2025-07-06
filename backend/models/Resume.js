@@ -252,6 +252,25 @@ class Resume {
       }
       
       console.log('📏 [RESUME_UPDATE] resume_data长度:', updateData.resume_data.length);
+      
+      // 🔧 关键修复：同时更新unified_data字段
+      try {
+        const resumeDataObj = typeof updateData.resume_data === 'string' 
+          ? JSON.parse(updateData.resume_data)
+          : updateData.resume_data;
+        
+        // 验证数据格式
+        const validation = validateUnifiedSchema(resumeDataObj);
+        if (validation.valid) {
+          updateData.unified_data = JSON.stringify(resumeDataObj);
+          updateData.schema_version = '2.1';
+          console.log('✅ [RESUME_UPDATE] unified_data已同步更新');
+        } else {
+          console.warn('⚠️ [RESUME_UPDATE] resume_data格式验证失败，跳过unified_data更新:', validation.error);
+        }
+      } catch (error) {
+        console.error('❌ [RESUME_UPDATE] 处理resume_data时发生错误:', error);
+      }
     }
 
     const [resume] = await knex('resumes')
@@ -364,15 +383,17 @@ class Resume {
     // 生成向后兼容的content字段
     content = unifiedData;
 
+    // 🔧 关键修复：确保前端收到的是JSON字符串格式
     const result = {
       ...resume,
-      unified_data: unifiedData,
-      content: content,
+      unified_data: JSON.stringify(unifiedData),  // 转换为JSON字符串
+      content: JSON.stringify(content),          // 转换为JSON字符串
       // 保持向后兼容
-      resume_data: unifiedData
+      resume_data: JSON.stringify(unifiedData)   // 转换为JSON字符串
     };
 
     console.log(`✅ [RESUME_MODEL] 数据处理完成 ID: ${resume.id}`);
+    console.log(`🔧 [RESUME_MODEL] 数据格式: unified_data=${typeof result.unified_data}, resume_data=${typeof result.resume_data}`);
     return result;
   }
 

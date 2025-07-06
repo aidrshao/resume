@@ -8,18 +8,40 @@ const AIPrompt = require('../models/AIPrompt');
 
 class AIService {
   constructor() {
-    // 使用成功验证的简化配置（移除timeout）
-    this.agictoClient = new OpenAI({
-      apiKey: process.env.AGICTO_API_KEY || "sk-NKLLp5aHrdNddfM5MXFuoagJXutv8QrPtMdnXy8oFEdTrAUk",
-      baseURL: "https://api.agicto.cn/v1"
-      // 移除timeout设置，使用默认值
+    // 🔧 修复的配置方案 - 使用OPENAI_API_KEY作为agicto.cn的密钥
+    this.hasAgictoKey = !!(process.env.OPENAI_API_KEY);
+    this.hasOpenaiKey = false; // 当前只使用agicto.cn代理服务
+    this.isDevelopment = process.env.NODE_ENV !== 'production';
+    
+    console.log('🤖 [AI_SERVICE] 初始化配置:', {
+      hasAgictoKey: this.hasAgictoKey,
+      hasOpenaiKey: this.hasOpenaiKey,
+      isDevelopment: this.isDevelopment,
+      environment: process.env.NODE_ENV || 'development'
     });
 
-    // 备用官方OpenAI客户端
-    this.openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY || "your-openai-api-key"
-      // 移除timeout设置，使用默认值
-    });
+    // agicto.cn代理客户端 - 使用OPENAI_API_KEY
+    if (this.hasAgictoKey) {
+      this.agictoClient = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY, // 🔧 使用OPENAI_API_KEY
+        baseURL: "https://api.agicto.cn/v1",
+        timeout: 300000, // 🔧 设置客户端超时为5分钟
+        maxRetries: 0 // 🔧 在客户端层面禁用重试，我们在上层处理重试
+      });
+      console.log('✅ [AI_SERVICE] agicto.cn客户端初始化成功，使用OPENAI_API_KEY');
+      console.log('⏰ [AI_SERVICE] agicto.cn客户端超时设置: 5分钟');
+    } else {
+      console.log('⚠️ [AI_SERVICE] 未配置OPENAI_API_KEY，将跳过agicto.cn服务');
+    }
+
+    // 🔧 暂时禁用官方OpenAI客户端，专注使用agicto.cn
+    console.log('ℹ️ [AI_SERVICE] 当前配置为仅使用agicto.cn代理服务');
+
+    // 🔧 如果没有配置API密钥，启用开发模式模拟
+    if (!this.hasAgictoKey) {
+      console.log('🚧 [AI_SERVICE] 无可用API密钥，启用开发模式模拟');
+      this.simulationMode = true;
+    }
   }
 
   /**
@@ -39,13 +61,16 @@ class AIService {
     console.log(`🚀 [AI_CALL] 模型: ${model}`);
     console.log(`🚀 [AI_CALL] 提示词长度: ${prompt.length} 字符`);
     
+    // 🔧 彻底禁用模拟模式，绝对不允许返回假数据
+    console.log(`🚀 [AI_CALL] 真实AI调用模式，不使用任何模拟数据`);
+    
     const defaultOptions = {
       temperature: 0.7,
       max_tokens: 4000,
-      timeout: parseInt(process.env.AI_TIMEOUT) || 120000, // 生产环境优化: 2分钟
-      maxRetries: parseInt(process.env.AI_MAX_RETRIES) || 2, // 最大重试次数
-      requestTimeout: parseInt(process.env.AI_REQUEST_TIMEOUT) || 90000, // 单次请求超时
-      connectionTimeout: parseInt(process.env.AI_CONNECTION_TIMEOUT) || 30000, // 连接超时
+      timeout: 300000, // 🔧 增加到300秒（5分钟），给复杂简历解析充足时间
+      maxRetries: 1, // 保持减少重试次数
+      requestTimeout: 240000, // 🔧 增加到240秒（4分钟），匹配AI调用时间
+      connectionTimeout: 30000, // 🔧 增加到30秒连接超时
       ...options
     };
 
@@ -54,197 +79,168 @@ class AIService {
       max_tokens: defaultOptions.max_tokens,
       timeout: defaultOptions.timeout + 'ms',
       requestTimeout: defaultOptions.requestTimeout + 'ms',
-      connectionTimeout: defaultOptions.connectionTimeout + 'ms',
       maxRetries: defaultOptions.maxRetries,
-      environment: process.env.NODE_ENV || 'development'
+      hasAgictoKey: this.hasAgictoKey,
+      hasOpenaiKey: this.hasOpenaiKey
     });
 
+    // 🔧 添加全局超时保护
+    const globalTimeout = new Promise((_, reject) => {
+      setTimeout(() => {
+        console.error(`⏰ [AI_CALL] 全局超时 (${defaultOptions.timeout}ms)，强制中断`);
+        reject(new Error(`AI调用全局超时 (${defaultOptions.timeout}ms)`));
+      }, defaultOptions.timeout);
+    });
+
+    try {
+      // 🔧 使用Promise.race确保全局超时生效
+      const result = await Promise.race([
+        this.performAIGeneration(prompt, model, defaultOptions, requestId),
+        globalTimeout
+      ]);
+
+      const totalDuration = Date.now() - startTime;
+      console.log(`✅ [AI_CALL] 成功完成，总耗时: ${totalDuration}ms`);
+      return result;
+
+    } catch (error) {
+      const failDuration = Date.now() - startTime;
+      console.error(`❌ [AI_CALL] 失败，耗时: ${failDuration}ms，错误: ${error.message}`);
+      
+      // 🔧 AI失败时必须报错，绝对不使用模拟数据
+      console.error(`❌ [AI_CALL] AI调用失败，拒绝返回模拟数据`);
+      throw error;
+    }
+  }
+
+  /**
+   * 执行AI生成（内部方法）
+   * @param {string} prompt - 提示词
+   * @param {string} model - 模型类型
+   * @param {Object} options - 配置选项
+   * @param {string} requestId - 请求ID
+   * @returns {Promise<string>} 生成结果
+   */
+  async performAIGeneration(prompt, model, options, requestId) {
     const errors = {};
     let attemptCount = 0;
 
-    // 重试机制包装器
-    const callWithRetry = async (apiCall, serviceName, maxRetries = defaultOptions.maxRetries) => {
+    // 强化的重试机制包装器
+    const callWithRetry = async (apiCall, serviceName, maxRetries = options.maxRetries) => {
       for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
         const attemptStartTime = Date.now();
         attemptCount++;
         
         try {
-          console.log(`🔄 [AI_CALL] ${serviceName} 第${attempt}次尝试 (总第${attemptCount}次)`);
+          console.log(`🔄 [AI_CALL] ${serviceName} 第${attempt}次尝试`);
           
-          const result = await apiCall();
+          // 🔧 为每次尝试添加超时控制
+          const attemptTimeout = new Promise((_, reject) => {
+            setTimeout(() => {
+              console.error(`⏰ [AI_CALL] ${serviceName} 第${attempt}次尝试超时`);
+              reject(new Error(`${serviceName} 调用超时`));
+            }, options.requestTimeout);
+          });
+
+          const result = await Promise.race([apiCall(), attemptTimeout]);
           
           const attemptDuration = Date.now() - attemptStartTime;
-          console.log(`✅ [AI_CALL] ${serviceName} 第${attempt}次尝试成功，耗时: ${attemptDuration}ms`);
+          console.log(`✅ [AI_CALL] ${serviceName} 成功，耗时: ${attemptDuration}ms`);
           
           return result;
           
         } catch (error) {
           const attemptDuration = Date.now() - attemptStartTime;
-          console.error(`❌ [AI_CALL] ${serviceName} 第${attempt}次尝试失败，耗时: ${attemptDuration}ms`);
-          console.error(`❌ [AI_CALL] 错误详情:`, error.message);
+          console.error(`❌ [AI_CALL] ${serviceName} 第${attempt}次失败，耗时: ${attemptDuration}ms`);
+          console.error(`❌ [AI_CALL] 错误:`, error.message);
           
           if (attempt === maxRetries + 1) {
-            throw error; // 最后一次尝试，直接抛出错误
+            throw error;
           }
           
-          // 指数退避重试延迟
-          const retryDelay = Math.min(1000 * Math.pow(2, attempt - 1), 10000);
-          console.log(`⏳ [AI_CALL] ${serviceName} ${retryDelay}ms后重试...`);
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          // 🔧 快速重试，不等待
+          console.log(`🔄 [AI_CALL] ${serviceName} 立即重试第${attempt + 1}次...`);
         }
       }
     };
 
     // === 优先使用agicto.cn代理服务 ===
-    try {
-      console.log(`🎯 [AI_CALL] 步骤1: 尝试agicto.cn代理服务`);
-      const agictoStartTime = Date.now();
-      
-      let primaryModel;
-      if (model === 'deepseek') {
-        primaryModel = 'deepseek-v3';
-      } else if (model === 'gpt') {
-        primaryModel = 'gpt-4o-2024-11-20';
-      } else {
-        throw new Error(`不支持的模型类型: ${model}`);
-      }
+    if (this.hasAgictoKey) {
+      try {
+        console.log(`🎯 [AI_CALL] 步骤1: 尝试agicto.cn代理服务`);
+        
+        let primaryModel;
+        if (model === 'deepseek') {
+          primaryModel = 'deepseek-v3';
+        } else if (model === 'gpt') {
+          primaryModel = 'gpt-4o-2024-11-20';
+        } else {
+          throw new Error(`不支持的模型类型: ${model}`);
+        }
 
-      console.log(`🎯 [AI_CALL] 使用模型: ${primaryModel}`);
+        console.log(`🎯 [AI_CALL] 使用模型: ${primaryModel}`);
 
-      const result = await callWithRetry(async () => {
-        // 使用Promise.race实现超时控制
-        const apiPromise = this.agictoClient.chat.completions.create({
-          messages: [
-            {
-              role: "user",
-              content: prompt
+        const result = await callWithRetry(async () => {
+          const controller = new AbortController();
+          // 🔧 移除提前中断逻辑，让SDK的timeout自然处理超时
+          // const timeoutId = setTimeout(() => {
+          //   console.warn(`⏰ [AI_CALL] agicto API调用即将超时，发送中断信号`);
+          //   controller.abort();
+          // }, options.requestTimeout - 2000);
+          
+          try {
+            const response = await this.agictoClient.chat.completions.create({
+              messages: [{ role: "user", content: prompt }],
+              model: primaryModel,
+              temperature: options.temperature,
+              max_tokens: options.max_tokens
+            }, { 
+              signal: controller.signal,
+              timeout: options.requestTimeout // 🔧 修复：使用完整的请求超时时间，不是连接超时
+            });
+
+            // clearTimeout(timeoutId); // 🔧 已移除timeout，无需清理
+
+            // 🔧 优先检查错误字段
+            if (response.error) {
+              const errorMsg = response.error.message || 'API返回未知错误';
+              if (errorMsg.includes('key from the platform')) {
+                throw new Error(`API密钥无效: ${errorMsg}`);
+              } else {
+                throw new Error(`agicto API错误: ${errorMsg}`);
+              }
             }
-          ],
-          model: primaryModel,
-          temperature: defaultOptions.temperature,
-          max_tokens: defaultOptions.max_tokens
-        });
 
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`agicto API超时 (${defaultOptions.timeout}ms)`)), defaultOptions.timeout);
-        });
+            if (!response.choices || response.choices.length === 0) {
+              throw new Error('agicto API返回空响应（无choices字段）');
+            }
 
-        const response = await Promise.race([apiPromise, timeoutPromise]);
+            return response.choices[0].message.content;
+          } catch (error) {
+            // clearTimeout(timeoutId); // 🔧 已移除timeout，无需清理
+            // 🔧 增强错误处理
+            if (error.name === 'AbortError') {
+              throw new Error('agicto API调用被中断');
+            }
+            throw error;
+          }
+        }, 'agicto', options.maxRetries);
 
-        // 验证响应
-        if (response.error) {
-          throw new Error(`agicto API错误: ${response.error.message}`);
-        }
-
-        if (!response.choices || response.choices.length === 0) {
-          throw new Error('agicto API返回空响应');
-        }
-
-        return response.choices[0].message.content;
-      }, 'agicto', defaultOptions.maxRetries);
-
-      const agictoDuration = Date.now() - agictoStartTime;
-      const totalDuration = Date.now() - startTime;
-      
-      console.log(`✅ [AI_CALL] agicto.cn调用成功！`);
-      console.log(`⏱️ [AI_PERFORMANCE] 性能统计:`);
-      console.log(`  - agicto调用耗时: ${agictoDuration}ms`);
-      console.log(`  - 总耗时: ${totalDuration}ms`);
-      console.log(`  - 尝试次数: ${attemptCount}`);
-      console.log(`  - 响应长度: ${result.length} 字符`);
-      console.log(`  - 平均速度: ${(result.length / (totalDuration / 1000)).toFixed(1)} 字符/秒`);
-
-      return result;
-      
-    } catch (agictoError) {
-      const agictoFailDuration = Date.now() - startTime;
-      errors.agicto = `agicto失败 (${agictoFailDuration}ms): ${agictoError.message}`;
-      console.warn(`⚠️ [AI_CALL] agicto.cn代理失败，耗时: ${agictoFailDuration}ms`);
-      console.warn(`⚠️ [AI_CALL] 错误: ${agictoError.message}`);
-      console.warn(`⚠️ [AI_CALL] 切换到官方OpenAI API...`);
+        return result;
+        
+      } catch (agictoError) {
+        errors.agicto = `agicto失败: ${agictoError.message}`;
+        console.warn(`⚠️ [AI_CALL] agicto.cn失败: ${agictoError.message}`);
+      }
     }
 
-    // === 备用: 官方OpenAI API ===
-    try {
-      console.log(`🔄 [AI_CALL] 步骤2: 尝试官方OpenAI API备用服务`);
-      const openaiStartTime = Date.now();
-      
-      let fallbackModel;
-      if (model === 'deepseek') {
-        fallbackModel = 'gpt-3.5-turbo'; // DeepSeek使用gpt-3.5-turbo作为备用
-      } else if (model === 'gpt') {
-        fallbackModel = 'gpt-4o'; // GPT使用gpt-4o
-      }
-
-      console.log(`🔄 [AI_CALL] 备用模型: ${fallbackModel}`);
-
-      const result = await callWithRetry(async () => {
-        // 增加官方API的超时时间
-        const extendedTimeout = defaultOptions.timeout * 1.5;
-        
-        const apiPromise = this.openaiClient.chat.completions.create({
-          messages: [
-            {
-              role: "user",
-              content: prompt
-            }
-          ],
-          model: fallbackModel,
-          temperature: defaultOptions.temperature,
-          max_tokens: defaultOptions.max_tokens
-        });
-
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error(`OpenAI API超时 (${extendedTimeout}ms)`)), extendedTimeout);
-        });
-
-        const response = await Promise.race([apiPromise, timeoutPromise]);
-
-        if (!response.choices || response.choices.length === 0) {
-          throw new Error('OpenAI API返回空响应');
-        }
-
-        return response.choices[0].message.content;
-      }, 'OpenAI', Math.max(1, defaultOptions.maxRetries - 1)); // 备用API减少重试次数
-
-      const openaiDuration = Date.now() - openaiStartTime;
-      const totalDuration = Date.now() - startTime;
-      
-      console.log(`✅ [AI_CALL] 官方OpenAI API调用成功！`);
-      console.log(`⏱️ [AI_PERFORMANCE] 性能统计:`);
-      console.log(`  - OpenAI调用耗时: ${openaiDuration}ms`);
-      console.log(`  - 总耗时(含agicto失败): ${totalDuration}ms`);
-      console.log(`  - 总尝试次数: ${attemptCount}`);
-      console.log(`  - 响应长度: ${result.length} 字符`);
-      console.log(`  - 平均速度: ${(result.length / (totalDuration / 1000)).toFixed(1)} 字符/秒`);
-
-      return result;
-        
-    } catch (openaiError) {
-      const openaiFailDuration = Date.now() - startTime;
-      errors.openai = `OpenAI失败 (${openaiFailDuration}ms): ${openaiError.message}`;
-      console.error(`❌ [AI_CALL] 官方OpenAI API失败，耗时: ${openaiFailDuration}ms`);
-      console.error(`❌ [AI_CALL] 错误: ${openaiError.message}`);
-    }
-
-    // === 所有API都失败 ===
-    const totalFailDuration = Date.now() - startTime;
-    console.error(`❌ [AI_CALL] 所有AI服务都失败！`);
-    console.error(`❌ [AI_CALL] 总耗时: ${totalFailDuration}ms`);
-    console.error(`❌ [AI_CALL] 总尝试次数: ${attemptCount}`);
+    // === 完全失败 ===
+    console.error(`❌ [AI_CALL] agicto.cn AI服务失败`);
     console.error(`❌ [AI_CALL] 错误汇总:`, errors);
     
-    // 根据错误类型构造更友好的错误信息
-    let userFriendlyError = 'AI服务暂时不可用';
-    if (Object.values(errors).some(err => err.includes('超时'))) {
-      userFriendlyError = `AI处理超时 (总耗时${(totalFailDuration/1000).toFixed(1)}秒)，请稍后重试或简化输入内容`;
-    } else if (Object.values(errors).some(err => err.includes('网络'))) {
-      userFriendlyError = 'AI服务网络连接异常，请检查网络连接后重试';
-    } else if (Object.values(errors).some(err => err.includes('quota') || err.includes('limit'))) {
-      userFriendlyError = 'AI服务配额不足，请联系管理员';
-    }
-    
-    throw new Error(`${userFriendlyError}。详细错误: agicto(${errors.agicto}) + openai(${errors.openai})`);
+    // 🔧 修复：移除开发环境下的错误降级逻辑，让AI失败时正确报错
+    console.error(`❌ [AI_CALL] AI调用失败，不使用模拟数据掩盖错误`);
+    throw new Error(`agicto.cn AI服务不可用: ${JSON.stringify(errors)}`);
   }
 
   /**

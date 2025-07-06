@@ -1,24 +1,28 @@
+邵俊的简历
 
-张三
-软件工程师
-电话：138-0000-0000
-邮箱：zhangsan@example.com
+个人信息：
+姓名：邵俊
+邮箱：shaojun@example.com
+电话：13800138000
+地址：上海市浦东新区
 
-工作经历：
-2020-2023 ABC科技公司 高级软件工程师
-- 负责前端开发和架构设计
-- 使用React、Node.js开发企业级应用
-- 团队协作，提升项目交付效率30%
+工作经验：
+2022-2024  高级软件工程师  ABC科技公司
+- 负责前端开发和系统架构设计
+- 使用React和Node.js开发企业级应用
+- 带领5人团队完成多个项目
 
-2018-2020 XYZ公司 软件工程师
-- 参与多个项目的开发和维护
-- 掌握Java、Python等编程语言
+2020-2022  软件工程师  XYZ互联网公司
+- 参与产品开发和维护
+- 优化系统性能，提升用户体验
 
 教育背景：
-2014-2018 北京大学 计算机科学与技术 本科
+2016-2020  计算机科学与技术学士  上海大学
 
 技能：
-- 编程语言：JavaScript, Python, Java
-- 前端框架：React, Vue.js
-- 后端技术：Node.js, Express
-- 数据库：MySQL, MongoDB
+- JavaScript、TypeScript、React、Node.js
+- Python、Java、PostgreSQL、MongoDB
+- Docker、Kubernetes、AWS云服务
+
+项目经验：
+简历管理系统 - 使用React和Node.js开发的在线简历管理平台 

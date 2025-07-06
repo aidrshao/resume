@@ -30,6 +30,9 @@ import MembershipPage from './components/MembershipPage';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 import ResumePreviewPage from './components/ResumePreviewPage';
 import TemplateTestPage from './components/TemplateTestPage';
+// V2版本组件
+import NewResumeUploaderTestPage from './components/NewResumeUploaderTestPage';
+import ResumeReviewPageV2 from './components/ResumeReviewPageV2';
 
 
 /**
@@ -104,6 +107,18 @@ function App() {
           {/* 模板测试页面 - 用于开发测试 */}
           <Route path="/template-test" element={<TemplateTestPage />} />
           
+          {/* V2版本简历上传测试页面 */}
+          <Route path="/resumes/upload-v2" element={<NewResumeUploaderTestPage />} />
+          
+          {/* V2版本简历审核页面 - 需要认证 */}
+          <Route 
+            path="/resumes/v2/review/:taskId" 
+            element={
+              <ProtectedRoute>
+                <ResumeReviewPageV2 />
+              </ProtectedRoute>
+            } 
+          />
           
           {/* 管理员路由 */}
           <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
