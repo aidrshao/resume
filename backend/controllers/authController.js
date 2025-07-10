@@ -124,8 +124,9 @@ const sendVerificationCode = async (req, res) => {
 
     // 生成验证码
     console.log('🔍 [SEND_CODE] 生成验证码...');
+    let code;
     try {
-      const code = emailService.generateCode();
+      code = emailService.generateCode();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟后过期
       console.log(`✅ [SEND_CODE] 验证码生成成功: ${code}, 过期时间: ${expiresAt}`);
 
