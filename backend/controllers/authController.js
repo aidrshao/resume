@@ -36,99 +36,156 @@ const sendVerificationCode = async (req, res) => {
     }
 
     // 验证邮箱格式
-    if (!emailService.constructor.isValidEmail(email)) {
-      return res.status(400).json({
-        success: false,
-        message: '邮箱格式不正确'
-      });
+    console.log('🔍 [SEND_CODE] 开始验证邮箱格式...');
+    try {
+      if (!emailService.constructor.isValidEmail(email)) {
+        console.error('❌ [SEND_CODE] 邮箱格式不正确:', email);
+        return res.status(400).json({
+          success: false,
+          message: '邮箱格式不正确'
+        });
+      }
+      console.log('✅ [SEND_CODE] 邮箱格式验证通过');
+    } catch (emailValidationError) {
+      console.error('❌ [SEND_CODE] 邮箱格式验证异常:', emailValidationError);
+      throw emailValidationError;
     }
 
     // 验证类型
     const validTypes = ['register', 'login', 'reset_password'];
     if (!validTypes.includes(type)) {
+      console.error('❌ [SEND_CODE] 验证码类型不正确:', type);
       return res.status(400).json({
         success: false,
         message: '验证码类型不正确'
       });
     }
+    console.log('✅ [SEND_CODE] 验证码类型验证通过');
 
     // 检查是否频繁发送验证码（1分钟内不能重复发送）
-    const recentCode = await EmailVerification.getRecentCode(email, type, 1);
-    if (recentCode) {
-      return res.status(429).json({
-        success: false,
-        message: '验证码发送过于频繁，请1分钟后再试'
-      });
+    console.log('🔍 [SEND_CODE] 检查频率限制...');
+    try {
+      const recentCode = await EmailVerification.getRecentCode(email, type, 1);
+      if (recentCode) {
+        console.warn('⚠️ [SEND_CODE] 验证码发送过于频繁:', { email, type });
+        return res.status(429).json({
+          success: false,
+          message: '验证码发送过于频繁，请1分钟后再试'
+        });
+      }
+      console.log('✅ [SEND_CODE] 频率限制检查通过');
+    } catch (frequencyCheckError) {
+      console.error('❌ [SEND_CODE] 频率限制检查异常:', frequencyCheckError);
+      throw frequencyCheckError;
     }
 
     // 根据类型进行特殊检查
-    if (type === 'register') {
-      // 注册时检查邮箱是否已存在
-      const existingUser = await User.findByEmail(email);
-      if (existingUser) {
-        return res.status(400).json({
-          success: false,
-          message: '该邮箱已被注册'
-        });
+    console.log('🔍 [SEND_CODE] 开始类型特殊检查...');
+    try {
+      if (type === 'register') {
+        console.log('🔍 [SEND_CODE] 注册类型：检查邮箱是否已存在...');
+        // 注册时检查邮箱是否已存在
+        const existingUser = await User.findByEmail(email);
+        if (existingUser) {
+          console.warn('⚠️ [SEND_CODE] 邮箱已被注册:', email);
+          return res.status(400).json({
+            success: false,
+            message: '该邮箱已被注册'
+          });
+        }
+        console.log('✅ [SEND_CODE] 邮箱可用于注册');
+      } else if (type === 'login' || type === 'reset_password') {
+        console.log('🔍 [SEND_CODE] 登录/重置类型：检查邮箱是否存在...');
+        // 登录或重置密码时检查邮箱是否存在
+        const user = await User.findByEmail(email);
+        if (!user) {
+          console.warn('⚠️ [SEND_CODE] 邮箱未注册:', email);
+          return res.status(400).json({
+            success: false,
+            message: '该邮箱未注册'
+          });
+        }
+        console.log('✅ [SEND_CODE] 邮箱存在，可以发送验证码');
       }
-    } else if (type === 'login' || type === 'reset_password') {
-      // 登录或重置密码时检查邮箱是否存在
-      const user = await User.findByEmail(email);
-      if (!user) {
-        return res.status(400).json({
-          success: false,
-          message: '该邮箱未注册'
-        });
-      }
+    } catch (userCheckError) {
+      console.error('❌ [SEND_CODE] 用户检查异常:', userCheckError);
+      throw userCheckError;
     }
 
     // 删除该邮箱之前未使用的验证码
-    await EmailVerification.deleteOldCodes(email, type);
+    console.log('🔍 [SEND_CODE] 清理旧验证码...');
+    try {
+      await EmailVerification.deleteOldCodes(email, type);
+      console.log('✅ [SEND_CODE] 旧验证码清理完成');
+    } catch (deleteOldCodesError) {
+      console.error('❌ [SEND_CODE] 清理旧验证码异常:', deleteOldCodesError);
+      throw deleteOldCodesError;
+    }
 
     // 生成验证码
-    const code = emailService.generateCode();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟后过期
+    console.log('🔍 [SEND_CODE] 生成验证码...');
+    try {
+      const code = emailService.generateCode();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10分钟后过期
+      console.log(`✅ [SEND_CODE] 验证码生成成功: ${code}, 过期时间: ${expiresAt}`);
 
-    // 存储验证码到数据库
-    await EmailVerification.create({
-      email,
-      code,
-      type,
-      expires_at: expiresAt
-    });
-
-    console.log(`💾 [SEND_CODE] 验证码已存储到数据库: ${code}, 过期时间: ${expiresAt}`);
+      // 存储验证码到数据库
+      console.log('🔍 [SEND_CODE] 存储验证码到数据库...');
+      await EmailVerification.create({
+        email,
+        code,
+        type,
+        expires_at: expiresAt
+      });
+      console.log(`💾 [SEND_CODE] 验证码已存储到数据库: ${code}, 过期时间: ${expiresAt}`);
+    } catch (codeGenerationError) {
+      console.error('❌ [SEND_CODE] 验证码生成或存储异常:', codeGenerationError);
+      throw codeGenerationError;
+    }
 
     // 发送验证码邮件
-    const emailResult = await emailService.sendVerificationCode(email, code, type);
+    console.log('🔍 [SEND_CODE] 发送验证码邮件...');
+    try {
+      const emailResult = await emailService.sendVerificationCode(email, code, type);
+      console.log('📧 [SEND_CODE] 邮件发送结果:', emailResult);
 
-    if (emailResult.success) {
-      console.log(`✅ [SEND_CODE] 验证码发送成功: ${email}`);
-      res.json({
-        success: true,
-        message: '验证码已发送到您的邮箱，请注意查收（有效期10分钟）',
-        data: {
-          email,
-          type,
-          expires_in: 600 // 秒
-        }
-      });
-    } else {
-      console.error(`❌ [SEND_CODE] 邮件发送失败: ${emailResult.error}`);
-      res.status(500).json({
-        success: false,
-        message: emailResult.error || '验证码发送失败，请稍后重试'
-      });
+      if (emailResult.success) {
+        console.log(`✅ [SEND_CODE] 验证码发送成功: ${email}`);
+        res.json({
+          success: true,
+          message: '验证码已发送到您的邮箱，请注意查收（有效期10分钟）',
+          data: {
+            email,
+            type,
+            expires_in: 600 // 秒
+          }
+        });
+      } else {
+        console.error(`❌ [SEND_CODE] 邮件发送失败: ${emailResult.error}`);
+        res.status(500).json({
+          success: false,
+          message: emailResult.error || '验证码发送失败，请稍后重试'
+        });
+      }
+    } catch (emailSendError) {
+      console.error('❌ [SEND_CODE] 邮件发送异常:', emailSendError);
+      throw emailSendError;
     }
 
   } catch (error) {
-    console.error('❌ [SEND_CODE] 发送验证码错误:', error);
-    console.error('❌ [SEND_CODE] 错误名称:', error.name);
-    console.error('❌ [SEND_CODE] 错误消息:', error.message);
-    console.error('❌ [SEND_CODE] 错误堆栈:', error.stack);
+    console.error('💥 [SEND_CODE] ==> 发送验证码严重错误');
+    console.error('💥 [SEND_CODE] 错误名称:', error.name);
+    console.error('💥 [SEND_CODE] 错误消息:', error.message);
+    console.error('💥 [SEND_CODE] 错误堆栈:', error.stack);
+    console.error('💥 [SEND_CODE] 请求参数:', req.body);
+    console.error('💥 [SEND_CODE] 请求ID:', req.requestId);
+    
     res.status(500).json({
       success: false,
       message: '服务器内部错误',
+      error_code: 'SEND_CODE_ERROR',
+      request_id: req.requestId,
+      timestamp: new Date().toISOString(),
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
