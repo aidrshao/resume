@@ -28,7 +28,7 @@ module.exports = {
     min_uptime: '10s',
     max_memory_restart: '500M',
     
-    // 环境变量
+    // 环境变量 - 强制使用8000端口
     env: {
       NODE_ENV: 'development',
       PORT: 8000

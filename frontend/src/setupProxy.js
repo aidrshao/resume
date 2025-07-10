@@ -12,16 +12,16 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:8001',
+      target: 'http://localhost:8000',
       changeOrigin: true,
       logLevel: 'info',
       onProxyReq: (proxyReq, req, res) => {
-        console.log('🔄 [PROXY] 代理请求:', req.method, req.path, '-> http://localhost:8001');
+        console.log('🔄 [PROXY] 代理请求:', req.method, req.path, '-> http://localhost:8000');
       },
       onError: (err, req, res) => {
         console.error('❌ [PROXY] 代理错误:', err.message);
         console.error('❌ [PROXY] 请求路径:', req.method, req.path);
-        console.error('❌ [PROXY] 请确保后端服务运行在 http://localhost:8001');
+        console.error('❌ [PROXY] 请确保后端服务运行在 http://localhost:8000');
       }
     })
   );
