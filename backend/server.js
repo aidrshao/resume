@@ -32,6 +32,8 @@ app.use(cors({
     'http://localhost:3017',
     'http://cv.juncaishe.com',
     'https://cv.juncaishe.com',
+    'http://resume.juncaishe.com',
+    'https://resume.juncaishe.com',
     process.env.FRONTEND_URL
   ].filter(Boolean),
   credentials: true
