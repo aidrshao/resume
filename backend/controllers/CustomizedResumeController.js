@@ -219,6 +219,8 @@ class CustomizedResumeController {
         targetPosition: targetJob.title || '',
         jobDescription: targetJob.description || '',
         resumeData: JSON.stringify(resumeData, null, 2),
+        baseResumeData: JSON.stringify(resumeData, null, 2),
+        preAnalyzedInfo: '',
         userRequirements: ''
       };
       
@@ -351,6 +353,18 @@ class CustomizedResumeController {
           success: false,
           message: 'AI响应格式错误，无法解析为有效的JSON格式'
         });
+      }
+      
+      // ===== 验证并修复优化后的数据 =====
+      const { validateUnifiedSchema: validate, EMPTY_UNIFIED_RESUME } = require('../schemas/schema');
+      let validationResult = validate(optimizedData);
+      if (!validationResult.valid && validationResult.error.includes('profile')) {
+        console.warn('⚠️ [CUSTOMIZE_RESUME] optimizedData 缺少 profile 字段，自动补充空模板');
+        optimizedData.profile = { ...EMPTY_UNIFIED_RESUME.profile };
+        validationResult = validate(optimizedData);
+      }
+      if (!validationResult.valid) {
+        throw new Error('优化后数据格式仍不合法: ' + validationResult.error);
       }
       
       const aiDuration = Date.now() - aiStartTime;
