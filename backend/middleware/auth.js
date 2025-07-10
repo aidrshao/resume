@@ -84,7 +84,7 @@ const authenticateToken = (req, res, next) => {
     console.error('❌ [AUTH_MIDDLEWARE] 最终错误代码:', errorCode);
     console.error('❌ [AUTH_MIDDLEWARE] 最终错误消息:', errorMessage);
     
-    return res.status(403).json({
+    return res.status(401).json({
       success: false,
       message: errorMessage,
       error_code: errorCode,

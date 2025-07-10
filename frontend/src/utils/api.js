@@ -114,9 +114,18 @@ api.interceptors.response.use(
         url: error.config?.url
       });
       
-      // 处理401未授权错误
-      if (error.response.status === 401) {
-        logger.auth('检测到401错误，清除认证信息', { url: error.config?.url });
+      // 处理未授权/令牌无效错误
+      const status = error.response.status;
+      const errCode = error.response.data?.error_code;
+      if (
+        status === 401 ||
+        (status === 403 && ['TOKEN_MALFORMED', 'TOKEN_INVALID', 'TOKEN_EXPIRED'].includes(errCode))
+      ) {
+        logger.auth('检测到鉴权失败，清除认证信息', {
+          url: error.config?.url,
+          status,
+          errorCode: errCode
+        });
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
