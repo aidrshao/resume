@@ -24,7 +24,7 @@ const shouldAutoSetup = process.env.AUTO_SETUP !== 'false';
 const app = express();
 const PORT = process.env.PORT || 8000;
 
-// 中间件配置
+// CORS配置
 app.use(cors({
   origin: [
     'http://localhost:3000',
@@ -36,8 +36,35 @@ app.use(cors({
     'https://resume.juncaishe.com',
     process.env.FRONTEND_URL
   ].filter(Boolean),
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
+
+// 详细的请求日志中间件
+app.use((req, res, next) => {
+  const timestamp = new Date().toISOString();
+  const origin = req.get('Origin') || 'no-origin';
+  const userAgent = req.get('User-Agent') || 'no-user-agent';
+  
+  console.log(`🔍 [${timestamp}] ${req.method} ${req.url} from ${origin}`);
+  console.log(`   Headers: ${JSON.stringify({
+    'user-agent': userAgent.substring(0, 100),
+    'origin': origin,
+    'referer': req.get('Referer'),
+    'authorization': req.get('Authorization') ? 'Bearer ***' : 'none'
+  }, null, 2)}`);
+  
+  // 记录响应
+  const originalSend = res.send;
+  res.send = function(data) {
+    console.log(`✅ [${timestamp}] Response ${res.statusCode} for ${req.method} ${req.url}`);
+    originalSend.call(this, data);
+  };
+  
+  next();
+});
+
+// 中间件配置
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
