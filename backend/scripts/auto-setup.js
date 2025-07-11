@@ -71,7 +71,25 @@ async function autoSetup() {
     // 运行种子数据
     console.log('🌱 插入种子数据...');
     await runCommand('npm', ['run', 'seed']);
-    
+
+    // ===== 新增：保证 templates 表存在 =====
+    console.log('🔍 [AUTO_SETUP] 验证 templates 表是否存在...');
+    const knexLib = require('knex');
+    const knexConf = require('../knexfile');
+    const currentEnv = process.env.NODE_ENV || 'development';
+    const db = knexLib(knexConf[currentEnv]);
+    const hasTemplatesTable = await db.schema.hasTable('templates');
+
+    if (!hasTemplatesTable) {
+      console.log('⚠️  [AUTO_SETUP] templates 表不存在，重新执行数据库迁移...');
+      // 再次执行迁移以确保新加入的迁移文件被应用
+      await runCommand('npx', ['knex', 'migrate:latest']);
+    } else {
+      console.log('✅ [AUTO_SETUP] templates 表已存在');
+    }
+    await db.destroy();
+    // ===== 新增结束 =====
+
     console.log('✅ 自动化设置完成!');
     console.log('🎉 数据库迁移和种子数据已就绪');
     
