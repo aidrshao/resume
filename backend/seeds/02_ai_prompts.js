@@ -4,11 +4,10 @@
  */
 
 exports.seed = async function(knex) {
-  // 删除现有数据
-  await knex('ai_prompts').del();
+  // 幂等处理：不再删除全部数据，改为按需插入
 
-  // 插入新的提示词数据
-  await knex('ai_prompts').insert([
+  // 定义提示词数据列表
+  const prompts = [
     {
       id: 1,
       name: '简历优化器',
@@ -338,7 +337,15 @@ exports.seed = async function(knex) {
       }),
       is_active: true
     }
-  ]);
+  ];
 
-  console.log('✅ AI提示词种子数据插入完成');
+  // 幂等插入：如已存在相同 key 的提示词则跳过
+  for (const p of prompts) {
+    const exists = await knex('ai_prompts').where({ key: p.key }).first();
+    if (!exists) {
+      await knex('ai_prompts').insert(p);
+    }
+  }
+
+  console.log('✅ [SEED] ai_prompts 已同步 (幂等)');
 }; 

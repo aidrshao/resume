@@ -5,11 +5,10 @@
  */
 
 exports.seed = async function(knex) {
-  // 删除现有数据
-  await knex('templates').del();
+  // 幂等处理：不再删除全部数据，改为按需插入
 
-  // 插入模板数据
-  await knex('templates').insert([
+  // 定义模板数据列表
+  const templates = [
     {
       id: 1,
       name: '简洁蓝色',
@@ -255,5 +254,15 @@ h2 {
     }
 }`,
     }
-  ]);
+  ];
+
+  // 幂等插入：以 name 唯一检查
+  for (const tpl of templates) {
+    const exists = await knex('templates').where({ name: tpl.name }).first();
+    if (!exists) {
+      await knex('templates').insert(tpl);
+    }
+  }
+
+  console.log('✅ [SEED] templates 已同步 (幂等)');
 }; 

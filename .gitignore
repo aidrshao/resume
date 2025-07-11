@@ -236,4 +236,4 @@ deploy-clean.sh
 EMERGENCY-*.md
 *问题解决方案.md
 diagnose-*.js
-deploy_1.sh
+deploy_setup.sh

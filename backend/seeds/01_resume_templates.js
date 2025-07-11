@@ -4,11 +4,10 @@
  */
 
 exports.seed = async function(knex) {
-  // 清空现有数据
-  await knex('resume_templates').del();
+  // 幂等处理：不再删除全部数据，改为按需插入
   
-  // 插入模板数据
-  await knex('resume_templates').insert([
+  // 定义模板数据列表
+  const templates = [
     {
       id: 1,
       name: '经典商务',
@@ -154,5 +153,15 @@ exports.seed = async function(knex) {
       created_at: new Date(),
       updated_at: new Date()
     }
-  ]);
+  ];
+
+  // 幂等插入：如已存在相同 name 的模板则跳过
+  for (const tpl of templates) {
+    const exists = await knex('resume_templates').where({ name: tpl.name }).first();
+    if (!exists) {
+      await knex('resume_templates').insert(tpl);
+    }
+  }
+
+  console.log('✅ [SEED] resume_templates 已同步 (幂等)');
 }; 

@@ -4,11 +4,10 @@
  */
 
 exports.seed = async function(knex) {
-  // 清空现有数据
-  await knex('global_quota_configs').del();
+  // 幂等处理：不再删除全部数据，按需插入
 
-  // 插入默认配额配置
-  await knex('global_quota_configs').insert([
+  // 定义默认配额配置
+  const configs = [
     {
       config_key: 'new_user_ai_resume_quota',
       config_name: '新用户AI简历生成配额',
@@ -137,7 +136,15 @@ exports.seed = async function(knex) {
         description_detail: '游客用户可免费体验1次AI简历生成'
       })
     }
-  ]);
+  ];
 
-  console.log('✅ 全局配额配置种子数据已插入');
+  // 幂等插入：根据 config_key 唯一检查
+  for (const cfg of configs) {
+    const exists = await knex('global_quota_configs').where({ config_key: cfg.config_key }).first();
+    if (!exists) {
+      await knex('global_quota_configs').insert(cfg);
+    }
+  }
+
+  console.log('✅ [SEED] global_quota_configs 已同步 (幂等)');
 }; 
