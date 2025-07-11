@@ -423,12 +423,6 @@ const JobsPage = () => {
               >
                 简历管理
               </Link>
-              <Link
-                to="/ai-chat"
-                className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors"
-              >
-                AI问答创建
-              </Link>
             </div>
           </div>
         </div>

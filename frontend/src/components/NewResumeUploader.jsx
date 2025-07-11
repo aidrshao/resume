@@ -8,6 +8,101 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { parseResumeV2, getTaskStatusV2, getTaskResultV2 } from '../utils/api';
 
+/**
+ * ----------  新增通用 SVG 图标 & 环形进度条 ----------
+ * 说明：仅用于视觉展示，不影响业务逻辑。
+ */
+
+const UploadCloudIcon = ({ className = '' }) => (
+  <svg
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.5}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+    />
+  </svg>
+);
+
+const CheckCircleIcon = ({ className = '' }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+const ExclamationCircleIcon = ({ className = '' }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+    <path
+      fillRule="evenodd"
+      d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
+// 环形进度条
+const CircularProgress = ({ progress = 0, status = 'processing' }) => {
+  const radius = 56;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (progress / 100) * circumference;
+
+  const colorClasses = {
+    processing: 'text-indigo-600',
+    completed: 'text-green-500',
+    failed: 'text-red-500',
+  };
+
+  return (
+    <div className="relative w-32 h-32">
+      <svg className="w-full h-full" viewBox="0 0 120 120">
+        <circle
+          className="text-gray-200"
+          strokeWidth="8"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx="60"
+          cy="60"
+        />
+        <circle
+          className={colorClasses[status] || 'text-indigo-600'}
+          strokeWidth="8"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx="60"
+          cy="60"
+          style={{
+            transition: 'stroke-dashoffset 0.35s',
+            transform: 'rotate(-90deg)',
+            transformOrigin: 'center',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {status === 'completed' && <CheckCircleIcon className="w-16 h-16 text-green-500" />}
+        {status === 'failed' && <ExclamationCircleIcon className="w-16 h-16 text-red-500" />}
+        {status === 'processing' && (
+          <span className="text-2xl font-bold text-gray-700">{Math.round(progress)}%</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const NewResumeUploader = ({ onComplete, className = '' }) => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -293,10 +388,21 @@ const NewResumeUploader = ({ onComplete, className = '' }) => {
         return;
       }
 
-      // 其他错误停止轮询
-      clearPolling();
-      setStatus('failed');
-      setError('状态查询失败，请刷新页面重试');
+      // 🔧 改进：对于临时错误，继续轮询而不是立即停止
+      if (error.response?.status === 500 || error.response?.status === 502 || error.response?.status === 503) {
+        console.log('⚠️ [NEW_UPLOADER] 服务器临时错误，继续轮询...');
+        return;
+      }
+
+      // 只有在确定是永久性错误时才停止轮询
+      if (error.response?.status === 404 || error.response?.status === 403) {
+        clearPolling();
+        setStatus('failed');
+        setError('任务不存在或无权访问');
+      } else {
+        // 其他未知错误，记录但继续轮询
+        console.log('⚠️ [NEW_UPLOADER] 未知错误，继续轮询...', error.message);
+      }
     }
   };
 
@@ -473,177 +579,78 @@ const NewResumeUploader = ({ onComplete, className = '' }) => {
   const isCompleted = status === 'completed';
   const hasFailed = status === 'failed' || error;
 
-  return (
-    <div className={`new-resume-uploader ${className}`}>
-      {/* 主上传区域 */}
-      <div
-        className={`
-          relative border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200
-          ${styles.borderColor} ${styles.bgColor}
-          ${!isProcessing && !isCompleted && !hasFailed ? 'hover:border-blue-400 hover:bg-blue-50 cursor-pointer' : ''}
-          ${isDragOver ? 'border-blue-400 bg-blue-100' : ''}
-        `}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
-        onClick={!isProcessing && !isCompleted ? triggerFileSelect : undefined}
-      >
-        {/* 隐藏的文件输入 */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".pdf,.doc,.docx,.txt"
-          onChange={handleFileInputChange}
-          className="hidden"
-          disabled={isProcessing || isCompleted}
-        />
+  const displayProgress = getCurrentProgress();
 
-        {/* 上传图标和提示 */}
-        {status === 'idle' && (
-          <div className="space-y-4">
-            <div className="mx-auto w-16 h-16 text-gray-400">
-              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                上传简历文件
-              </h3>
-              <p className="text-sm text-gray-500 mb-4">
-                {isDragOver ? '松开鼠标即可上传文件' : '拖拽文件到此处，或点击选择文件'}
-              </p>
-              <p className="text-xs text-gray-400">
-                支持 PDF、Word文档(.docx/.doc)、文本文件(.txt)，最大 50MB
-              </p>
-            </div>
-            
-            {!isDragOver && (
+  return (
+    <div className={`flex items-center justify-center min-h-screen bg-gray-100 p-4 ${className}`}>
+      <div className="w-full max-w-lg">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          {/* 顶部图标 / 进度圈 */}
+          <div className="mb-6 flex justify-center">
+            {['uploading', 'uploaded', 'polling', 'completed', 'failed'].includes(status) ? (
+              <CircularProgress
+                progress={displayProgress}
+                status={status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'processing'}
+              />
+            ) : (
+              <UploadCloudIcon className="w-24 h-24 mx-auto text-gray-300" />
+            )}
+          </div>
+
+          {/* 状态标题 */}
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            {status === 'idle' && '上传您的简历'}
+            {status === 'uploading' && '正在上传...'}
+            {(status === 'uploaded' || status === 'polling') && 'AI解析中...'}
+            {status === 'completed' && '解析完成！'}
+            {status === 'failed' && '出现错误'}
+          </h2>
+
+          {/* 描述 / 错误信息 */}
+          <p className="text-gray-500 mb-8 min-h-[2rem]">{error || message}</p>
+
+          {/* 空闲状态：拖拽 / 选择文件区域 */}
+          {status === 'idle' && (
+            <div
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-lg p-10 transition-colors duration-200 ${
+                isDragOver ? 'border-indigo-400 bg-indigo-50' : 'border-gray-300'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.txt"
+                onChange={handleFileInputChange}
+                className="hidden"
+              />
               <button
                 type="button"
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                 onClick={triggerFileSelect}
+                className="bg-indigo-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors shadow-md"
               >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
                 选择文件
               </button>
-            )}
-          </div>
-        )}
+              <p className="mt-4 text-sm text-gray-400">或将文件拖拽到此处</p>
+            </div>
+          )}
 
-        {/* 处理中状态 */}
-        {isProcessing && (
-          <div className="space-y-4">
-            <div className="mx-auto w-16 h-16 text-blue-500">
-              <div className="animate-spin rounded-full h-full w-full border-4 border-blue-200 border-t-blue-500"></div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {status === 'uploading' ? '正在上传' : 'AI 正在解析'}
-              </h3>
-              <p className={`text-sm font-medium ${styles.textColor} mb-4`}>
-                {message}
-              </p>
-              
-              {selectedFile && (
-                <p className="text-xs text-gray-500 mb-4">
-                  文件: {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
-                </p>
-              )}
-            </div>
-
-            {/* 进度条 */}
-            <div className="w-full max-w-sm mx-auto">
-              <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>进度</span>
-                <span>{Math.round(currentProgress)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className={`h-2 rounded-full transition-all duration-300 ${styles.progressColor}`}
-                  style={{ width: `${currentProgress}%` }}
-                />
-              </div>
-            </div>
-
-            {/* 处理步骤指示器 */}
-            {status === 'polling' && (
-              <div className="flex justify-center space-x-1 mt-4">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 完成状态 */}
-        {isCompleted && (
-          <div className="space-y-4">
-            <div className="mx-auto w-16 h-16 text-green-500">
-              <div className="w-full h-full bg-green-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                解析完成！
-              </h3>
-              <p className="text-sm text-green-600 font-medium">
-                {message}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* 错误状态 */}
-        {hasFailed && (
-          <div className="space-y-4">
-            <div className="mx-auto w-16 h-16 text-red-500">
-              <div className="w-full h-full bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                处理失败
-              </h3>
-              <p className="text-sm text-red-600 font-medium mb-4">
-                {error}
-              </p>
-              
-              <button
-                type="button"
-                onClick={resetUploader}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200"
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                重新上传
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 任务ID显示（调试用） */}
-      {taskId && process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 p-3 bg-gray-100 rounded text-xs text-gray-600">
-          <strong>任务ID:</strong> {taskId}
+          {/* 失败状态：重新上传按钮 */}
+          {status === 'failed' && (
+            <button
+              type="button"
+              onClick={resetUploader}
+              className="bg-red-600 text-white font-semibold px-6 py-3 rounded-lg hover:bg-red-700 transition-colors shadow-md"
+            >
+              重新上传
+            </button>
+          )}
         </div>
-      )}
+        <p className="text-center text-xs text-gray-400 mt-4">支持 PDF, DOC, DOCX, TXT. 最大 50MB.</p>
+      </div>
     </div>
   );
 };

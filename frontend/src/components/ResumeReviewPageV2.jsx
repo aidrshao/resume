@@ -985,16 +985,7 @@ const ResumeReviewPageV2 = () => {
           </div>
         </form>
 
-        {/* 任务ID显示（调试用） */}
-        {taskId && process.env.NODE_ENV === 'development' && (
-          <div className="mt-8 bg-gray-100 rounded-lg p-4">
-            <div className="text-xs text-gray-600">
-              <strong>调试信息:</strong>
-              <br />任务ID: {taskId}
-              <br />数据字段: {Object.keys(formData).join(', ')}
-            </div>
-          </div>
-        )}
+        {/* 用户视图不展示调试信息 */}
       </div>
     </div>
   );
