@@ -9,6 +9,39 @@ import * as api from '../utils/api';
 import html2pdf from 'html2pdf.js';
 import ResumeRenderer from './ResumeRenderer';
 
+/* ---------------------------------------------
+ * SVG 图标组件
+ * -------------------------------------------*/
+const PlusIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L16.732 3.732z" />
+  </svg>
+);
+
+const MoreVertIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+  </svg>
+);
+
+const DocumentTextIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const SparklesIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6.343 17.657l-2.828-2.828m11.314 0l-2.828 2.828m-2.828-7.07l2.828 2.828m0 0l2.828 2.828m-11.314-2.828l2.828-2.828m2.828 7.07l-2.828-2.828" />
+  </svg>
+);
+
 const ResumeDashboard = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState([]);
@@ -16,6 +49,7 @@ const ResumeDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [baseResume, setBaseResume] = useState(null);
+  const [activeMenu, setActiveMenu] = useState(null); // 追踪哪个 "..." 菜单打开
   
   // 🔧 添加重试相关状态
   const [retryCount, setRetryCount] = useState(0);
@@ -253,7 +287,14 @@ const ResumeDashboard = () => {
     } catch (err) {
       console.error('删除简历失败:', err);
       setError('删除简历失败，请重试');
+    } finally {
+      setActiveMenu(null); // 删除后关闭菜单
     }
+  };
+
+  // 切换 "..." 操作菜单
+  const handleMenuToggle = (menuId) => {
+    setActiveMenu(activeMenu === menuId ? null : menuId);
   };
 
   /**
@@ -532,26 +573,21 @@ const ResumeDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* 页面标题和操作栏 */}
-        <div className="bg-white shadow-sm rounded-lg mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">简历管理</h1>
-                <p className="mt-1 text-sm text-gray-600">管理您的简历，创建和编辑您的个人简历</p>
-              </div>
-              <div className="flex space-x-4">
-                <Link 
-                  to="/jobs" 
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  🎯 岗位管理
-                </Link>
-              </div>
-            </div>
+      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* 顶部标题与新建按钮 */}
+        <header className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">简历仪表板</h1>
+            <p className="mt-1 text-sm text-gray-500">在这里管理您的所有简历，开启新的职业可能。</p>
           </div>
-        </div>
+          <button
+            onClick={() => navigate('/resumes/upload-v2')}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <PlusIcon />
+            创建新简历
+          </button>
+        </header>
 
         {/* 🔧 更新错误提示UI */}
         {error && (
@@ -593,127 +629,103 @@ const ResumeDashboard = () => {
         )}
 
         {/* 基础简历部分 */}
-        <div className="bg-white shadow-sm rounded-lg mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">基础简历</h2>
-            <p className="mt-1 text-sm text-gray-600">这是您的主要简历，可以作为生成其他专属简历的基础</p>
-          </div>
-          <div className="p-6">
-            {baseResume ? (
-              <div className="bg-blue-50 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-medium text-blue-900">{baseResume.title}</h3>
-                    <p className="text-sm text-blue-700">
-                      创建时间: {new Date(baseResume.created_at).toLocaleDateString()}
-                    </p>
-                    <p className="text-sm text-blue-700">
-                      更新时间: {new Date(baseResume.updated_at).toLocaleDateString()}
+        <section className="mb-10">
+          <h2 className="text-xl font-semibold text-gray-700 mb-4">我的基础简历</h2>
+          {baseResume ? (
+            <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300">
+              <div className="p-6 flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 bg-indigo-100 p-3 rounded-full">
+                    <DocumentTextIcon />
+                  </div>
+                  <div className="ml-4">
+                    <h3 className="text-lg font-semibold text-gray-900">{baseResume.title}</h3>
+                    <p className="text-sm text-gray-500">
+                      最后更新于 {new Date(baseResume.updated_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex space-x-2">
-                    <Link 
-                      to={`/resume/${baseResume.id}/edit`}
-                      className="inline-flex items-center px-3 py-2 border border-blue-300 text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      ✏️ 编辑
-                    </Link>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <button onClick={() => navigate(`/resume/${baseResume.id}/edit`)} className="text-sm font-medium text-indigo-600 hover:text-indigo-900 inline-flex items-center">
+                    <EditIcon /> 编辑
+                  </button>
+                  <div className="relative">
+                    <button onClick={() => handleMenuToggle(`base-${baseResume.id}`)} className="text-gray-400 hover:text-gray-600">
+                      <MoreVertIcon />
+                    </button>
+                    {activeMenu === `base-${baseResume.id}` && (
+                      <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-10">
+                        <a href="#" onClick={(e) => { e.preventDefault(); deleteResume(baseResume.id); }} className="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100">删除</a>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">您还没有基础简历</p>
-                <div className="space-x-4">
-                  <Link 
-                    to="/landing" 
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    📄 上传简历文件
-                  </Link>
-                  <Link 
-                    to="/resumes/create" 
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    ✏️ 手动创建
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* AI定制简历部分 */}
-        <div className="bg-white shadow-sm rounded-lg mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-medium text-gray-900">AI定制简历</h2>
-                <p className="mt-1 text-sm text-gray-600">基于AI优化的个性化简历版本</p>
               </div>
             </div>
-          </div>
-          <div className="p-6">
-            {/* 定制简历 */}
-            {customizedResumes.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-md font-medium text-gray-700 mb-4">🎯 AI定制简历</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {customizedResumes.map(resume => (
-                    <div key={`customized-${resume.id}`} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-lg font-medium text-blue-900 truncate">
-                            {resume.job_title || '专属简历'}
-                          </h3>
-                          <p className="text-sm text-blue-700 mt-1">
-                            🏢 {resume.company_name}
-                          </p>
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-2">
-                            AI定制版本
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-blue-600 mb-4">
-                        生成时间: {new Date(resume.created_at).toLocaleDateString()}
-                      </p>
-                      
-                      <div className="flex justify-between items-center">
-                        <div className="flex space-x-2">
-                          <Link 
-                            to={`/resumes/customized/${resume.id}`}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                          >
-                            👁️ 预览
-                          </Link>
-                          <Link 
-                            to={`/resumes/customized/${resume.id}`}
-                            className="text-green-600 hover:text-green-800 text-sm font-medium"
-                          >
-                            ✏️ 编辑模板
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          ) : (
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+              <p className="text-gray-600 mb-4">您还没有创建基础简历。</p>
+              <p className="text-sm text-gray-500 mb-6">基础简历是您所有定制简历的来源。</p>
+              <button
+                onClick={() => navigate('/resumes/upload-v2')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+              >
+                立即创建
+              </button>
+            </div>
+          )}
+        </section>
 
-            {/* 空状态 */}
-            {customizedResumes.length === 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">您还没有AI定制简历</p>
-                {baseResume ? (
-                  <p className="text-sm text-gray-500">基于基础简历，您可以生成AI优化的定制简历版本</p>
-                ) : (
-                  <p className="text-sm text-gray-500">请先创建基础简历，然后就可以生成AI定制简历了</p>
-                )}
-              </div>
-            )}
+        {/* AI定制简历部分 */}
+        <section>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-700">AI 定制简历</h2>
+            <button onClick={() => navigate('/jobs')} className="text-sm font-medium text-indigo-600 hover:text-indigo-900">管理目标岗位 →</button>
           </div>
-        </div>
+          {customizedResumes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {customizedResumes.map(resume => (
+                <div key={`customized-${resume.id}`} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex flex-col">
+                  <div className="p-6 flex-grow">
+                    <div className="flex items-center mb-3">
+                      <SparklesIcon />
+                      <h3 className="ml-2 text-md font-semibold text-gray-900 truncate" title={resume.job_title}>
+                        {resume.job_title || '专属简历'}
+                      </h3>
+                    </div>
+                    <p className="text-sm text-gray-500 mb-4">
+                      目标公司: {resume.company_name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      创建于: {new Date(resume.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="border-t border-gray-200 px-6 py-4 flex justify-between items-center bg-gray-50 rounded-b-lg">
+                    <button onClick={() => navigate(`/resumes/customized/${resume.id}`)} className="text-sm font-medium text-indigo-600 hover:text-indigo-900">预览与导出</button>
+                    <div className="relative">
+                      <button onClick={() => handleMenuToggle(`custom-${resume.id}`)} className="text-gray-400 hover:text-gray-600">
+                        <MoreVertIcon />
+                      </button>
+                      {activeMenu === `custom-${resume.id}` && (
+                        <div className="origin-top-right absolute right-0 bottom-full mb-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 z-10">
+                          <a href="#" onClick={(e) => { e.preventDefault(); deleteResume(resume.id); }} className="block px-4 py-2 text-sm text-red-700 hover:bg-gray-100">删除</a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+             <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <p className="text-gray-600 mb-4">您还没有AI定制简历。</p>
+                <p className="text-sm text-gray-500 mb-6">为您的目标岗位生成一份专属简历，大幅提升面试机会。</p>
+                <button onClick={() => navigate('/jobs')} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                  前往岗位管理
+                </button>
+              </div>
+          )}
+        </section>
 
         {/* 模板预览模态框 */}
         {showTemplateModal && (
