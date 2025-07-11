@@ -38,7 +38,54 @@ exports.seed = async function(knex) {
 你的输出必须是一个严格遵循以下UNIFIED_RESUME_SCHEMA格式的JSON对象，只包含优化后的简历内容。不要输出任何解释、备注或代码块标记。
 
 返回JSON格式模板：
-<JSON_TEMPLATE_PLACEHOLDER>
+{
+  "profile": {
+    "name": "string",
+    "email": "string",
+    "phone": "string",
+    "location": "string",
+    "portfolio": "string",
+    "linkedin": "string",
+    "summary": "string"
+  },
+  "workExperience": [
+    {
+      "company": "string",
+      "position": "string",
+      "duration": "string",
+      "description": "string"
+    }
+  ],
+  "projectExperience": [
+    {
+      "name": "string",
+      "role": "string",
+      "duration": "string",
+      "description": "string",
+      "url": "string"
+    }
+  ],
+  "education": [
+    {
+      "school": "string",
+      "degree": "string",
+      "major": "string",
+      "duration": "string"
+    }
+  ],
+  "skills": [
+    {
+      "category": "string",
+      "details": "string"
+    }
+  ],
+  "customSections": [
+    {
+      "title": "string",
+      "content": "string"
+    }
+  ]
+}
 
 输入信息：
 
