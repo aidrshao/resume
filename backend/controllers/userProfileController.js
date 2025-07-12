@@ -87,15 +87,11 @@ class UserProfileController {
             await redis.del(cacheKey);
             console.log(`[CACHE] INVALIDATED for user profile ${userId}`);
 
-            const updatedUser = await User.findById(userId);
-            delete updatedUser.password_hash;
-            
-            const userProfile = {
-                ...updatedUser,
-                name: updatedUser.nickname || null
-            };
-
-            res.json({ success: true, message: 'Avatar uploaded successfully', data: userProfile });
+            res.json({ 
+                success: true, 
+                message: 'Avatar uploaded successfully', 
+                avatarUrl: avatarUrl 
+            });
 
         } catch (error) {
             console.error(`[AVATAR_UPLOAD] Error uploading avatar for user ${userId}:`, error);

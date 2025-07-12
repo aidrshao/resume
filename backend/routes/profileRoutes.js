@@ -9,16 +9,21 @@ const router = express.Router();
 const userProfileController = require('../controllers/userProfileController');
 const { authenticateToken } = require('../middleware/auth');
 const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
 
 // Configure Multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'uploads/avatars/');
+        const uploadDir = path.join(__dirname, '../uploads/avatars/');
+        // 确保目录存在
+        fs.mkdirSync(uploadDir, { recursive: true });
+        cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const extension = file.mimetype.split('/')[1];
-        cb(null, `avatar-${req.user.id}-${uniqueSuffix}.${extension}`);
+        cb(null, `avatar-${req.user.userId}-${uniqueSuffix}.${extension}`);
     }
 });
 

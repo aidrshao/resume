@@ -7,6 +7,7 @@
 import React, { useState, useRef } from 'react';
 import { uploadAvatar } from '../utils/api';
 import { API_BASE_URL } from '../utils/api';
+import { getUser, saveAuthData, getToken } from '../utils/auth';
 
 const ProfileSettings = ({ userData, setUserData }) => {
     const fileInputRef = useRef(null);
@@ -21,7 +22,24 @@ const ProfileSettings = ({ userData, setUserData }) => {
         try {
             const response = await uploadAvatar(uploadFormData);
             if (response.data.success) {
-                setUserData(response.data.data);
+                // 更新用户数据，包含新的头像URL
+                const updatedUserData = {
+                    ...userData,
+                    avatar_url: response.data.avatarUrl
+                };
+                setUserData(updatedUserData);
+                
+                // 同时更新localStorage中的用户信息，让导航栏立即显示新头像
+                const currentUser = getUser();
+                const currentToken = getToken();
+                if (currentUser && currentToken) {
+                    const updatedUser = {
+                        ...currentUser,
+                        avatar_url: response.data.avatarUrl
+                    };
+                    saveAuthData(currentToken, updatedUser);
+                }
+                
                 alert('头像更新成功！');
             }
         } catch (error) {

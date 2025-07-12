@@ -129,33 +129,6 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* 顶部导航栏 */}
-      <nav className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <span className="text-2xl font-bold text-indigo-600">俊才AI简历</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              {isAuth ? (
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-700">欢迎, {profile?.nickname || currentUser.email}</span>
-                  <button onClick={() => navigate('/resumes')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">我的简历</button>
-                  <button onClick={() => navigate('/my-plan')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">我的套餐</button>
-                  <button onClick={() => navigate('/profile')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">个人中心</button>
-                  <button onClick={handleLogout} className="text-gray-500 hover:text-gray-700 text-sm">退出</button>
-                </div>
-              ) : (
-                <div className="flex items-center space-x-2 md:space-x-4">
-                  <button onClick={() => { setAuthMode('login'); setShowAuthModal(true); }} className="text-gray-700 hover:text-gray-900 text-sm font-medium px-3 py-2 rounded-md">登录</button>
-                  <button onClick={() => { setAuthMode('register'); setShowAuthModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700 transition-colors">免费注册</button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* 主要内容 */}
       <main>
         {/* Hero Section */}

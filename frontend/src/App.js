@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import logger from './utils/logger';
+import Navbar from './components/Navbar'; // 导入新的Navbar组件
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
@@ -98,6 +99,7 @@ function App() {
         }}
       >
         <div className="App">
+          <Navbar /> {/* 在这里添加全局导航栏 */}
           <Routes>
           {/* 首页 - Landing页面 */}
           <Route path="/" element={<LandingPage />} />
