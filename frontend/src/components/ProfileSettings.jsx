@@ -16,6 +16,20 @@ const ProfileSettings = ({ userData, setUserData }) => {
         const file = event.target.files[0];
         if (!file) return;
 
+        // 文件大小检查 - 20MB限制
+        const maxSize = 20 * 1024 * 1024; // 20MB
+        if (file.size > maxSize) {
+            alert('文件过大，请选择小于20MB的图片文件。');
+            return;
+        }
+
+        // 文件类型检查
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('只支持 JPEG、PNG、GIF 格式的图片文件。');
+            return;
+        }
+
         const uploadFormData = new FormData();
         uploadFormData.append('avatar', file);
 
@@ -44,7 +58,18 @@ const ProfileSettings = ({ userData, setUserData }) => {
             }
         } catch (error) {
             console.error('Failed to upload avatar', error);
-            alert('头像上传失败，请稍后再试。');
+            
+            // 更好的错误处理
+            let errorMessage = '头像上传失败，请稍后再试。';
+            if (error.response?.data?.message) {
+                errorMessage = error.response.data.message;
+            } else if (error.response?.data?.error_code === 'FILE_TOO_LARGE') {
+                errorMessage = '文件过大，请选择小于20MB的图片文件。';
+            } else if (error.response?.data?.error_code === 'INVALID_FILE_TYPE') {
+                errorMessage = '只支持 JPEG、PNG、GIF 格式的图片文件。';
+            }
+            
+            alert(errorMessage);
         }
     };
 

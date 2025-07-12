@@ -39,8 +39,8 @@ router.post('/resumes/save-base', ResumeController.saveBaseResume);
 router.post('/resumes/:id/generate', ResumeController.generateResume);
 router.post('/resumes/generate-for-job', ResumeController.generateJobSpecificResume);
 
-// 简历上传和解析
-router.post('/resumes/upload', upload.single('resume'), ResumeController.uploadAndParseResume);
+// 简历上传和解析 - 已废弃，使用V2版本 /api/v2/resumes/parse
+// router.post('/resumes/upload', upload.single('resume'), ResumeController.uploadAndParseResume);
 
 // 任务状态查询
 router.get('/tasks/:taskId/status', ResumeController.getTaskStatus);

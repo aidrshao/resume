@@ -70,32 +70,78 @@ class UserProfileController {
      * @param {import('express').Response} res - Express response object
      */
     static async uploadAvatar(req, res) {
-        const userId = req.user.userId;
-        const cacheKey = `user_profile:${userId}`;
-        console.log(`[AVATAR_UPLOAD] User ${userId} is uploading a new avatar.`);
+        const userId = req.user?.userId;
+        console.log(`[AVATAR_UPLOAD] 开始处理头像上传，用户ID: ${userId}`);
+        console.log(`[AVATAR_UPLOAD] 请求信息:`, {
+            hasFile: !!req.file,
+            fileInfo: req.file ? {
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                filename: req.file.filename
+            } : null,
+            userId: userId
+        });
+        
         try {
+            // 验证用户身份
+            if (!userId) {
+                console.error('[AVATAR_UPLOAD] 用户身份验证失败，userId 不存在');
+                return res.status(401).json({ success: false, message: '用户身份验证失败' });
+            }
+
+            // 验证文件是否存在
             if (!req.file) {
-                return res.status(400).json({ success: false, message: 'No file uploaded.' });
+                console.error('[AVATAR_UPLOAD] 没有上传文件');
+                return res.status(400).json({ success: false, message: '请选择要上传的图片文件' });
             }
 
             const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+            console.log(`[AVATAR_UPLOAD] 生成头像URL: ${avatarUrl}`);
             
-            await User.updateById(userId, { avatar_url: avatarUrl, updated_at: new Date() });
-            console.log(`[AVATAR_UPLOAD] User ${userId} avatar_url updated in database.`);
+            // 更新数据库
+            console.log(`[AVATAR_UPLOAD] 开始更新数据库，用户ID: ${userId}`);
+            const updatedUser = await User.updateById(userId, { 
+                avatar_url: avatarUrl, 
+                updated_at: new Date() 
+            });
+            
+            if (!updatedUser) {
+                console.error(`[AVATAR_UPLOAD] 数据库更新失败，用户 ${userId} 不存在`);
+                return res.status(404).json({ success: false, message: '用户不存在' });
+            }
+            
+            console.log(`[AVATAR_UPLOAD] 数据库更新成功，用户 ${userId}`);
 
-            // Invalidate cache after update
-            await redis.del(cacheKey);
-            console.log(`[CACHE] INVALIDATED for user profile ${userId}`);
+            // 尝试清除缓存（不阻塞主流程）
+            const cacheKey = `user_profile:${userId}`;
+            try {
+                await redis.del(cacheKey);
+                console.log(`[CACHE] 缓存清除成功: ${cacheKey}`);
+            } catch (cacheError) {
+                console.warn(`[CACHE] 缓存清除失败 (非致命错误): ${cacheError.message}`);
+                // 缓存错误不应该影响主要功能
+            }
 
+            console.log(`[AVATAR_UPLOAD] 头像上传成功，用户 ${userId}`);
             res.json({ 
                 success: true, 
-                message: 'Avatar uploaded successfully', 
+                message: '头像上传成功', 
                 avatarUrl: avatarUrl 
             });
 
         } catch (error) {
-            console.error(`[AVATAR_UPLOAD] Error uploading avatar for user ${userId}:`, error);
-            res.status(500).json({ success: false, message: 'Server error during avatar upload.' });
+            console.error(`[AVATAR_UPLOAD] 上传头像时出现错误，用户 ${userId}:`, {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            });
+            
+            res.status(500).json({ 
+                success: false, 
+                message: '服务器内部错误，请稍后重试',
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     }
 
@@ -184,36 +230,9 @@ class UserProfileController {
         console.log(`[API_DEBUG] Received request for GET /api/profile/plan for user ${userId}.`);
 
         try {
-            // 获取用户的配额信息
-            const userQuotas = await knex('user_quotas')
-                .where({ user_id: userId })
-                .select('quota_type', 'quota_limit', 'quota_used', 'reset_date');
-
-            // 获取默认套餐信息
-            const defaultPlan = await knex('plans')
-                .where({ is_default: true })
-                .first();
-
-            const planData = {
-                planName: defaultPlan ? defaultPlan.name : '免费版',
-                planId: defaultPlan ? defaultPlan.id : null,
-                quotas: {
-                    subscription: {},
-                    permanent: {}
-                },
-                subscriptionExpiresAt: null
-            };
-
-            // 处理配额数据
-            if (userQuotas && userQuotas.length > 0) {
-                userQuotas.forEach(quota => {
-                    const remaining = Math.max(0, quota.quota_limit - quota.quota_used);
-                    planData.quotas.subscription[quota.quota_type] = remaining;
-                });
-            } else {
-                // 如果没有配额记录，返回默认配额
-                planData.quotas.subscription.resume_optimizations = 5;
-            }
+            // 使用quotaService获取用户套餐详情
+            const quotaService = require('../services/quotaService');
+            const planData = await quotaService.getUserPlanDetails(userId);
             
             console.log('[API_DEBUG] Sending plan data to frontend:', JSON.stringify(planData, null, 2));
 

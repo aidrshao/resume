@@ -23,11 +23,53 @@ const storage = multer.diskStorage({
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         const extension = file.mimetype.split('/')[1];
-        cb(null, `avatar-${req.user.userId}-${uniqueSuffix}.${extension}`);
+        // 安全的文件名生成，避免依赖req.user
+        cb(null, `avatar-${uniqueSuffix}.${extension}`);
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: {
+        fileSize: 20 * 1024 * 1024 // 20MB 限制 (从10MB增加)
+    },
+    fileFilter: function (req, file, cb) {
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('只支持 JPEG, PNG, GIF 格式的图片文件'));
+        }
+    }
+});
+
+// 头像上传错误处理中间件
+const handleAvatarUploadError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({
+                success: false,
+                message: '文件过大，请上传小于20MB的图片文件',
+                error_code: 'FILE_TOO_LARGE'
+            });
+        }
+        return res.status(400).json({
+            success: false,
+            message: '文件上传失败: ' + err.message,
+            error_code: 'UPLOAD_ERROR'
+        });
+    }
+    
+    if (err.message.includes('只支持')) {
+        return res.status(400).json({
+            success: false,
+            message: err.message,
+            error_code: 'INVALID_FILE_TYPE'
+        });
+    }
+    
+    next(err);
+};
 
 
 // @route   GET api/profile
@@ -48,7 +90,14 @@ router.post('/change-password', authenticateToken, userProfileController.changeP
 // @route   POST api/profile/upload-avatar
 // @desc    Upload user avatar
 // @access  Private
-router.post('/upload-avatar', authenticateToken, upload.single('avatar'), userProfileController.uploadAvatar);
+router.post('/upload-avatar', authenticateToken, (req, res, next) => {
+    upload.single('avatar')(req, res, (err) => {
+        if (err) {
+            return handleAvatarUploadError(err, req, res, next);
+        }
+        next();
+    });
+}, userProfileController.uploadAvatar);
 
 // 添加新的账户删除路由
 router.post('/delete-account', authenticateToken, userProfileController.scheduleAccountDeletion);

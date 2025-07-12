@@ -291,12 +291,14 @@ class ResumeController {
 
   /**
    * 上传并解析简历
+   * @deprecated 此方法已废弃，请使用V2版本 /api/v2/resumes/parse
    */
   static async uploadAndParseResume(req, res) {
     const uploadStartTime = Date.now();
     const requestId = `UPLOAD_${uploadStartTime}_${Math.random().toString(36).substr(2, 9)}`;
     
     try {
+      console.warn(`⚠️ [${requestId}] [DEPRECATED] 使用了已废弃的上传API，请迁移到V2版本 /api/v2/resumes/parse`);
       console.log(`🚀 [${requestId}] =========================== 开始文件上传处理 ===========================`);
       console.log(`📤 [${requestId}] 请求时间:`, new Date().toISOString());
       console.log(`📤 [${requestId}] 用户ID:`, req.user?.userId);

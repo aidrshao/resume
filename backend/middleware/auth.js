@@ -31,7 +31,13 @@ const authenticateToken = async (req, res, next) => {
       return res.status(403).json({ success: false, message: '认证失败：用户状态异常或已停用', error_code: 'USER_INACTIVE' });
     }
 
-    req.user = decoded; // 存储解码后的用户信息，如userId
+    // 统一用户ID字段，确保兼容性
+    req.user = {
+      ...decoded,
+      id: decoded.userId,  // 为了兼容使用req.user.id的控制器
+      userId: decoded.userId  // 为了兼容使用req.user.userId的控制器
+    };
+    
     next();
   } catch (err) {
     return res.status(403).json({ success: false, message: '认证失败：令牌无效或已过期', error_code: 'TOKEN_INVALID' });
@@ -52,7 +58,12 @@ const optionalAuth = (req, res, next) => {
   if (token) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
-      req.user = decoded;
+      // 统一用户ID字段，确保兼容性
+      req.user = {
+        ...decoded,
+        id: decoded.userId,
+        userId: decoded.userId
+      };
     } catch (error) {
       console.error('可选Token验证失败:', error);
       // 不返回错误，继续执行

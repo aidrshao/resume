@@ -43,6 +43,19 @@ dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
       console.log(`✅ 默认套餐已创建，ID: ${inserted.id}`);
     }
 
+    console.log('🔍 正在检查AI提示词是否已存在...');
+    const existingPrompts = await knex('ai_prompts').count('* as count').first();
+    const promptCount = parseInt(existingPrompts.count);
+    
+    if (promptCount === 0) {
+      console.log('📝 AI提示词不存在，正在导入...');
+      const aiPromptSeed = require('../seeds/02_ai_prompts.js');
+      await aiPromptSeed.seed(knex);
+      console.log('✅ AI提示词已导入');
+    } else {
+      console.log(`ℹ️ 已检测到${promptCount}个AI提示词，跳过导入。`);
+    }
+
     console.log('🏁 数据填充脚本执行完毕 (幂等)。');
     process.exit(0);
   } catch (err) {
