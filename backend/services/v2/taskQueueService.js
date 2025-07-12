@@ -622,4 +622,4 @@ class TaskQueueService {
   }
 }
 
-module.exports = TaskQueueService; 
+module.exports = new TaskQueueService(); 

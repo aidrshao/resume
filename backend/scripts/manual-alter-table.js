@@ -1,83 +1,54 @@
 /**
- * 手动执行ALTER TABLE操作来添加新字段
+ * 手动修复Knex迁移状态脚本
+ * 
+ * 背景：
+ * 当前数据库状态与Knex迁移日志不一致。`knex_migrations` 表记录了
+ * `20250712082935_add_soft_delete_to_users.js` 已运行，但实际上 `users` 表
+ * 中并无 `status` 字段。这导致 `migrate:latest` 和 `migrate:rollback`
+ * 双双失败。
+ * 
+ * 功能：
+ * 此脚本将手动从 `knex_migrations` 表中删除指定的迁移记录，
+ * 以允许 `knex migrate:latest` 重新运行该迁移，从而修复数据库结构。
  */
+const { db: knex } = require('../config/database');
 
-const knex = require('../config/database');
+const MIGRATION_NAME = '20250712082935_add_soft_delete_to_users.js';
 
-async function manualAlterTable() {
+async function manualFixMigrationState() {
+  console.log('🚀 [MANUAL_FIX] 开始手动修复迁移状态...');
+  console.log(`🚀 [MANUAL_FIX] 目标迁移记录: ${MIGRATION_NAME}`);
+
   try {
-    console.log('🔧 开始手动添加字段...');
-    
-    // 检查字段是否已存在
-    const hasUnifiedData = await knex.schema.hasColumn('resumes', 'unified_data');
-    const hasSchemaVersion = await knex.schema.hasColumn('resumes', 'schema_version');
-    
-    console.log('📊 当前状态:');
-    console.log('  - unified_data存在:', hasUnifiedData);
-    console.log('  - schema_version存在:', hasSchemaVersion);
-    
-    if (!hasUnifiedData) {
-      console.log('➕ 添加unified_data字段...');
-      try {
-        await knex.raw('ALTER TABLE resumes ADD COLUMN unified_data JSONB NULL');
-        console.log('✅ unified_data字段添加成功');
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log('✅ unified_data字段已存在');
-        } else {
-          throw error;
-        }
-      }
-    } else {
-      console.log('✅ unified_data字段已存在');
+    const record = await knex('knex_migrations')
+      .where({ name: MIGRATION_NAME })
+      .first();
+
+    if (!record) {
+      console.log('✅ [MANUAL_FIX] 无需修复，目标迁移记录不存在。可以尝试直接运行 `npm run migrate`。');
+      return;
     }
+
+    console.log(`🔍 [MANUAL_FIX] 发现需要删除的迁移记录:`, record);
     
-    if (!hasSchemaVersion) {
-      console.log('➕ 添加schema_version字段...');
-      try {
-        await knex.raw("ALTER TABLE resumes ADD COLUMN schema_version VARCHAR(10) DEFAULT '2.1'");
-        console.log('✅ schema_version字段添加成功');
-      } catch (error) {
-        if (error.message.includes('already exists')) {
-          console.log('✅ schema_version字段已存在');
-        } else {
-          throw error;
-        }
-      }
+    const deletedCount = await knex('knex_migrations')
+      .where({ name: MIGRATION_NAME })
+      .del();
+
+    if (deletedCount > 0) {
+      console.log(`✅ [MANUAL_FIX] 成功删除了 ${deletedCount} 条迁移记录。`);
+      console.log('🎉 [MANUAL_FIX] 修复完成！现在可以安全地运行 `npm run migrate` 来应用缺失的迁移。');
     } else {
-      console.log('✅ schema_version字段已存在');
+       console.log('🤔 [MANUAL_FIX] 操作完成，但没有记录被删除，可能已被其他进程处理。');
     }
-    
-    // 再次验证
-    const finalHasUnifiedData = await knex.schema.hasColumn('resumes', 'unified_data');
-    const finalHasSchemaVersion = await knex.schema.hasColumn('resumes', 'schema_version');
-    
-    console.log('\n📊 最终状态:');
-    console.log('  - unified_data存在:', finalHasUnifiedData);
-    console.log('  - schema_version存在:', finalHasSchemaVersion);
-    
-    if (finalHasUnifiedData && finalHasSchemaVersion) {
-      console.log('\n🎉 数据库结构迁移成功！');
-    } else {
-      console.log('\n❌ 数据库结构迁移失败');
-    }
-    
+
   } catch (error) {
-    console.error('❌ 迁移失败:', error.message);
-    
-    // 尝试其他解决方案
-    if (error.message.includes('must be owner')) {
-      console.log('\n💡 建议解决方案:');
-      console.log('1. 以postgres用户身份运行迁移');
-      console.log('2. 或者授予resume_user表所有者权限');
-      console.log('3. 或者请数据库管理员手动添加字段');
-      console.log('\n执行的SQL命令:');
-      console.log('ALTER TABLE resumes ADD COLUMN unified_data JSONB NULL;');
-      console.log("ALTER TABLE resumes ADD COLUMN schema_version VARCHAR(10) DEFAULT '2.1';");
-    }
+    console.error('❌ [MANUAL_FIX] 手动修复过程中发生错误:', error);
+    process.exit(1);
   } finally {
     await knex.destroy();
+    console.log('🚪 [MANUAL_FIX] 数据库连接已关闭。');
   }
 }
 
-manualAlterTable(); 
+manualFixMigrationState(); 

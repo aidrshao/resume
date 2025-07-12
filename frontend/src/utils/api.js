@@ -697,7 +697,7 @@ export const getTemplateById = (id) => api.get(`/templates/${id}`).then(res => r
  * 获取当前用户的会员套餐信息
  * @returns {Promise<any>}
  */
-export const getCurrentUserPlan = () => api.get('/auth/me/plan');
+export const getCurrentUserPlan = () => api.get('/profile/plan');
 
 /**
  * Fetches all available subscription plans and top-up packs.
@@ -835,6 +835,15 @@ export const getTaskResultV2 = (taskId) => {
     logger.error('V2解析结果获取失败', { taskId, error: error.message });
     throw error;
   });
+};
+
+/**
+ * 请求删除账户
+ * @param {string} password - 用户当前密码
+ * @returns {Promise} API响应
+ */
+export const requestAccountDeletion = (password) => {
+  return api.post('/profile/delete-account', { password });
 };
 
 /**

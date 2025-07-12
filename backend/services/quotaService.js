@@ -112,28 +112,39 @@ class QuotaService {
    * 优先扣 subscription_quota，其次 permanent_quota
    * @param {number} userId
    * @param {string} featureName 目前仅支持 resume_optimizations，可扩展
+   * @returns {Promise<boolean>} - 返回 true 表示成功，false 表示配额不足
    */
   async checkAndDecrementQuota(userId, featureName = 'resume_optimizations') {
-    return await knex.transaction(async trx => {
+    const trxResult = await knex.transaction(async trx => {
       const quota = await trx(this.tableName).where({ user_id: userId }).first();
-      if (!quota) throw new Error('用户配额记录不存在');
+      if (!quota) {
+        // 这是一个系统级错误，应该抛出异常
+        throw new Error('用户配额记录不存在');
+      }
 
       // 先判断订阅配额是否有效
       const now = new Date();
       let updatedFields = {};
+      let canDecrement = false;
 
       if (quota.subscription_quota > 0 && quota.subscription_expires_at && quota.subscription_expires_at > now) {
-        updatedFields.subscription_quota = quota.subscription_quota - 1;
+        updatedFields.subscription_quota = trx.raw('subscription_quota - 1');
+        canDecrement = true;
       } else if (quota.permanent_quota > 0) {
-        updatedFields.permanent_quota = quota.permanent_quota - 1;
-      } else {
-        throw new Error('配额不足');
+        updatedFields.permanent_quota = trx.raw('permanent_quota - 1');
+        canDecrement = true;
       }
 
-      updatedFields.updated_at = knex.fn.now();
-
-      await trx(this.tableName).where({ user_id: userId }).update(updatedFields);
+      if (canDecrement) {
+        updatedFields.updated_at = trx.fn.now();
+        await trx(this.tableName).where({ user_id: userId }).update(updatedFields);
+        return true; // 表示成功
+      } else {
+        return false; // 表示配额不足
+      }
     });
+
+    return trxResult;
   }
 
   /**

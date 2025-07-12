@@ -141,6 +141,7 @@ const LandingPage = () => {
                 <div className="flex items-center space-x-4">
                   <span className="text-sm text-gray-700">欢迎, {profile?.nickname || currentUser.email}</span>
                   <button onClick={() => navigate('/resumes')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">我的简历</button>
+                  <button onClick={() => navigate('/my-plan')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">我的套餐</button>
                   <button onClick={() => navigate('/profile')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">个人中心</button>
                   <button onClick={handleLogout} className="text-gray-500 hover:text-gray-700 text-sm">退出</button>
                 </div>

@@ -4,7 +4,7 @@
  */
 
 require('dotenv').config();
-const TaskQueueService = require('./services/v2/taskQueueService');
+const taskQueueService = require('./services/v2/taskQueueService');
 const ResumeParseTaskHandler = require('./services/v2/resumeParseTaskHandler');
 
 async function startTaskProcessor() {
@@ -12,7 +12,7 @@ async function startTaskProcessor() {
     console.log('🚀 [TASK_PROCESSOR] 启动独立任务处理器...');
     console.log('🚀 [TASK_PROCESSOR] 时间:', new Date().toISOString());
     
-    const taskQueue = new TaskQueueService();
+    const taskQueue = taskQueueService; // 直接使用单例
     const taskHandler = new ResumeParseTaskHandler(taskQueue);
     
     // 测试连接

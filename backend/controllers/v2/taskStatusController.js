@@ -3,11 +3,11 @@
  * 处理任务状态查询和结果获取
  */
 
-const TaskQueueService = require('../../services/v2/taskQueueService');
+const taskQueueService = require('../../services/v2/taskQueueService');
 
 class TaskStatusController {
   constructor() {
-    this.taskQueue = new TaskQueueService();
+    this.taskQueue = taskQueueService; // 直接使用导入的单例
   }
 
   /**

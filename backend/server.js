@@ -20,6 +20,9 @@ const profileRoutes = require('./routes/profileRoutes'); // 个人中心
 const { autoSetup } = require('./scripts/auto-setup');
 const fs = require('fs');
 const path = require('path');
+const taskQueueService = require('./services/v2/taskQueueService');
+console.log('[SERVICE_LOAD] TaskQueueService loaded successfully.');
+const { scheduleHardDelete } = require('./scripts/hardDeleteUsers'); // 引入硬删除任务调度器
 
 // Ensure upload directories exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -193,18 +196,23 @@ app.get('/api/health', (req, res) => {
 });
 
 // 路由配置
-app.use('/api/logs', logRoutes);  // 日志路由（无需认证）
-app.use('/api/auth', authRoutes);
-app.use('/api/billing', require('./routes/billingRoutes')); // 新增计费路由
-app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
-app.use('/api/memberships', membershipRoutes);  // 会员路由
-app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
-app.use('/api/templates', templateRoutes);  // 模板管理路由
-app.use('/api/v2', v2TaskRoutes);  // V2版本任务路由（新的简历解析服务）
-app.use('/api/jobs', jobRoutes);
-app.use('/api', customizedResumeRoutes);  // 专属简历路由
-app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
-app.use('/api/profile', profileRoutes); // 个人中心
+const logAndLoad = (path) => {
+  console.log(`[ROUTE_LOAD] Loading routes from ${path}...`);
+  return require(path);
+};
+
+app.use('/api/logs', logAndLoad('./routes/logRoutes'));  // 日志路由（无需认证）
+app.use('/api/auth', logAndLoad('./routes/auth'));
+app.use('/api/billing', logAndLoad('./routes/billingRoutes')); // 新增计费路由
+app.use('/api/admin', logAndLoad('./routes/adminRoutes'));  // 管理员路由需要在通用路由之前
+app.use('/api/memberships', logAndLoad('./routes/membershipRoutes'));  // 会员路由
+app.use('/api/resume-render', logAndLoad('./routes/resumeRenderRoutes'));  // 简历渲染路由
+app.use('/api/templates', logAndLoad('./routes/templateRoutes'));  // 模板管理路由
+app.use('/api/v2', logAndLoad('./routes/v2/tasks'));  // V2版本任务路由（新的简历解析服务）
+app.use('/api/jobs', logAndLoad('./routes/jobRoutes'));
+app.use('/api', logAndLoad('./routes/customizedResumeRoutes'));  // 专属简历路由
+app.use('/api', logAndLoad('./routes/resumeRoutes'));  // 简历路由，包含 /resumes 前缀
+app.use('/api/profile', logAndLoad('./routes/profileRoutes')); // 个人中心
 
 // 404处理
 app.use('*', (req, res) => {
@@ -251,17 +259,17 @@ async function startServer() {
       console.log('🚀 [AUTO_SETUP] 环境变量 AUTO_SETUP =', process.env.AUTO_SETUP);
       console.log('🚀 [AUTO_SETUP] 将自动运行数据库迁移和种子数据');
       
-      try {
-        await autoSetup();
-        console.log('✅ [AUTO_SETUP] 自动化设置完成');
-      } catch (error) {
-        console.error('❌ [AUTO_SETUP] 自动化设置失败:', error.message);
-        console.error('⚠️ [AUTO_SETUP] 服务器将继续启动，但某些功能可能不可用');
-        console.error('💡 [AUTO_SETUP] 请手动运行: npm run migrate && npm run seed');
-      }
+      await autoSetup();
+      console.log('✅ [AUTO_SETUP] 自动化设置完成');
     } else {
       console.log('⏭️ [AUTO_SETUP] 跳过自动化设置 (AUTO_SETUP=false)');
     }
+
+    // 初始化任务队列服务 (此步骤已在服务实例化时自动完成，无需显式调用)
+    // await initTaskQueue();
+    
+    // 启动定时硬删除任务
+    scheduleHardDelete();
 
     // 启动服务器
     app.listen(PORT, () => {
@@ -277,10 +285,9 @@ async function startServer() {
       if (process.env.ENABLE_TASK_PROCESSOR !== 'false') {
         console.log('🔄 [TASK_PROCESSOR] 启动任务处理器...');
         try {
-          const TaskQueueService = require('./services/v2/taskQueueService');
           const ResumeParseTaskHandler = require('./services/v2/resumeParseTaskHandler');
           
-          const taskQueue = new TaskQueueService();
+          const taskQueue = taskQueueService; // 直接使用单例实例
           const taskHandler = new ResumeParseTaskHandler(taskQueue);
           
           // 开始处理任务队列

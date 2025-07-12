@@ -63,20 +63,31 @@ const MyPlanPage = () => {
   const [currentUserPlan, setCurrentUserPlan] = useState(null);
   const [products, setProducts] = useState({ plans: [], topUpPacks: [] });
   const location = useLocation();
-  const alertMessage = location.state?.message;
+  const [alertMessage, setAlertMessage] = useState(location.state?.message || '');
 
   useEffect(() => {
+    // 新增：从URL查询参数检查并设置提示信息
+    const queryParams = new URLSearchParams(location.search);
+    if (queryParams.get('reason') === 'quota_exceeded') {
+      setAlertMessage('您的简历优化次数已用完，请升级套餐或购买加油包。');
+      // 可选：从URL中移除查询参数以保持整洁
+      window.history.replaceState(null, '', location.pathname);
+    }
+
     const fetchData = async () => {
+      console.log('[FRONTEND_DEBUG] MyPlanPage mounted. Attempting to fetch user plan data...');
       setLoading(true);
       try {
         const [planRes, productsRes] = await Promise.all([
           getCurrentUserPlan(),
           getAvailableProducts(),
         ]);
+        console.log('[FRONTEND_DEBUG] Successfully received data from API (planRes):', planRes);
+        console.log('[FRONTEND_DEBUG] Successfully received data from API (productsRes):', productsRes);
         if (planRes.data.success) setCurrentUserPlan(planRes.data.data);
         if (productsRes.data.success) setProducts(productsRes.data.data);
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error("[FRONTEND_DEBUG] Failed to fetch data from API. Error:", error);
       } finally {
         setLoading(false);
       }

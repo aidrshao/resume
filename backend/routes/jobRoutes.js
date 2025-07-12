@@ -6,10 +6,10 @@
 const express = require('express');
 const router = express.Router();
 const JobController = require('../controllers/jobController');
-const { verifyToken } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // 所有岗位相关的路由都需要登录验证
-router.use(verifyToken);
+router.use(authenticateToken);
 
 /**
  * 获取岗位统计信息

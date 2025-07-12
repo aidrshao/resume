@@ -66,12 +66,12 @@ class ResumeController {
       console.log('🔄 [RESUME_CONTROLLER] 开始处理getUserResumes请求');
       console.log('🔄 [RESUME_CONTROLLER] 请求ID:', req.requestId);
       console.log('🔄 [RESUME_CONTROLLER] 用户信息:', {
-        userId: req.user?.id,
+        userId: req.user?.userId,
         userObject: req.user,
         hasUser: !!req.user
       });
       
-      const userId = req.user.id;
+      const userId = req.user.userId;
       console.log('🔍 [RESUME_CONTROLLER] 提取的用户ID:', userId);
       
       if (!userId) {
@@ -164,7 +164,7 @@ class ResumeController {
   static async getResumeById(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
       
       const resume = await Resume.findByIdAndUser(id, userId);
       
@@ -201,7 +201,7 @@ class ResumeController {
   static async createResume(req, res) {
     try {
       const { title, content, template_id } = req.body;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       const resumeData = {
         user_id: userId,
@@ -234,7 +234,7 @@ class ResumeController {
   static async updateResume(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const updateData = req.body;
 
       const updated = await Resume.updateByIdAndUser(id, userId, updateData);
@@ -265,7 +265,7 @@ class ResumeController {
   static async deleteResume(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       const deleted = await Resume.deleteByIdAndUser(id, userId);
       
@@ -299,7 +299,7 @@ class ResumeController {
     try {
       console.log(`🚀 [${requestId}] =========================== 开始文件上传处理 ===========================`);
       console.log(`📤 [${requestId}] 请求时间:`, new Date().toISOString());
-      console.log(`📤 [${requestId}] 用户ID:`, req.user?.id);
+      console.log(`📤 [${requestId}] 用户ID:`, req.user?.userId);
       console.log(`📤 [${requestId}] req.file 存在:`, !!req.file);
       console.log(`📤 [${requestId}] req.files 存在:`, !!req.files);
       console.log(`📤 [${requestId}] req.body:`, req.body);
@@ -334,7 +334,7 @@ class ResumeController {
         });
       }
 
-      const userId = req.user.id;
+      const userId = req.user.userId;
       const filePath = req.file.path;
       
       // 从文件扩展名获取文件类型
@@ -512,7 +512,7 @@ class ResumeController {
   static async generateJobSpecificResume(req, res) {
     try {
       const { job_id, generation_mode = 'advanced' } = req.body;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       // 检查配额
       const quotaCheck = await MembershipController.checkAndConsumeQuota(userId, 'ai_generation');
@@ -579,7 +579,7 @@ class ResumeController {
    * 保存基础简历
    */
   static async saveBaseResume(req, res) {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { content } = req.body; // content is the UNIFIED_RESUME_SCHEMA object
 
     console.log(`[SAVE_BASE_RESUME] User ${userId} starting to save base resume.`);
@@ -648,7 +648,7 @@ class ResumeController {
   static async generateResume(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       // 检查配额
       const quotaCheck = await MembershipController.checkAndConsumeQuota(userId, 'ai_generation');
@@ -691,7 +691,7 @@ class ResumeController {
   static async getTaskStatus(req, res) {
     try {
       const { taskId } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       // 🆕 兼容逻辑：如果 taskId 是纯数字，说明前端直接把简历ID当作 taskId 传递过来。
       // 此时直接查询简历表并返回 "已完成" 状态，避免 500 错误。
@@ -790,7 +790,7 @@ class ResumeController {
   static async getTaskProgress(req, res) {
     try {
       const { taskId } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       // 导入任务队列服务
       const { taskQueueService } = require('../services/taskQueueService');
@@ -869,7 +869,7 @@ class ResumeController {
   static async getResumeSuggestions(req, res) {
     try {
       const { id } = req.params;
-      const userId = req.user.id;
+      const userId = req.user.userId;
 
       const resume = await Resume.findByIdAndUser(id, userId);
       if (!resume) {

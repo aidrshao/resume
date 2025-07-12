@@ -214,6 +214,16 @@ const JobsPage = () => {
     } catch (error) {
       console.error('❌ [GENERATE_CUSTOM] 生成定制简历失败:', error);
       
+      // === 新增：处理配额不足的场景 ===
+      if (error.response?.data?.error_code === 'INSUFFICIENT_QUOTA') {
+        // 使用React Router的navigate进行跳转，并传递提示信息
+        // 注意：需要从'react-router-dom'导入'useNavigate'
+        // 此处假设您已在组件顶部添加 const navigate = useNavigate();
+        window.location.href = `/my-plan?from=jobs&reason=quota_exceeded`; // 简单起见，暂时使用href跳转
+        // 更优方案是使用 navigate('/my-plan', { state: { message: '您的简历优化次数已用完...' } });
+        return; 
+      }
+      
       // 处理不同类型的错误
       let errorMessage = '生成定制简历失败';
       

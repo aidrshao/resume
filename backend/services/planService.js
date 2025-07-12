@@ -111,6 +111,62 @@ class PlanService {
   async deletePlan(id) {
     return await knex(this.tableName).where({ id }).del();
   }
+
+  /**
+   * 获取用户的当前套餐和所有配额信息
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object|null>}
+   */
+  async getUserPlanAndQuotas(userId) {
+    console.log(`[SERVICE_DEBUG] PlanService: Fetching plan and quotas for user ${userId}`);
+
+    // 1. 获取用户当前的会员信息
+    const userMembership = await knex('user_memberships')
+      .where({ user_id: userId })
+      .andWhere('expires_at', '>', knex.fn.now())
+      .orderBy('expires_at', 'desc')
+      .first();
+
+    let planName = '免费版';
+    let planId = null;
+    let subscriptionExpiresAt = null;
+
+    if (userMembership) {
+      const plan = await knex('plans').where({ id: userMembership.plan_id }).first();
+      if (plan) {
+        planName = plan.name;
+        planId = plan.id;
+        subscriptionExpiresAt = userMembership.expires_at;
+      }
+    }
+
+    // 2. 获取用户的所有配额（包括订阅和永久）
+    const userQuotas = await knex('user_quotas')
+      .where({ user_id: userId })
+      .select('quota_type', 'quota_limit', 'quota_used', 'source');
+
+    // 3. 组合数据
+    const quotas = {
+      subscription: {},
+      permanent: {}
+    };
+
+    userQuotas.forEach(q => {
+      const remaining = q.quota_limit - q.quota_used;
+      if (q.source === 'subscription') {
+        quotas.subscription[q.quota_type] = remaining > 0 ? remaining : 0;
+      } else if (q.source === 'permanent_pack') {
+        quotas.permanent[q.quota_type] = (quotas.permanent[q.quota_type] || 0) + remaining;
+      }
+    });
+
+    return {
+      planName,
+      planId,
+      subscriptionExpiresAt,
+      quotas,
+    };
+  }
 }
 
 module.exports = new PlanService(); 

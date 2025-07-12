@@ -7,11 +7,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const TaskQueueService = require('../../services/v2/taskQueueService');
+const taskQueueService = require('../../services/v2/taskQueueService');
 
 class ResumeParserController {
   constructor() {
-    this.taskQueue = new TaskQueueService();
+    this.taskQueue = taskQueueService; // 直接使用导入的单例
     this.setupMulter();
   }
 

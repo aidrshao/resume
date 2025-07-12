@@ -13,6 +13,7 @@ const { Resume } = require('../models/Resume');
 const JobPosition = require('../models/JobPosition');
 const AIPrompt = require('../models/AIPrompt');
 const { aiService } = require('../services/aiService');
+const quotaService = require('../services/quotaService'); // 引入配额服务
 
 class CustomizedResumeController {
   
@@ -113,6 +114,25 @@ class CustomizedResumeController {
     try {
       const { baseResumeId, targetJobId, forceOverwrite = false } = req.body;
       const userId = req.user.userId;
+
+      // --------------------------------------------------
+      // === 🚀 配额检查与扣减 (前置步骤) ===
+      // --------------------------------------------------
+      console.log(`[QUOTA_CHECK] Checking 'resume_optimizations' quota for user ${userId}.`);
+      
+      const hasQuota = await quotaService.checkAndDecrementQuota(userId, 'resume_optimizations');
+      
+      if (!hasQuota) {
+        console.warn(`[QUOTA_CHECK] Quota check failed for user ${userId}.`);
+        return res.status(403).json({
+          success: false,
+          message: "您的简历优化次数已用完，请升级套餐或购买加油包。",
+          error_code: "INSUFFICIENT_QUOTA"
+        });
+      }
+      
+      console.log(`[QUOTA_CHECK] Quota check passed and decremented for user ${userId}.`);
+      // --------------------------------------------------
       
       // 参数验证
       if (!baseResumeId || !targetJobId) {

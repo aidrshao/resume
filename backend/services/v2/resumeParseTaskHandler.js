@@ -9,15 +9,18 @@ const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const Tesseract = require('tesseract.js');
 const pdf2pic = require('pdf2pic');
-const TaskQueueService = require('./taskQueueService');
+// const TaskQueueService = require('./taskQueueService'); // 已通过依赖注入，不再需要
 const AIPrompt = require('../../models/AIPrompt');
 const { aiService } = require('../../services/aiService');
 const { validateAndCompleteUnifiedFormat } = require('../../utils/dataTransformer');
 
 class ResumeParseTaskHandler {
-  constructor(taskQueueService = null) {
+  constructor(taskQueueService) {
+    if (!taskQueueService) {
+      throw new Error('A taskQueueService instance must be provided to ResumeParseTaskHandler.');
+    }
     // 使用传入的任务队列服务实例，避免创建重复实例
-    this.taskQueue = taskQueueService || new TaskQueueService();
+    this.taskQueue = taskQueueService;
   }
 
   /**
