@@ -9,6 +9,10 @@ const AdminController = require('../controllers/adminController');
 const { adminAuth, superAdminAuth } = require('../middleware/adminAuth');
 const AdminAIPromptController = require('../controllers/adminAIPromptController');
 const AdminGlobalQuotaController = require('../controllers/adminGlobalQuotaController');
+const PlanController = require('../controllers/planController');
+// 引入套餐管理路由
+const planRoutes = require('./planRoutes');
+const topUpPackRoutes = require('./topUpPackRoutes');
 
 // ==================== 认证相关路由 ====================
 
@@ -192,6 +196,22 @@ router.post('/assign-quota', adminAuth, AdminController.assignQuota);
  * GET /api/admin/statistics
  */
 router.get('/statistics', adminAuth, AdminController.getStatistics);
+
+// ==================== 权益字典 ====================
+
+/**
+ * 获取权益字典
+ * GET /api/admin/features
+ */
+router.get('/features', adminAuth, PlanController.getFeatures);
+
+// ==================== 套餐(plan) 管理 ====================
+
+// 所有以 /api/admin/plans 为前缀的请求交给子路由处理
+router.use('/plans', planRoutes);
+
+// ==================== 加油包(Top-up Pack) 管理 ====================
+router.use('/top-up-packs', topUpPackRoutes);
 
 // ==================== 全局配额配置管理 ====================
 

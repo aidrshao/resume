@@ -906,118 +906,30 @@ class AdminController {
    */
   static async assignQuota(req, res) {
     try {
-      const { userId, quotaAmount, quotaType } = req.body;
-      const adminUserId = req.admin.id;
+      const { userId, planId, permanentQuota } = req.body;
 
-      // 验证必填字段
-      if (!userId || !quotaAmount || !quotaType) {
-        return res.status(400).json({
-          success: false,
-          message: '用户ID、配额数量和配额类型不能为空'
-        });
+      // 验证参数
+      if (!userId || (!planId && !permanentQuota)) {
+        return res.status(400).json({ success: false, message: '请提供 planId 或 permanentQuota' });
       }
 
-      // 验证配额数量
-      if (parseInt(quotaAmount) <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: '配额数量必须大于0'
-        });
-      }
-
-      // 验证用户是否存在
+      // 验证用户存在
       const user = await User.findById(parseInt(userId));
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          message: '用户不存在'
-        });
+      if (!user) return res.status(404).json({ success: false, message: '用户不存在' });
+
+      const quotaService = require('../services/quotaService');
+
+      if (planId) {
+        // 指定套餐
+        await quotaService.assignPlanToUser(userId, planId);
+        return res.json({ success: true, message: `成功为用户分配套餐 planId=${planId}` });
       }
 
-      // 检查用户是否有会员记录
-      let userMembership = await knex('user_memberships')
-        .where({ user_id: parseInt(userId) })
-        .orderBy('created_at', 'desc')
-        .first();
-
-      if (!userMembership) {
-        // 如果用户没有会员记录，创建一个免费版会员记录
-        const freeTier = await knex('membership_tiers')
-          .where({ name: '免费版' })
-          .first();
-
-        if (freeTier) {
-          // 从全局配额配置获取新用户AI简历配额
-          const GlobalQuotaConfig = require('../models/GlobalQuotaConfig');
-          const aiResumeConfig = await GlobalQuotaConfig.getByKey('new_user_ai_resume_quota');
-          const aiResumeQuota = aiResumeConfig ? aiResumeConfig.default_quota : freeTier.ai_resume_quota;
-          
-          const membershipResult = await knex('user_memberships').insert({
-            user_id: parseInt(userId),
-            membership_tier_id: freeTier.id,
-            status: 'active',
-            start_date: new Date(),
-            end_date: null, // 永久有效
-            remaining_ai_quota: aiResumeQuota,
-            quota_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
-            payment_status: 'paid',
-            paid_amount: 0,
-            payment_method: 'admin_grant',
-            admin_notes: `管理员分配配额时自动创建免费会员`,
-            created_at: new Date(),
-            updated_at: new Date()
-          }).returning('id');
-
-          const membershipId = Array.isArray(membershipResult) ? membershipResult[0] : membershipResult.id || membershipResult;
-          userMembership = await knex('user_memberships').where({ id: membershipId }).first();
-        }
+      if (permanentQuota) {
+        if (parseInt(permanentQuota) <= 0) return res.status(400).json({ success: false, message: 'permanentQuota必须大于0' });
+        await quotaService.addTopUpPackToUser(userId, { permanent_quota: parseInt(permanentQuota) });
+        return res.json({ success: true, message: `成功为用户增加永久配额 ${permanentQuota}` });
       }
-
-      // 根据配额类型更新配额（简化处理，主要支持AI简历配额）
-      let updateData = {};
-      switch (quotaType) {
-        case 'monthly_ai_resume':
-          updateData.remaining_ai_quota = (userMembership.remaining_ai_quota || 0) + parseInt(quotaAmount);
-          break;
-        default:
-          return res.status(400).json({
-            success: false,
-            message: '当前只支持AI简历生成配额分配'
-          });
-      }
-
-      updateData.updated_at = new Date();
-      updateData.admin_notes = `管理员分配${quotaAmount}个${quotaType}配额`;
-
-      // 更新用户配额
-      await knex('user_memberships')
-        .where({ id: userMembership.id })
-        .update(updateData);
-
-      // 记录操作日志
-      await knex('user_ai_usage_logs').insert({
-        user_id: parseInt(userId),
-        usage_type: 'resume_generation',
-        is_success: true,
-        error_message: null,
-        tokens_used: 0,
-        cost: 0,
-        used_at: new Date(),
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-
-      res.json({
-        success: true,
-        data: { 
-          message: `成功为用户分配${quotaAmount}个${quotaType}配额`,
-          quota_type: quotaType,
-          quota_amount: parseInt(quotaAmount),
-          new_total: updateData.remaining_ai_quota
-        },
-        message: '配额分配成功'
-      });
-
     } catch (error) {
       console.error('❌ [ASSIGN_QUOTA] 分配配额失败:', error.message);
       res.status(500).json({

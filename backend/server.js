@@ -16,7 +16,17 @@ const resumeRenderRoutes = require('./routes/resumeRenderRoutes');
 const templateRoutes = require('./routes/templateRoutes');
 const logRoutes = require('./routes/logRoutes');
 const v2TaskRoutes = require('./routes/v2/tasks');
+const profileRoutes = require('./routes/profileRoutes'); // 个人中心
 const { autoSetup } = require('./scripts/auto-setup');
+const fs = require('fs');
+const path = require('path');
+
+// Ensure upload directories exist
+const uploadsDir = path.join(__dirname, 'uploads');
+const avatarsDir = path.join(uploadsDir, 'avatars');
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir);
+if (!fs.existsSync(avatarsDir)) fs.mkdirSync(avatarsDir);
+
 
 // 自动化设置标志
 const shouldAutoSetup = process.env.AUTO_SETUP !== 'false';
@@ -67,6 +77,10 @@ app.use((req, res, next) => {
 // 中间件配置
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Serve static files from the 'uploads' directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // 请求日志中间件
 app.use((req, res, next) => {
@@ -181,6 +195,7 @@ app.get('/api/health', (req, res) => {
 // 路由配置
 app.use('/api/logs', logRoutes);  // 日志路由（无需认证）
 app.use('/api/auth', authRoutes);
+app.use('/api/billing', require('./routes/billingRoutes')); // 新增计费路由
 app.use('/api/admin', adminRoutes);  // 管理员路由需要在通用路由之前
 app.use('/api/memberships', membershipRoutes);  // 会员路由
 app.use('/api/resume-render', resumeRenderRoutes);  // 简历渲染路由
@@ -189,6 +204,7 @@ app.use('/api/v2', v2TaskRoutes);  // V2版本任务路由（新的简历解析�
 app.use('/api/jobs', jobRoutes);
 app.use('/api', customizedResumeRoutes);  // 专属简历路由
 app.use('/api', resumeRoutes);  // 简历路由，包含 /resumes 前缀
+app.use('/api/profile', profileRoutes); // 个人中心
 
 // 404处理
 app.use('*', (req, res) => {

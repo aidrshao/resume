@@ -35,7 +35,7 @@
     "migrate": "knex migrate:latest",
     "migrate:rollback": "knex migrate:rollback",
     "migrate:status": "knex migrate:status",
-    "seed": "knex seed:run",
+    "seed": "node scripts/seed.js",
     "migrate:unified": "node scripts/run-unified-schema-migration.js",
     "migrate:unified-db": "node scripts/run-unified-schema-migration.js --database-only",
     "migrate:unified-data": "node scripts/run-unified-schema-migration.js --data-only",

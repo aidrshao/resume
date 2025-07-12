@@ -684,32 +684,45 @@ export const getResumeTemplates = () => {
  * 获取已发布的模板列表
  * @returns {Promise} API响应
  */
-export const getTemplatesList = () => {
-  console.log('🎨 [模板API] 开始获取模板列表');
-  return api.get('/templates').then(response => {
-    console.log('✅ [GET_TEMPLATES] API响应成功:', response.data);
-    return response.data;
-  }).catch(error => {
-    console.error('❌ [GET_TEMPLATES] API响应失败:', error);
-    throw error;
-  });
-};
+export const getTemplatesList = () => api.get('/templates');
 
 /**
- * 获取单个模板详情
- * @param {number} templateId - 模板ID
- * @returns {Promise} API响应
+ * Get a single template by its ID.
+ * @param {string} id The ID of the template.
+ * @returns {Promise<Object>} The server response.
  */
-export const getTemplateById = (templateId) => {
-  console.log('🎨 [模板API] 开始获取模板详情', templateId);
-  return api.get(`/templates/${templateId}`).then(response => {
-    console.log('✅ [GET_TEMPLATE_BY_ID] API响应成功:', response.data);
-    return response.data;
-  }).catch(error => {
-    console.error('❌ [GET_TEMPLATE_BY_ID] API响应失败:', error);
-    throw error;
-  });
-};
+export const getTemplateById = (id) => api.get(`/templates/${id}`);
+
+// New functions for billing and plans
+/**
+ * Fetches the current user's active plan and quotas.
+ * @returns {Promise<Object>} The server response.
+ */
+export const getCurrentUserPlan = () => api.get('/auth/me/plan');
+
+/**
+ * Fetches all available subscription plans and top-up packs.
+ * @returns {Promise<Object>} The server response.
+ */
+export const getAvailableProducts = () => api.get('/billing/products');
+
+/**
+ * Changes the user's password.
+ * @param {object} passwordData The password data ({ currentPassword, newPassword }).
+ * @returns {Promise<Object>} The server response.
+ */
+export const changePassword = (passwordData) => api.post('/profile/change-password', passwordData);
+
+/**
+ * Uploads a new user avatar.
+ * @param {FormData} formData The form data containing the avatar file.
+ * @returns {Promise<Object>} The server response.
+ */
+export const uploadAvatar = (formData) => api.post('/profile/upload-avatar', formData, {
+    headers: {
+        'Content-Type': 'multipart/form-data',
+    },
+});
 
 /**
  * 生成简历预览HTML

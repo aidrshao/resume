@@ -6,10 +6,11 @@
  * 3. 恢复“三步流程”模块，丰富页面内容。
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isAuthenticated, getUser, logout } from '../utils/auth';
 import AuthModal from './AuthModal';
+import { getUserProfile } from '../utils/api'; // 引入API
 
 /**
  * 简历优化前后对比组件 (v2.5)
@@ -66,11 +67,40 @@ const ResumeComparison = () => {
  */
 const LandingPage = () => {
   const navigate = useNavigate();
-  const userLoggedIn = isAuthenticated();
-  const user = getUser();
+  const [isAuth, setIsAuth] = useState(isAuthenticated());
+  const [currentUser, setCurrentUser] = useState(getUser());
+  const [profile, setProfile] = useState(null); // 新增状态
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState('login');
+
+  useEffect(() => {
+    const checkAuth = () => {
+      setIsAuth(isAuthenticated());
+      setCurrentUser(getUser());
+    };
+
+    const fetchProfile = async () => {
+      if (isAuth) {
+        try {
+          const res = await getUserProfile();
+          if (res.data.success) {
+            setProfile(res.data.data);
+          }
+        } catch (error) {
+          console.error("Failed to fetch profile on landing page", error);
+        }
+      }
+    };
+
+    checkAuth();
+    fetchProfile();
+
+    window.addEventListener('storage', checkAuth);
+    return () => {
+      window.removeEventListener('storage', checkAuth);
+    };
+  }, [isAuth]);
 
   /**
    * 登录或注册成功回调
@@ -107,10 +137,11 @@ const LandingPage = () => {
               <span className="text-2xl font-bold text-indigo-600">俊才AI简历</span>
             </div>
             <div className="flex items-center space-x-4">
-              {userLoggedIn ? (
+              {isAuth ? (
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-700">欢迎，{user?.email}</span>
+                  <span className="text-sm text-gray-700">欢迎, {profile?.nickname || currentUser.email}</span>
                   <button onClick={() => navigate('/resumes')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">我的简历</button>
+                  <button onClick={() => navigate('/profile')} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">个人中心</button>
                   <button onClick={handleLogout} className="text-gray-500 hover:text-gray-700 text-sm">退出</button>
                 </div>
               ) : (

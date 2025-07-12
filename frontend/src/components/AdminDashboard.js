@@ -216,6 +216,31 @@ const AdminDashboard = () => {
             </div>
           </div>
 
+          {/* 新版配额套餐管理 */}
+          <div 
+            onClick={() => navigateTo('/admin/plans')}
+            className="bg-white overflow-hidden shadow rounded-lg cursor-pointer hover:shadow-md transition-shadow"
+          >
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 6v.01M12 10v4m0 4h.01M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">套餐管理(新)</dt>
+                    <dd className="text-lg font-medium text-gray-900">{statistics?.plans_count || 0} 套餐</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-5 py-3">
+              <div className="text-sm text-blue-600">点击管理 →</div>
+            </div>
+          </div>
+
           {/* 收入统计 */}
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
@@ -343,9 +368,27 @@ const AdminDashboard = () => {
                 </div>
               </button>
 
+              {/* 加油包管理 */}
+              <button
+                onClick={() => navigateTo('/admin/top-up-packs')}
+                className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+              >
+                <div>
+                  <span className="rounded-lg inline-flex p-3 bg-purple-50 text-purple-600 ring-4 ring-white">
+                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                    </svg>
+                  </span>
+                </div>
+                <div className="mt-4">
+                  <h3 className="text-lg font-medium text-gray-900">加油包管理</h3>
+                  <p className="mt-2 text-sm text-gray-500">管理订阅套餐和默认配置</p>
+                </div>
+              </button>
+
               {/* 全局配额管理 */}
               <button
-                onClick={() => navigateTo('/admin/global-quota-configs')}
+                onClick={() => navigateTo('/admin/global-quotas')}
                 className="relative group bg-white p-6 focus-within:ring-2 focus-within:ring-inset focus-within:ring-indigo-500 border border-gray-200 rounded-lg hover:bg-gray-50"
               >
                 <div>

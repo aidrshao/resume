@@ -139,6 +139,25 @@ class Resume {
   }
 
   /**
+   * 获取用户的最新一份简历
+   * @param {number} userId - 用户ID
+   * @returns {Promise<Object|null>} 最新的简历对象或null
+   */
+  static async findLatestByUserId(userId) {
+    try {
+      const resume = await knex('resumes')
+        .where('user_id', userId)
+        .orderBy('created_at', 'desc')
+        .first();
+      
+      return resume ? this.enrichResumeData(resume) : null;
+    } catch (error) {
+      console.error('查询用户最新简历失败:', error);
+      throw error;
+    }
+  }
+
+  /**
    * 获取用户的简历列表（仅基本信息，用于列表页面）
    * @param {number} userId - 用户ID
    * @returns {Promise<Array>} 简历列表（仅基本信息）

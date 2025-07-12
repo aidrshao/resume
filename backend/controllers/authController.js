@@ -286,27 +286,37 @@ const register = async (req, res) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // 创建用户（邮箱已验证）
-    const newUser = await User.create({
-      email,
-      password_hash: passwordHash,
-      email_verified: true
+    // 🚀 使用事务确保“创建用户 + 分配默认套餐”原子性
+    const { db: knex } = require('../config/database');
+    const quotaService = require('../services/quotaService');
+
+    const newUser = await knex.transaction(async trx => {
+      // 1) 创建用户
+      const [created] = await trx('users')
+        .insert({
+          email,
+          password_hash: passwordHash,
+          email_verified: true,
+          created_at: knex.fn.now(),
+          updated_at: knex.fn.now()
+        })
+        .returning(['id', 'email', 'email_verified', 'created_at']);
+
+      // 2) 分配默认套餐/配额
+      await quotaService.assignDefaultPlanToUser(created.id, trx);
+
+      // 3) 标记验证码已用
+      await EmailVerification.markAsUsed(verification.id);
+
+      return created;
     });
 
-    // 标记验证码为已使用
-    await EmailVerification.markAsUsed(verification.id);
-
-    console.log(`✅ [REGISTER] 注册成功: ${email}, 用户ID: ${newUser.id}`);
+    console.log(`✅ [REGISTER] 注册并分配默认套餐成功: ${email}, 用户ID: ${newUser.id}`);
 
     res.status(201).json({
       success: true,
       message: '注册成功',
-      data: {
-        id: newUser.id,
-        email: newUser.email,
-        email_verified: newUser.email_verified,
-        created_at: newUser.created_at
-      }
+      data: newUser
     });
   } catch (error) {
     console.error('注册错误:', error);
@@ -605,6 +615,22 @@ const testEmailService = async (req, res) => {
   }
 };
 
+/**
+ * 获取当前用户的套餐和配额详情
+ * GET /api/auth/me/plan
+ */
+const getMyPlan = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const quotaService = require('../services/quotaService');
+    const planDetails = await quotaService.getUserPlanDetails(userId);
+    res.json({ success: true, data: planDetails });
+  } catch (error) {
+    console.error('❌ [GET_MY_PLAN] 获取我的套餐失败:', error);
+    res.status(500).json({ success: false, message: '获取套餐信息失败' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -613,5 +639,6 @@ module.exports = {
   sendVerificationCode,
   verifyEmailCode,
   getProfile,
-  testEmailService
+  testEmailService,
+  getMyPlan
 }; 

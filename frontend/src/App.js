@@ -3,7 +3,7 @@
  * 配置应用路由和全局布局
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import logger from './utils/logger';
 import LandingPage from './components/LandingPage';
@@ -24,6 +24,8 @@ import AdminMembershipTiers from './components/AdminMembershipTiers';
 import AdminUserMembershipManagement from './components/AdminUserMembershipManagement';
 import AdminAIPromptManagement from './components/AdminAIPromptManagement';
 import AdminGlobalQuotaManagement from './components/AdminGlobalQuotaManagement';
+import PlanManagementPage from './components/PlanManagementPage';
+import TopUpPackManagementPage from './components/TopUpPackManagementPage';
 import TemplateManagement from './components/TemplateManagement';
 import ResumeBuilder from './components/ResumeBuilder';
 import MembershipPage from './components/MembershipPage';
@@ -33,6 +35,8 @@ import TemplateTestPage from './components/TemplateTestPage';
 // V2版本组件
 import NewResumeUploaderTestPage from './components/NewResumeUploaderTestPage';
 import ResumeReviewPageV2 from './components/ResumeReviewPageV2';
+import MyPlanPage from './components/MyPlanPage'; // 引入新页面
+import UserProfilePage from './components/UserProfilePage'; // 个人中心
 
 
 /**
@@ -179,13 +183,29 @@ function App() {
               </AdminProtectedRoute>
             } 
           />
+          <Route 
+            path="/admin/plans" 
+            element={
+              <AdminProtectedRoute>
+                <PlanManagementPage />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/top-up-packs" 
+            element={
+              <AdminProtectedRoute>
+                <TopUpPackManagementPage />
+              </AdminProtectedRoute>
+            } 
+          />
           
           {/* 用户中心 - 需要认证 */}
           <Route 
             path="/profile" 
             element={
               <ProtectedRoute>
-                <ProfilePage />
+                <UserProfilePage />
               </ProtectedRoute>
             } 
           />
@@ -196,6 +216,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <MembershipPage />
+              </ProtectedRoute>
+            } 
+          />
+          
+          {/* 我的套餐页面 - 需要认证 */}
+          <Route 
+            path="/my-plan" 
+            element={
+              <ProtectedRoute>
+                <MyPlanPage />
               </ProtectedRoute>
             } 
           />

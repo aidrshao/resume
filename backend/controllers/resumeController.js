@@ -11,6 +11,9 @@ const path = require('path');
 const fs = require('fs');
 const { db: knex } = require('../config/database');
 const MembershipController = require('./membershipController');
+const User = require('../models/User');
+const Redis = require('ioredis');
+const redis = new Redis(process.env.REDIS_URL);
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -576,90 +579,66 @@ class ResumeController {
    * 保存基础简历
    */
   static async saveBaseResume(req, res) {
+    const userId = req.user.id;
+    const { content } = req.body; // content is the UNIFIED_RESUME_SCHEMA object
+
+    console.log(`[SAVE_BASE_RESUME] User ${userId} starting to save base resume.`);
+
+    if (!content || typeof content !== 'object') {
+      console.error(`[SAVE_BASE_RESUME] Invalid content format for user ${userId}.`);
+      return res.status(400).json({ success: false, message: '无效的简历数据格式' });
+    }
+
     try {
-      console.log('💾 [SAVE_BASE_RESUME] ==> 开始处理保存基础简历请求');
-      console.log('💾 [SAVE_BASE_RESUME] 请求ID:', req.requestId);
-      console.log('💾 [SAVE_BASE_RESUME] 用户ID:', req.user?.id);
-      console.log('💾 [SAVE_BASE_RESUME] 请求体结构:', {
-        hasContent: !!req.body.content,
-        bodyKeys: Object.keys(req.body),
-        contentType: typeof req.body.content
-      });
-      
-      const { content } = req.body;
-      const userId = req.user.id;
+      // Find if a base resume already exists
+      let baseResume = await Resume.findBaseResumeByUserId(userId);
+      let resumeId;
 
-      console.log('🔍 [SAVE_BASE_RESUME] 接收到的content数据:');
-      console.log('🔍 [SAVE_BASE_RESUME] content完整结构:', JSON.stringify(content, null, 2));
-      console.log('🔍 [SAVE_BASE_RESUME] content数据分析:');
-      console.log('  - 数据类型:', typeof content);
-      console.log('  - 是否为对象:', typeof content === 'object' && content !== null);
-      console.log('  - 主要字段:', Object.keys(content || {}));
-      console.log('  - profile存在:', !!content?.profile);
-      console.log('  - 姓名:', content?.profile?.name || '未提供');
-      console.log('  - 邮箱:', content?.profile?.email || '未提供');
-      console.log('  - 电话:', content?.profile?.phone || '未提供');
-      console.log('  - 工作经验数量:', content?.workExperience?.length || 0);
-      console.log('  - 教育背景数量:', content?.education?.length || 0);
-
-      // 验证content是否为统一格式数据
-      if (!content || !content.profile) {
-        console.error('❌ [SAVE_BASE_RESUME] 数据验证失败: 缺少profile字段');
-        return res.status(400).json({
-          success: false,
-          message: '简历数据格式无效：必须包含profile字段'
+      if (baseResume) {
+        // Update existing base resume
+        console.log(`[SAVE_BASE_RESUME] Updating existing base resume (ID: ${baseResume.id}) for user ${userId}.`);
+        await Resume.update(baseResume.id, {
+          unified_data: content,
+          source: 'manual_update',
+          status: 'completed',
         });
+        resumeId = baseResume.id;
+      } else {
+        // Create new base resume
+        console.log(`[SAVE_BASE_RESUME] Creating new base resume for user ${userId}.`);
+        const newResume = await Resume.create({
+          user_id: userId,
+          title: '我的基础简历',
+          unified_data: content,
+          is_base: true,
+          status: 'completed',
+          source: 'manual_create'
+        });
+        resumeId = newResume.id;
+      }
+      
+      // Extract name and update user table
+      const userName = content.personal_info?.name;
+      if (userName && typeof userName === 'string') {
+        console.log(`[SAVE_BASE_RESUME] Updating user's name to "${userName}" for user ${userId}.`);
+        await User.updateById(userId, { nickname: userName });
+
+        // Invalidate profile cache
+        const cacheKey = `user_profile:${userId}`;
+        await redis.del(cacheKey);
+        console.log(`[CACHE] INVALIDATED for user profile ${userId} after resume save.`);
       }
 
-      console.log('✅ [SAVE_BASE_RESUME] 数据验证通过，调用服务层保存');
-      console.log('🔄 [SAVE_BASE_RESUME] 传递给服务层的参数:');
-      console.log('  - userId:', userId);
-      console.log('  - originalText: (空字符串)');
-      console.log('  - unifiedData:', {
-        profileName: content.profile?.name,
-        workExpCount: content.workExperience?.length || 0,
-        educationCount: content.education?.length || 0,
-        dataSize: JSON.stringify(content).length + ' 字符'
+      console.log(`[SAVE_BASE_RESUME] Successfully saved base resume (ID: ${resumeId}) for user ${userId}.`);
+      res.json({ 
+        success: true, 
+        message: '基础简历保存成功',
+        data: { resumeId }
       });
 
-      // 调用服务层保存基础简历，参数顺序：userId, originalText, unifiedData
-      const savedResume = await ResumeParseService.saveBaseResume(
-        userId, 
-        '', // originalText - 这里为空，因为是用户编辑后的数据
-        content // unifiedData - 统一格式的简历数据
-      );
-
-      console.log('✅ [SAVE_BASE_RESUME] 服务层保存成功:', {
-        resumeId: savedResume.id,
-        title: savedResume.title
-      });
-
-      res.json({
-        success: true,
-        data: {
-          resumeId: savedResume.id,
-          title: savedResume.title
-        },
-        message: '基础简历保存成功'
-      });
-      
-      console.log('✅ [SAVE_BASE_RESUME] 响应已发送，保存流程完成');
-      
     } catch (error) {
-      console.error('❌ [SAVE_BASE_RESUME] 保存基础简历失败:', error);
-      console.error('❌ [SAVE_BASE_RESUME] 错误详情:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack.split('\n').slice(0, 10).join('\n')
-      });
-      
-      res.status(500).json({
-        success: false,
-        message: '保存基础简历失败',
-        error_code: 'SAVE_FAILED',
-        request_id: req.requestId,
-        timestamp: new Date().toISOString()
-      });
+      console.error(`[SAVE_BASE_RESUME] Error saving base resume for user ${userId}:`, error);
+      res.status(500).json({ success: false, message: '保存基础简历失败' });
     }
   }
 

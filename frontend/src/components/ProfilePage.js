@@ -242,26 +242,16 @@ const ProfilePage = () => {
                   </div>
                 </form>
               ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      姓名
-                    </label>
-                    <p className="text-gray-900">{profile?.name || '未设置'}</p>
+                <dl>
+                  <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">用户名</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{profile?.name || '未设置'}</dd>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      邮箱
-                    </label>
-                    <p className="text-gray-900">{profile?.email || '未设置'}</p>
+                  <div className="py-3 sm:py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                    <dt className="text-sm font-medium text-gray-500">邮箱地址</dt>
+                    <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{profile?.email}</dd>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      注册时间
-                    </label>
-                    <p className="text-gray-900">{formatDate(profile?.created_at)}</p>
-                  </div>
-                </div>
+                </dl>
               )}
             </div>
           </div>
@@ -327,28 +317,25 @@ const ProfilePage = () => {
               </div>
             </div>
 
-            {/* 账户操作 */}
+            {/* 账户操作卡片 */}
             <div className="bg-white shadow rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">账户操作</h3>
-              
+              <h3 className="text-lg font-medium text-gray-900 mb-4">账户操作</h3>
               <div className="space-y-3">
                 <button
-                  onClick={() => navigate('/resumes')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-md border border-gray-200 transition-colors"
+                  onClick={() => navigate('/my-plan')}
+                  className="w-full text-left bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium py-3 px-4 rounded-md transition"
                 >
-                  我的简历
+                  我的套餐与配额
                 </button>
-                
                 <button
-                  onClick={() => navigate('/jobs')}
-                  className="w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 rounded-md border border-gray-200 transition-colors"
+                  onClick={() => navigate('/change-password')}
+                  className="w-full text-left bg-gray-50 hover:bg-gray-100 text-gray-700 font-medium py-3 px-4 rounded-md transition"
                 >
-                  投递记录
+                  修改密码
                 </button>
-
                 <button
                   onClick={logout}
-                  className="w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 rounded-md border border-red-200 transition-colors"
+                  className="w-full text-left bg-red-50 hover:bg-red-100 text-red-700 font-medium py-3 px-4 rounded-md transition"
                 >
                   退出登录
                 </button>
