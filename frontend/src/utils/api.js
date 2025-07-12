@@ -682,21 +682,20 @@ export const getResumeTemplates = () => {
 
 /**
  * 获取已发布的模板列表
- * @returns {Promise} API响应
+ * @returns {Promise<any>}
  */
-export const getTemplatesList = () => api.get('/templates');
+export const getTemplatesList = () => api.get('/templates').then(res => res.data);
 
 /**
- * Get a single template by its ID.
- * @param {string} id The ID of the template.
- * @returns {Promise<Object>} The server response.
+ * 根据ID获取单个模板详情
+ * @param {string} id - 模板ID
+ * @returns {Promise<any>}
  */
-export const getTemplateById = (id) => api.get(`/templates/${id}`);
+export const getTemplateById = (id) => api.get(`/templates/${id}`).then(res => res.data);
 
-// New functions for billing and plans
 /**
- * Fetches the current user's active plan and quotas.
- * @returns {Promise<Object>} The server response.
+ * 获取当前用户的会员套餐信息
+ * @returns {Promise<any>}
  */
 export const getCurrentUserPlan = () => api.get('/auth/me/plan');
 
